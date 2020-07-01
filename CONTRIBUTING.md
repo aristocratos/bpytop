@@ -1,0 +1,33 @@
+# Contributing guidelines
+
+## When submitting pull requests
+
+* Explain your thinking in why a change or addition is needed.
+  * Is it a requested change or feature?
+  * If not, open a feature request to get feedback before making a pull request.
+
+* Split up multiple unrelated changes in multiple pull requests.
+
+
+* Purely cosmetic changes won't be accepted without a very good explanation of its value.
+  * (Some design choices are for better configurability of syntax highlighting.)
+
+## Formatting
+
+### Follow the current syntax design
+
+* Indent type: Tabs
+
+* Tab size: 4
+
+## Optimization
+
+* Avoid writing to disk if possible.
+
+* Make sure variables/arrays are cleaned up if not reused.
+
+* Compare cpu and memory usage with and without your code and look for alternatives if they cause a noticeable negative impact.
+
+For questions contact Aristocratos at admin@qvantnet.com
+
+For proposing changes to this document create a [new issue](https://github.com/aristocratos/bashtop/issues/new/choose).
