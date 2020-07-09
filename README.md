@@ -4,7 +4,7 @@
 ![OSX](https://img.shields.io/badge/-OSX-black?logo=apple)
 ![FreeBSD](https://img.shields.io/badge/-FreeBSD-red?logo=freebsd)
 ![Usage](https://img.shields.io/badge/Usage-System%20resource%20monitor-blue)
-![Python](https://img.shields.io/badge/Python-v3.7%5E-orange?logo=python)
+![Python](https://img.shields.io/badge/Python-v3.6%5E-orange?logo=python)
 ![bashtop_version](https://img.shields.io/github/v/tag/aristocratos/bpytop?label=version)
 [![Donate](https://img.shields.io/badge/-Donate-yellow?logo=paypal)](https://paypal.me/aristocratos)
 [![Sponsor](https://img.shields.io/badge/-Sponsor-red?logo=github)](https://github.com/sponsors/aristocratos)

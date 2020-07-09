@@ -1,6 +1,3 @@
-PREFIX ?= /usr/local
-DOCDIR ?= $(PREFIX)/share/doc/bpytop
-
 all:
 	@echo Run \'make install\' to install bpytop.
 
