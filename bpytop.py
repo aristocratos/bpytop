@@ -760,23 +760,21 @@ class Theme:
 				setattr(self, item, Color(tdict[item], depth=depth, default=default))
 			else:
 				setattr(self, item, Color(value, depth=depth, default=default))
-		#* Create color gradients from one, two or three colors, 101 values
+		#* Create color gradients from one, two or three colors, 101 values indexed 0-100
 		rgb: Dict[str, Tuple[int, int, int]]
-		colors: List[Tuple[int, ...]]
-		rgb_calc: List[int]
+		colors: List[List[int]] = []
 		for name in self.gradient.keys():
 			rgb = { "start" : getattr(self, f'{name}_start').dec, "mid" : getattr(self, f'{name}_mid').dec, "end" : getattr(self, f'{name}_end').dec }
-			colors = [ getattr(self, f'{name}_start') ]
+			colors = [ list(getattr(self, f'{name}_start')) ]
 			if rgb["end"][0] >= 0:
 				r = 50 if rgb["mid"][0] >= 0 else 100
 				for first, second in ["start", "mid" if r == 50 else "end"], ["mid", "end"]:
 					for i in range(r):
-						rgb_calc = [rgb[first][n] + i * (rgb[second][n] - rgb[first][n]) // r for n in range(3)]
-						colors += [tuple(rgb_calc)]
+						colors += [[rgb[first][n] + i * (rgb[second][n] - rgb[first][n]) // r for n in range(3)]]
 					if r == 100:
 						break
-				for color in colors:
-					self.gradient[name] += [Color.fg(*color)]
+				self.gradient[name] += [ Color.fg(*color) for color in colors ]
+
 			else:
 				c = Color.fg(*rgb["start"])
 				for _ in range(100):
@@ -875,36 +873,93 @@ class Symbol:
 	fail: str = f'{Color.fg("#ff3050")}!{Color.fg("#cc")}'
 
 class Graph:
-	out: str = ""
-	width: int = 0
-	height: int = 0
-	graphs: Dict[bool, List[str]] = {False : [], True : []}
+	out: str
+	width: int
+	height: int
+	graphs: Dict[bool, List[str]]
 	colors: List[str]
-	invert: bool = False
-	max_value: int = 0
-	current: bool = False
-	last_value: int = 0
+	invert: bool
+	max_value: int
+	current: bool
+	last: int
 	symbol: Dict[float, str]
 
-	def __init__(self, width: int, height: int, color_gradient: List[str], data: List[int], invert: bool = False, max_value: int = 0):
-		for i in range(1, height + 1):
-			self.colors.append(color_gradient[100 // height * i]) #* Calculate colors of graph
-		if invert: self.colors.reverse()
+	def __init__(self, width: int, height: int, color: Union[List[str], Color, None], data: List[int], invert: bool = False, max_value: int = 0):
+		self.graphs: Dict[bool, List[str]] = {False : [], True : []}
+		self.current: bool = True
+		self.colors: List[str] = []
+		if isinstance(color, list):
+			for i in range(1, height + 1): self.colors.insert(0, color[i * 100 // height]) #* Calculate colors of graph
+			if invert: self.colors.reverse()
+		elif isinstance(color, Color):
+			self.colors = [ f'{color}' for _ in range(height) ]
+		self.width = width
+		self.height = height
+		self.invert = invert
+		if not data: data = [0]
 		if max_value:
 			self.max_value = max_value
 			data = [ v * 100 // max_value if v < max_value else 100 for v in data ] #* Convert values to percentage values of max_value with max_value as ceiling
+		else:
+			self.max_value = 0
 		self.symbol = Symbol.graph_down if invert else Symbol.graph_up
+		value_width: int = ceil(len(data) / 2)
+		filler: str = ""
+		if value_width > width: #* If the size of given data set is bigger then width of graph, shrink data set
+			data = data[-(width*2):]
+			value_width = ceil(len(data) / 2)
+		elif value_width < width: #* If the size of given data set is smaller then width of graph, fill graph with whitespace
+			filler = " " * (width - value_width)
+		for _ in range(height):
+			for b in [True, False]:
+				self.graphs[b].append(filler if filler else "")
+		self._create(data, new=True)
 
+	def _create(self, data: List[int], new: bool = False):
+		h_high: int
+		h_low: int
+		value: Dict[str, int] = { "left" : 0, "right" : 0 }
+		val: int
+		side: str
+
+		#* Create the graph
+		for h in range(self.height):
+			h_high = round(100 * (self.height - h) / self.height) if self.height > 1 else 100
+			h_low = round(100 * (self.height - (h + 1)) / self.height) if self.height > 1 else 0
+			for v in range(len(data)):
+				if new: self.current = bool(v % 2) #* Switch between True and False graphs
+				if new and v == 0: self.last = 0
+				for val, side in [self.last, "left"], [data[v], "right"]: # type: ignore
+					if val >= h_high:
+						value[side] = 4
+					elif val <= h_low:
+						value[side] = 0
+					else:
+						if self.height == 1: value[side] = round(val * 4 / 100 + 0.5)
+						else: value[side] = round((val - h_low) * 4 / (h_high - h_low) + 0.1)
+				if new: self.last = data[v]
+				self.graphs[self.current][h] += self.symbol[float(value["left"] + value["right"] / 10)]
+		self.last = data[-1]
+		self.out = ""
+
+		for h in range(self.height):
+			if h > 0: self.out += f'{Mv.d(1)}{Mv.l(self.width)}'
+			self.out += f'{"" if not self.colors else self.colors[h]}{self.graphs[self.current][h if not self.invert else (self.height - 1) - h]}'
+		self.out += f'{Term.fg}'
 
 	def add(self, value: int):
 		self.current = not self.current
-		del self.graphs[self.current][0]
+		for n in range(self.height):
+			self.graphs[self.current][n] = self.graphs[self.current][n][1:]
 		if self.max_value: value = value * 100 // self.max_value if value < self.max_value else 100
+		self._create([value])
+		return self.out
 
 	def __str__(self):
 		return self.out
 
-
+	def __repr__(self):
+		return repr(self.out)
 
 
 class Graphs:
@@ -923,18 +978,18 @@ class Meter:
 	__call__(value) to set value and return meter as a string
 	__str__ returns last set meter as a string
 	'''
-	out: str = ""
+	out: str
 	color_gradient: List[str]
 	color_inactive: Color
-	width: int = 0
-	saved: Dict[int, str] = {}
+	width: int
+	saved: Dict[int, str]
 
 	def __init__(self, value: int, width: int, gradient_name: str):
 		self.color_gradient = THEME.gradient[gradient_name]
 		self.color_inactive = THEME.inactive_fg
 		self.width = width
 		self.out = self._create(value)
-		self.saved[value] = self.out
+		self.saved = { value : self.out }
 
 	def __call__(self, value: int):
 		if value in self.saved.keys():
@@ -977,18 +1032,18 @@ class Meters:
 
 class Box:
 	'''Box class with all needed attributes for create_box() function'''
-	name: str = ""
-	height_p: int = 0
-	width_p: int = 0
-	x: int = 1
-	y: int = 1
-	width: int = 0
-	height: int = 0
-	out: str = ""
-	bg: str = ""
-	_b_cpu_h: int = 0
-	_b_mem_h: int = 0
-	redraw_all: bool = False
+	name: str
+	height_p: int
+	width_p: int
+	x: int
+	y: int
+	width: int
+	height: int
+	out: str
+	bg: str
+	_b_cpu_h: int
+	_b_mem_h: int
+	redraw_all: bool
 
 	@classmethod
 	def calc_sizes(cls):
@@ -1010,6 +1065,8 @@ class SubBox:
 
 class CpuBox(Box, SubBox):
 	name = "cpu"
+	x = 0
+	y = 0
 	height_p = 32
 	width_p = 100
 
@@ -1045,6 +1102,8 @@ class MemBox(Box):
 	name = "mem"
 	height_p = 40
 	width_p = 45
+	x = 0
+	y = 0
 	divider: int = 0
 	mem_width: int = 0
 	disks_width: int = 0
@@ -1072,6 +1131,8 @@ class NetBox(Box, SubBox):
 	name = "net"
 	height_p = 28
 	width_p = 45
+	x = 0
+	y = 0
 
 	@classmethod
 	def _calc_size(cls):
@@ -1093,6 +1154,8 @@ class ProcBox(Box):
 	name = "proc"
 	height_p = 68
 	width_p = 55
+	x = 0
+	y = 0
 	detailed: bool = False
 	detailed_x: int = 0
 	detailed_y: int = 0
@@ -1502,6 +1565,34 @@ def testing_keyinput():
 						pass
 					Draw.clear()
 
+def testing_graphs():
+
+	from random import randint
+
+	my_data = [x for x in range(0, 101)]
+	my_data += [x for x in range(100, -1, -1)]
+
+	my_graph = Graph(Term.width, Term.height // 3, THEME.gradient['cpu'], my_data, invert=False)
+	my_graph2 = Graph(Term.width, Term.height // 3, THEME.gradient['cpu'], my_data, invert=True)
+	my_graph3 = Graph(Term.width, 1, THEME.proc_misc, my_data)
+	my_graph4 = Graph(Term.width, 2, None, my_data)
+
+	Draw.now(f'{Mv.to(0, 0)}{my_graph}')
+	Draw.now(f'{Mv.to(Term.height // 3 + 1, 0)}{my_graph2}')
+	Draw.now(f'{Mv.to(Term.height - (Term.height // 3) + 2, 0)}{my_graph3}')
+	Draw.now(f'{Mv.to(Term.height - (Term.height // 3) + 4, 0)}{my_graph4}')
+
+
+	for _ in range(100):
+		sleep(0.1)
+		x = randint(0, 100)
+		Draw.now(f'{Mv.to(0, 0)}{my_graph.add(x)}')
+		Draw.now(f'{Mv.to(Term.height // 3 + 1, 0)}{my_graph2.add(x)}')
+		Draw.now(f'{Mv.to(Term.height - (Term.height // 3) + 2, 0)}{my_graph3.add(x)}')
+		Draw.now(f'{Mv.to(Term.height - (Term.height // 3) + 4, 0)}{my_graph4.add(x)}')
+
+	Draw.now(Mv.to(Term.height -4, 0))
+
 		# if not Key.reader.is_alive():
 		# 	clean_quit(1)
 		# Key.new.wait(1.0)
@@ -1613,19 +1704,20 @@ if __name__ == "__main__":
 	#! For testing ------------------------------------------------------------------------------->
 	if testing:
 		try:
-			testing_collectors()
-			testing_humanizer()
+			testing_graphs()
+			#testing_collectors()
+			#testing_humanizer()
 			# waitone(1)
 			#testing_keyinput()
-			testing_banner()
+			#testing_banner()
 			# waitone(1)
-			# testing_colors()
+			#testing_colors()
 			# waitone(1)
-			testing_gradients()
+			#testing_gradients()
 			# waitone(1)
-			testing_boxes()
+			#testing_boxes()
 			# waitone(1)
-			testing_meter()
+			#testing_meter()
 			# Draw.idle.clear()
 			#Draw.now(f'{Mv.to(Term.height - 5, 1)}Any key to exit!')
 			#waitone()
