@@ -24,6 +24,7 @@ from select import select
 from distutils.util import strtobool
 from string import Template
 from math import ceil
+from random import randint
 from typing import List, Set, Dict, Tuple, Optional, Union, Any, Callable, ContextManager, Iterable
 
 errors: List[str] = []
@@ -53,16 +54,48 @@ if errors:
 
 #? Variables ------------------------------------------------------------------------------------->
 
-BANNER_SRC: Dict[str, str] = {
-	"#E62525" : "██████╗ ██████╗ ██╗   ██╗████████╗ ██████╗ ██████╗",
-	"#CD2121" : "██╔══██╗██╔══██╗╚██╗ ██╔╝╚══██╔══╝██╔═══██╗██╔══██╗",
-	"#B31D1D" : "██████╔╝██████╔╝ ╚████╔╝    ██║   ██║   ██║██████╔╝",
-	"#9A1919" : "██╔══██╗██╔═══╝   ╚██╔╝     ██║   ██║   ██║██╔═══╝ ",
-	"#801414" : "██████╔╝██║        ██║      ██║   ╚██████╔╝██║",
-	"#000000" : "╚═════╝ ╚═╝        ╚═╝      ╚═╝    ╚═════╝ ╚═╝",
-}
+BANNER_SRC: List[Tuple[str, str, str]] = [
+	("#ffa50a", "#0fd7ff", "██████╗ ██████╗ ██╗   ██╗████████╗ ██████╗ ██████╗"),
+	("#f09800", "#00bfe6", "██╔══██╗██╔══██╗╚██╗ ██╔╝╚══██╔══╝██╔═══██╗██╔══██╗"),
+	("#db8b00", "#00a6c7", "██████╔╝██████╔╝ ╚████╔╝    ██║   ██║   ██║██████╔╝"),
+	("#c27b00", "#008ca8", "██╔══██╗██╔═══╝   ╚██╔╝     ██║   ██║   ██║██╔═══╝ "),
+	("#a86b00", "#006e85", "██████╔╝██║        ██║      ██║   ╚██████╔╝██║"),
+	("#000000", "#000000", "╚═════╝ ╚═╝        ╚═╝      ╚═╝    ╚═════╝ ╚═╝"),
+]
 
-VERSION: str = "0.0.1"
+#RED
+# "#E62525"
+# "#CD2121"
+# "#B31D1D"
+# "#9A1919"
+# "#801414"
+# "#000000"
+
+#GREEN
+# "#75e12d"
+# "#5bbb1b"
+# "#499914"
+# "#3b7811"
+# "#30620e"
+# "#000000"
+
+#YELLOW
+# "#fadd00"
+# "#dbc200"
+# "#b8a200"
+# "#998700"
+# "#807100"
+# "#000000"
+
+#BLUE
+# "#0084ff"
+# "#016cd0"
+# "#0157a7"
+# "#014484"
+# "#003261"
+# "#000000"
+
+VERSION: str = "0.0.3"
 
 #*?This is the template used to create the config file
 DEFAULT_CONF: Template = Template(f'#? Config file for bpytop v. {VERSION}' + '''
@@ -70,45 +103,46 @@ DEFAULT_CONF: Template = Template(f'#? Config file for bpytop v. {VERSION}' + ''
 #* Color theme, looks for a .theme file in "~/.config/bpytop/themes" and "~/.config/bpytop/user_themes", "Default" for builtin default theme
 color_theme="$color_theme"
 
-#* Update time in milliseconds, increases automatically if set below internal loops processing time, recommended 2000 ms or above for better sample times for graphs
+#* Update time in milliseconds, increases automatically if set below internal loops processing time, recommended 2000 ms or above for better sample times for graphs.
 update_ms=$update_ms
 
-#* Processes sorting, "pid" "program" "arguments" "threads" "user" "memory" "cpu lazy" "cpu responsive"
-#* "cpu lazy" updates sorting over time, "cpu responsive" updates sorting directly
+#* Processes sorting, "pid" "program" "arguments" "threads" "user" "memory" "cpu lazy" "cpu responsive",
+#* "cpu lazy" updates sorting over time, "cpu responsive" updates sorting directly.
 proc_sorting="$proc_sorting"
 
-#* Reverse sorting order, True or False
+#* Reverse sorting order, True or False.
 proc_reversed=$proc_reversed
 
 #* Show processes as a tree
 proc_tree=$proc_tree
 
-#* Check cpu temperature, needs "vcgencmd" on Raspberry Pi and "osx-cpu-temp" on MacOS X
+#* Check cpu temperature, needs "vcgencmd" on Raspberry Pi and "osx-cpu-temp" on MacOS X.
 check_temp=$check_temp
 
-#* Draw a clock at top of screen, formatting according to strftime, empty string to disable
+#* Draw a clock at top of screen, formatting according to strftime, empty string to disable.
 draw_clock="$draw_clock"
 
-#* Update main ui in background when menus are showing, set this to false if the menus is flickering too much for comfort
+#* Update main ui in background when menus are showing, set this to false if the menus is flickering too much for comfort.
 background_update=$background_update
 
-#* Custom cpu model name, empty string to disable
+#* Custom cpu model name, empty string to disable.
 custom_cpu_name="$custom_cpu_name"
 
-#* Show color gradient in process list, True or False
+#* Show color gradient in process list, True or False.
 proc_gradient=$proc_gradient
 
-#* If process cpu usage should be of the core it's running on or usage of the total available cpu power
+#* If process cpu usage should be of the core it's running on or usage of the total available cpu power.
 proc_per_core=$proc_per_core
 
-#* Optional filter for shown disks, should be names of mountpoints, "root" replaces "/", separate multiple values with space
+#* Optional filter for shown disks, should be names of mountpoints, "root" replaces "/", separate multiple values with space.
 disks_filter="$disks_filter"
 
-#* Enable check for new version from github.com/aristocratos/bpytop at start
+#* Enable check for new version from github.com/aristocratos/bpytop at start.
 update_check=$update_check
 
-#* Enable graphs with double the horizontal resolution, increases cpu usage
-hires_graphs=$hires_graphs
+#* Set loglevel for "~/.config/bpytop/error.log" levels are: "CRITICAL" "ERROR" "WARNING" "INFO" "DEBUG".
+#* The level set includes all lower levels, i.e. "DEBUG" will show all logging info.
+log_level="$log_level"
 ''')
 
 CONFIG_DIR: str = f'{os.path.expanduser("~")}/.config/bpytop'
@@ -186,8 +220,6 @@ except PermissionError:
 	print(f'ERROR!\nNo permission to write to "{CONFIG_DIR}" directory!')
 	quit(1)
 
-errlog.info(f'New instance of bpytop version {VERSION} started with pid {os.getpid()}')
-
 #! Timers, remove ----------------------------------------------------------------------->
 
 class Timer:
@@ -229,7 +261,7 @@ def timerd(func):
 
 class Config:
 	'''Holds all config variables and functions for loading from and saving to disk'''
-	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name", "proc_gradient", "proc_per_core", "disks_filter", "update_check", "hires_graphs"]
+	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name", "proc_gradient", "proc_per_core", "disks_filter", "update_check", "log_level"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	update_ms: int = 2500
@@ -244,7 +276,12 @@ class Config:
 	proc_per_core: bool = False
 	disks_filter: str = ""
 	update_check: bool = True
-	hires_graphs: bool = False
+	log_level: str = "WARNING"
+
+	warnings: List[str] = []
+
+	sorting_options: List[str] = ["pid", "program", "arguments", "threads", "user", "memory", "cpu lazy", "cpu responsive"]
+	log_levels: List[str] = ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"]
 
 	changed: bool = False
 	recreate: bool = False
@@ -257,10 +294,10 @@ class Config:
 		conf: Dict[str, Union[str, int, bool]] = self.load_config()
 		if not "version" in conf.keys():
 			self.recreate = True
-			errlog.warning(f'Config file malformatted or missing, will be recreated on exit!')
+			self.warnings.append(f'Config file malformatted or missing, will be recreated on exit!')
 		elif conf["version"] != VERSION:
 			self.recreate = True
-			errlog.warning(f'Config file version and bpytop version missmatch, will be recreated on exit!')
+			self.warnings.append(f'Config file version and bpytop version missmatch, will be recreated on exit!')
 		for key in self.keys:
 			if key in conf.keys() and conf[key] != "_error_":
 				setattr(self, key, conf[key])
@@ -295,19 +332,22 @@ class Config:
 								try:
 									new_config[key] = int(line)
 								except ValueError:
-									errlog.warning(f'Config key "{key}" should be an integer!')
+									self.warnings.append(f'Config key "{key}" should be an integer!')
 							if type(getattr(self, key)) == bool:
 								try:
 									new_config[key] = bool(strtobool(line))
 								except ValueError:
-									errlog.warning(f'Config key "{key}" can only be True or False!')
+									self.warnings.append(f'Config key "{key}" can only be True or False!')
 							if type(getattr(self, key)) == str:
 									new_config[key] = str(line)
 		except Exception as e:
 			errlog.exception(str(e))
-		if "proc_sorting" in new_config and not new_config["proc_sorting"] in ["pid", "program", "arguments", "threads", "user", "memory", "cpu lazy", "cpu responsive"]:
+		if "proc_sorting" in new_config and not new_config["proc_sorting"] in self.sorting_options:
 			new_config["proc_sorting"] = "_error_"
-			errlog.warning(f'Config key "proc_sorted" didn\'t get an acceptable value!')
+			self.warnings.append(f'Config key "proc_sorted" didn\'t get an acceptable value!')
+		if "log_level" in new_config and not new_config["log_level"] in self.log_levels:
+			new_config["log_level"] = "_error_"
+			self.warnings.append(f'Config key "log_level" didn\'t get an acceptable value!')
 		return new_config
 
 	def save_config(self):
@@ -321,6 +361,13 @@ class Config:
 
 try:
 	CONFIG: Config = Config(CONFIG_FILE)
+	errlog.setLevel(getattr(logging, CONFIG.log_level))
+	errlog.info(f'New instance of bpytop version {VERSION} started with pid {os.getpid()}')
+	errlog.debug(f'Loglevel set to {CONFIG.log_level}')
+	if CONFIG.warnings:
+		for warning in CONFIG.warnings:
+			errlog.warning(warning)
+		CONFIG.warnings = []
 except Exception as e:
 	errlog.exception(f'{e}')
 	quit(1)
@@ -365,7 +412,7 @@ class Term:
 			cls._w, cls._h = os.get_terminal_size()
 		cls._resizing = False
 		Box.calc_sizes()
-		Box.draw_bg()
+		Box.draw_bg(now=True if not Init.running else False)
 
 
 	@staticmethod
@@ -479,6 +526,25 @@ class Key:
 				pass
 
 	@classmethod
+	def last(cls) -> str:
+		if cls.list: return cls.list.pop()
+		else: return ""
+
+	@classmethod
+	def get(cls) -> str:
+		if cls.list: return cls.list.pop(0)
+		else: return ""
+
+	@classmethod
+	def has_key(cls) -> bool:
+		if cls.list: return True
+		else: return False
+
+	@classmethod
+	def clear(cls):
+		cls.list = []
+
+	@classmethod
 	def input_wait(cls, sec: float = 0.0) -> bool:
 		'''Returns True if key is detected else waits out timer and returns False'''
 		cls.new.wait(sec if sec > 0 else 0.0)
@@ -533,7 +599,7 @@ class Key:
 						with Nonblocking(sys.stdin): #* Set non blocking to prevent read stall if less than 5 characters
 							input_key += sys.stdin.read(5)
 					if input_key == "\033":	clean_key = "escape" #* Key is escape if only containing \033
-					if input_key == "\\": clean_key = "\\" #* Clean up "\" to not return escaped
+					elif input_key == "\\": clean_key = "\\" #* Clean up "\" to not return escaped
 					else:
 						for code in escape.keys(): #* Go trough dict of escape codes to get the cleaned key name
 							if input_key.lstrip("\033").startswith(code):
@@ -542,9 +608,10 @@ class Key:
 						else: #* If not found in escape dict and length of key is 1, assume regular character
 							if len(input_key) == 1:
 								clean_key = input_key
-					#if testing: errlog.debug(f'Input key: {repr(input_key)} Clean key: {clean_key}') #! Remove
+					if testing: errlog.debug(f'Input key: {repr(input_key)} Clean key: {clean_key}') #! Remove
 					if clean_key:
-						cls.list.append(clean_key)		#* Store keys in input queue for later processing
+						cls.list.append(clean_key)		#* Store up to 10 keys in input queue for later processing
+						if len(cls.list) > 10: del cls.list[0]
 						clean_key = ""
 						cls.new.set()					#* Set threading event to interrupt main thread sleep
 					input_key = ""
@@ -557,7 +624,7 @@ class Key:
 
 class Draw:
 	'''Holds the draw buffer and manages IO blocking queue
-	* .buffer([+]name[!], *args, append=False, now=False) : Add *args to buffer
+	* .buffer([+]name[!], *args, append=False, now=False, z=100) : Add *args to buffer
 	* - Adding "+" prefix to name sets append to True and appends to name's current string
 	* - Adding "!" suffix to name sets now to True and print name's current string
 	* .out(clear=False) : Print all strings in buffer, clear=True clear all buffers after
@@ -565,6 +632,7 @@ class Draw:
 	* .clear(*names) : Clear named buffers, all if no argument
 	'''
 	strings: Dict[str, str] = {}
+	z_order: Dict[str, int] = {}
 	last_screen: str = ""
 	idle = threading.Event()
 	idle.set()
@@ -584,7 +652,7 @@ class Draw:
 		cls.idle.set()
 
 	@classmethod
-	def buffer(cls, name: str, *args: str, append: bool = False, now: bool = False):
+	def buffer(cls, name: str, *args: str, append: bool = False, now: bool = False, z: int = 100):
 		string: str = ""
 		if name.startswith("+"):
 			name = name.lstrip("+")
@@ -592,29 +660,47 @@ class Draw:
 		if name.endswith("!"):
 			name = name.rstrip("!")
 			now = True
-		if name == "": name = "_null"
+		if not name in cls.z_order or z != 100: cls.z_order[name] = z
 		if args: string = "".join(args)
 		if name not in cls.strings or not append: cls.strings[name] = ""
 		cls.strings[name] += string
 		if now: cls.now(string)
 
 	@classmethod
-	def out(cls, clear = False):
-		cls.last_screen = "".join(cls.strings.values())
-		if clear: cls.strings = {}
-		cls.now(cls.last_screen)
+	def out(cls, *names: str, clear = False, no_order: bool = False):
+		out: str = ""
+		if not cls.strings: return
+		if no_order:
+			cls.last_screen = "".join(cls.strings.values())
+			if clear: cls.strings = {}
+			cls.now(cls.last_screen)
+		elif names:
+			for name in sorted(cls.z_order, key=cls.z_order.get, reverse=True):
+				if name in names:
+					out += cls.strings[name]
+					if clear:
+						del cls.strings[name]
+						del cls.z_order[name]
+			cls.now(out)
+		else:
+			for name in sorted(cls.z_order, key=cls.z_order.get, reverse=True):
+				if name in cls.strings: out += cls.strings[name]
+			if clear: cls.strings = {}
+			cls.last_screen = out
+			cls.now(cls.last_screen)
 
 	@classmethod
 	def clear(cls, *names):
 		if names:
 			for name in names:
 				if name in cls.strings:
-					del cls.strings["name"]
+					del cls.strings[name]
+					del cls.z_order[name]
 		else:
 			cls.strings = {}
 
 class Color:
-	'''Holds representations for a 24-bit color
+	'''Holds representations for a 24-bit color value
 	__init__(color, depth="fg", default=False)
 	-- color accepts 6 digit hexadecimal: string "#RRGGBB", 2 digit hexadecimal: string "#FF" or decimal RGB "255 255 255" as a string.
 	-- depth accepts "fg" or "bg"
@@ -623,7 +709,7 @@ class Color:
 	__iter__ returns iteration over red, green and blue in integer values of 0-255.
 	* Values:  .hexa: str  |  .dec: Tuple[int, int, int]  |  .red: int  |  .green: int  |  .blue: int  |  .depth: str  |  .escape: str
 	'''
-	hex: str; dec: Tuple[int, int, int]; red: int; green: int; blue: int; depth: str; escape: str; default: bool
+	hexa: str; dec: Tuple[int, int, int]; red: int; green: int; blue: int; depth: str; escape: str; default: bool
 
 	def __init__(self, color: str, depth: str = "fg", default: bool = False):
 		self.depth = depth
@@ -748,7 +834,9 @@ class Theme:
 			tdict = self._load_file(self.themes[theme])
 			self.cached[theme] = tdict
 		else:
+			errlog.warning(f'No theme named "{theme}" found!')
 			theme = "Default"
+			CONFIG.color_theme = theme
 			tdict = DEFAULT_THEME
 		self.current = theme
 		#if CONFIG.color_theme != theme: CONFIG.color_theme = theme
@@ -817,21 +905,25 @@ class Banner:
 	c_color: str = ""
 	length: int = 0
 	if not out:
-		for num, (color, line) in enumerate(BANNER_SRC.items()):
+		for num, (color, color2, line) in enumerate(BANNER_SRC):
 			if len(line) > length: length = len(line)
-			out += [""]
+			out_var = ""
 			line_color = Color.fg(color)
+			line_color2 = Color.fg(color2)
 			line_dark = Color.fg(f'#{80 - num * 6}')
-			for letter in line:
+			for n, letter in enumerate(line):
 				if letter == "█" and c_color != line_color:
-					c_color = line_color
-					out[num] += line_color
+					if n > 5 and n < 25: c_color = line_color2
+					else: c_color = line_color
+					out_var += c_color
 				elif letter == " ":
 					letter = f'{Mv.r(1)}'
+					c_color = ""
 				elif letter != "█" and c_color != line_dark:
 					c_color = line_dark
-					out[num] += line_dark
-				out[num] += letter
+					out_var += line_dark
+				out_var += letter
+			out.append(out_var)
 
 	@classmethod
 	def draw(cls, line: int, col: int = 0, center: bool = False, now: bool = False):
@@ -873,6 +965,10 @@ class Symbol:
 	fail: str = f'{Color.fg("#ff3050")}!{Color.fg("#cc")}'
 
 class Graph:
+	'''Class for creating and adding to graphs
+	* __str__ : returns graph as a string
+	* add(value: int) : adds a value to graph and returns it as a string
+	'''
 	out: str
 	width: int
 	height: int
@@ -910,9 +1006,10 @@ class Graph:
 			value_width = ceil(len(data) / 2)
 		elif value_width < width: #* If the size of given data set is smaller then width of graph, fill graph with whitespace
 			filler = " " * (width - value_width)
+		if len(data) % 2 == 1: data.insert(0, 0)
 		for _ in range(height):
 			for b in [True, False]:
-				self.graphs[b].append(filler if filler else "")
+				self.graphs[b].append(filler)
 		self._create(data, new=True)
 
 	def _create(self, data: List[int], new: bool = False):
@@ -970,7 +1067,7 @@ class Graphs:
 	net: Graph
 	detailed_cpu: Graph
 	detailed_mem: Graph
-	pid_cpu: List[Graph] = []
+	pid_cpu: Dict[int, Graph] = {}
 
 class Meter:
 	'''Creates a percentage meter
@@ -1065,8 +1162,8 @@ class SubBox:
 
 class CpuBox(Box, SubBox):
 	name = "cpu"
-	x = 0
-	y = 0
+	x = 1
+	y = 1
 	height_p = 32
 	width_p = 100
 
@@ -1102,8 +1199,8 @@ class MemBox(Box):
 	name = "mem"
 	height_p = 40
 	width_p = 45
-	x = 0
-	y = 0
+	x = 1
+	y = 1
 	divider: int = 0
 	mem_width: int = 0
 	disks_width: int = 0
@@ -1131,8 +1228,8 @@ class NetBox(Box, SubBox):
 	name = "net"
 	height_p = 28
 	width_p = 45
-	x = 0
-	y = 0
+	x = 1
+	y = 1
 
 	@classmethod
 	def _calc_size(cls):
@@ -1154,8 +1251,8 @@ class ProcBox(Box):
 	name = "proc"
 	height_p = 68
 	width_p = 55
-	x = 0
-	y = 0
+	x = 1
+	y = 1
 	detailed: bool = False
 	detailed_x: int = 0
 	detailed_y: int = 0
@@ -1294,6 +1391,16 @@ def testing_collectors():
 	#Draw.now(f'Cpu usage: {CpuCollector.cpu_usage}\nCpu freq: {CpuCollector.cpu_freq}\nLoad avg: {CpuCollector.load_avg}\n')
 
 
+class Menu:
+	'''Holds the main menu and all submenus
+	* uncolor(string: str) : removes all color and returns string with THEME.inactive_fg color
+	'''
+	color_re = re.compile(r"\033\[\d+;\d?;?\d*;?\d*;?\d*m{1}")
+
+	@classmethod
+	def uncolor(cls, string: str) -> str:
+		return f'{THEME.inactive_fg}{cls.color_re.sub("", string)}{Term.fg}'
+
 
 
 #? Functions ------------------------------------------------------------------------------------->
@@ -1400,8 +1507,8 @@ def clean_quit(errcode: int = 0, errmsg: str = ""):
 	Key.stop()
 	Collector.stop()
 	if not errcode: CONFIG.save_config()
-	#Draw.now(Term.clear, Term.normal_screen, Term.show_cursor) #! Enable
-	Draw.now(Term.show_cursor) #! Remove
+	if not testing: Draw.now(Term.clear, Term.normal_screen, Term.show_cursor) #! Enable
+	else: Draw.now(Term.show_cursor) #! Remove
 	Term.echo(True)
 	if errcode == 0:
 		errlog.info(f'Exiting. Runtime {timedelta(seconds=round(time() - SELF_START, 0))} \n')
@@ -1457,7 +1564,7 @@ def main():
 
 CPU_NAME: str = get_cpu_name()
 
-testing = True #! Remove
+testing = False #! Remove
 
 #! For testing ------------------------------------------------------------------------------->
 
@@ -1566,136 +1673,207 @@ def testing_keyinput():
 					Draw.clear()
 
 def testing_graphs():
-
-	from random import randint
-
 	my_data = [x for x in range(0, 101)]
 	my_data += [x for x in range(100, -1, -1)]
 
-	my_graph = Graph(Term.width, Term.height // 3, THEME.gradient['cpu'], my_data, invert=False)
-	my_graph2 = Graph(Term.width, Term.height // 3, THEME.gradient['cpu'], my_data, invert=True)
-	my_graph3 = Graph(Term.width, 1, THEME.proc_misc, my_data)
-	my_graph4 = Graph(Term.width, 2, None, my_data)
+	#my_data100 = [100 for _ in range(200)]
 
-	Draw.now(f'{Mv.to(0, 0)}{my_graph}')
-	Draw.now(f'{Mv.to(Term.height // 3 + 1, 0)}{my_graph2}')
-	Draw.now(f'{Mv.to(Term.height - (Term.height // 3) + 2, 0)}{my_graph3}')
-	Draw.now(f'{Mv.to(Term.height - (Term.height // 3) + 4, 0)}{my_graph4}')
+	my_data100 = [randint(0, 100) for _ in range(Term.width * 2)]
+
+	my_data2 = my_data[-90:]
+	my_data3 = my_data[:86]
+
+	my_colors = []
+	for i in range(51):
+		for _ in range(2): my_colors.append(Color.fg(i, i, i))
+	#my_colors.reverse()
 
 
-	for _ in range(100):
-		sleep(0.1)
+	my_graph = Graph(Term.width, Term.height // 2, my_colors, my_data100, invert=True)
+	my_graph2 = Graph(Term.width, Term.height // 2, my_colors, my_data100, invert=False)
+	# my_graph3 = Graph(100 // 3 + 10, 1, THEME.proc_misc, my_data2)
+	# my_graph4 = Graph(100 // 3 + 10, 1, THEME.proc_misc, my_data3)
+	# my_graph5 = Graph(100, Term.height // 3, THEME.inactive_fg, my_data)
+
+	#pause = re.compile(r"\033\[\d+;\d?;?\d*;?\d*;?\d*m{1}")
+	#repl = "\033[0;37m"
+
+	banner = Banner.draw(Term.height // 3 - 2, center=True)
+
+	Draw.now(f'{Fx.ub}{Mv.to(0, 0)}{my_graph}\
+	{Mv.to(Term.height // 2, 0)}{my_graph2}\
+	{banner}')
+
+	# {Mv.to(Term.height - (Term.height // 3), Term.width // 2 - 50)}{my_graph5}\
+	# {Mv.to(Term.height - (Term.height // 3) - 1, Term.width // 2 - 50)}{my_graph3}\
+	# {Mv.to(Term.height - (Term.height // 3) - 1, Term.width // 2 + 7)}{my_graph4}\
+
+	#t = 1
+	x = 0
+	for _ in range(200):
+		sleep(0.05)
 		x = randint(0, 100)
-		Draw.now(f'{Mv.to(0, 0)}{my_graph.add(x)}')
-		Draw.now(f'{Mv.to(Term.height // 3 + 1, 0)}{my_graph2.add(x)}')
-		Draw.now(f'{Mv.to(Term.height - (Term.height // 3) + 2, 0)}{my_graph3.add(x)}')
-		Draw.now(f'{Mv.to(Term.height - (Term.height // 3) + 4, 0)}{my_graph4.add(x)}')
+		# x += 1 if t == 1 else -1
+		# if x == 100: t = 0
+		# if x == 0: t = 1
+		Draw.now(f'{Fx.ub}{Mv.to(0, 0)}{my_graph.add(x)}\
+		{Mv.to(Term.height // 2, 0)}{my_graph2.add(x)}\
+		{banner}')
+
+		# 		Draw.now(f'{Mv.to(Term.height - (Term.height // 3), Term.width // 2 - 50)}{my_graph5.add(x)}')
+		# Draw.now(f'{Mv.to(Term.height - (Term.height // 3) - 1, Term.width // 2 - 50)}{my_graph3.add(x)}')
+		# Draw.now(f'{Mv.to(Term.height - (Term.height // 3) - 1, Term.width // 2 + 7)}{my_graph4.add(x)}')
 
 	Draw.now(Mv.to(Term.height -4, 0))
 
-		# if not Key.reader.is_alive():
-		# 	clean_quit(1)
-		# Key.new.wait(1.0)
 #! Remove ------------------------------------------------------------------------------------<
 
 if __name__ == "__main__":
 
 	#? Init -------------------------------------------------------------------------------------->
 	Timer.start("Init")
-	#? Temporary functions for init
-	def _fail(err):
-		Draw.now(f'{Symbol.fail}')
-		errlog.exception(f'{err}')
-		sleep(2)
-		clean_quit(1, errmsg=f'Error during init! See {CONFIG_DIR}/error.log for more information.')
-	def _success():
-		if not testing: sleep(0.1) #! Remove if
-		Draw.now(f'{Symbol.ok}\n{Mv.r(Term.width // 2 - 19)}')
+
+	class Init:
+		running: bool = True
+		initbg_colors: List[str] = []
+		initbg_data: List[int]
+		initbg_up: Graph
+		initbg_down: Graph
+
+		@staticmethod
+		def fail(err):
+			Draw.buffer("+init!", f'{Mv.restore()}{Symbol.fail}')
+			errlog.exception(f'{err}')
+			sleep(2)
+			clean_quit(1, errmsg=f'Error during init! See {CONFIG_DIR}/error.log for more information.')
+
+		@classmethod
+		def success(cls, start: bool = False):
+			if start:
+				Draw.buffer("initbg", z=10)
+				Draw.buffer("init", z=1)
+				for i in range(51):
+					for _ in range(2): cls.initbg_colors.append(Color.fg(i, i, i))
+				Draw.buffer("banner", f'{Banner.draw(Term.height // 2 - 10, center=True)}{Color.fg("#50")}\n', z=2)
+				for _i in range(10):
+					perc = f'{str((_i + 1) * 10) + "%":>5}'
+					Draw.buffer("+banner", f'{Mv.to(Term.height // 2 - 3 + _i, Term.width // 2 - 28)}{Fx.trans(perc)}{Symbol.v_line}')
+				Draw.out("banner")
+				Draw.buffer("+init!", f'{Color.fg("#cc")}{Fx.b}{Mv.to(Term.height // 2 - 3, Term.width // 2 - 21)}{Mv.save()}')
+
+			if start or Term.resized:
+				cls.initbg_data = [randint(0, 100) for _ in range(Term.width * 2)]
+				cls.initbg_up = Graph(Term.width, Term.height // 2, cls.initbg_colors, cls.initbg_data, invert=True)
+				cls.initbg_down = Graph(Term.width, Term.height // 2, cls.initbg_colors, cls.initbg_data, invert=False)
+
+			if start: return
+
+			if not testing:
+				cls.draw_bg(10)
+			Draw.buffer("+init!", f'{Mv.restore()}{Symbol.ok}\n{Mv.r(Term.width // 2 - 22)}{Mv.save()}')
+
+		@classmethod
+		def draw_bg(cls, times: int = 10):
+			for _ in range(times):
+				sleep(0.05)
+				x = randint(0, 100)
+				Draw.buffer("initbg", f'{Fx.ub}{Mv.to(0, 0)}{cls.initbg_up.add(x)}{Mv.to(Term.height // 2, 0)}{cls.initbg_down.add(x)}')
+				Draw.out("initbg", "banner", "init")
+
+		@classmethod
+		def done(cls):
+			cls.draw_bg(20)
+			Draw.clear("initbg", "banner", "init")
+			cls.running = False
+			del cls.initbg_up, cls.initbg_down, cls.initbg_data, cls.initbg_colors
+
 
 	#? Switch to alternate screen, clear screen, hide cursor and disable input echo
-	Draw.now(Term.alt_screen, Term.clear, Term.hide_cursor) #! Enable
-	#Draw.now(Term.clear, Term.hide_cursor) #! Disable
+	if not testing: Draw.now(Term.alt_screen, Term.clear, Term.hide_cursor) #! Enable
+	else: Draw.now(Term.clear, Term.hide_cursor) #! Disable
 	Term.echo(False)
 
 	#? Draw banner and init status
-	Draw.now(Banner.draw(Term.height // 2 - 10, center=True), "\n")
-	Draw.now(Color.fg("#50"))
-	for _i in range(10):
-		Draw.now(f'{Mv.to(Term.height // 2 - 3 + _i, Term.width // 2 - 25)}{str((_i + 1) * 10) + "%":>5}{Symbol.v_line}')
-	Draw.now(f'{Color.fg("#cc")}{Fx.b}{Mv.to(Term.height // 2 - 3, Term.width // 2 - 18)}')
+	if not testing: Init.success(start=True)
 
 	#? Load theme
-	Draw.now("Loading theme and creating colors... ")
+	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Loading theme and creating colors... ")}{Mv.save()}')
 	try:
 		THEME: Theme = Theme(CONFIG.color_theme)
 	except Exception as e:
-		_fail(e)
+		Init.fail(e)
 	else:
-		_success()
+		Init.success()
 
 	#? Setup boxes
-	Draw.now("Doing some maths and drawing... ")
+	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Doing some maths and drawing... ")}{Mv.save()}')
 	try:
 		Box.calc_sizes()
 		Box.draw_bg(now=False)
 	except Exception as e:
-		_fail(e)
+		Init.fail(e)
 	else:
-		_success()
+		Init.success()
 
 	#? Setup signal handlers for SIGSTP, SIGCONT, SIGINT and SIGWINCH
-	Draw.now("Setting up signal handlers... ")
+	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Setting up signal handlers... ")}{Mv.save()}')
 	try:
 		signal.signal(signal.SIGTSTP, now_sleeping) #* Ctrl-Z
 		signal.signal(signal.SIGCONT, now_awake)	#* Resume
 		signal.signal(signal.SIGINT, quit_sigint)	#* Ctrl-C
 		signal.signal(signal.SIGWINCH, Term.refresh) #* Terminal resized
 	except Exception as e:
-		_fail(e)
+		Init.fail(e)
 	else:
-		_success()
+		Init.success()
 
 	#? Start a separate thread for reading keyboard input
-	Draw.now("Starting input reader thread... ")
+	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Starting input reader thread... ")}{Mv.save()}')
 	try:
 		Key.start()
 	except Exception as e:
-		_fail(e)
+		Init.fail(e)
 	else:
-		_success()
+		Init.success()
 
 	#? Start a separate thread for data collection and drawing
-	Draw.now("Starting data collection and drawer thread... ")
+	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Starting data collection and drawer thread... ")}{Mv.save()}')
 	try:
 		Collector.start()
 	except Exception as e:
-		_fail(e)
+		Init.fail(e)
 	else:
-		_success()
+		Init.success()
 
 	#? Collect data and draw to buffer
-	Draw.now("Collecting data and drawing...")
+	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Collecting data and drawing... ")}{Mv.save()}')
 	try:
 		#Collector.collect(draw_now=False)
 		pass
 	except Exception as e:
-		_fail(e)
+		Init.fail(e)
 	else:
-		_success()
+		Init.success()
+
+	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Collecting nuclear launch codes... ")}{Mv.save()}')
+	Init.success()
+	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Launching missiles... ")}{Mv.save()}')
+	Init.success()
+	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Alien invasion... ")}{Mv.save()}')
+	Init.success()
 
 	#? Draw to screen
-	Draw.now("Finishing up...")
+	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Finishing up... ")}{Mv.save()}')
 	try:
 		#Collector.collect_done.wait()
 		pass
 	except Exception as e:
-		_fail(e)
+		Init.fail(e)
 	else:
-		_success()
+		Init.success()
 
 
-	if not testing: sleep(1) #! Remove if
-	del _fail, _success
+	if not testing: Init.done() #! Remove if
 	if not testing: Draw.out(clear=True) #! Remove if
 	else: Draw.clear(); Draw.now(Term.clear) #! Remove
 	Timer.stop("Init")
@@ -1704,12 +1882,12 @@ if __name__ == "__main__":
 	#! For testing ------------------------------------------------------------------------------->
 	if testing:
 		try:
-			testing_graphs()
+			#testing_graphs()
 			#testing_collectors()
 			#testing_humanizer()
 			# waitone(1)
 			#testing_keyinput()
-			#testing_banner()
+			testing_banner()
 			# waitone(1)
 			#testing_colors()
 			# waitone(1)
