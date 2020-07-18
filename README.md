@@ -1,4 +1,4 @@
-# ![bpytop](Imgs/logo-t.png)
+# ![bpytop](Imgs/logo.png)
 
 ![Linux](https://img.shields.io/badge/-Linux-grey?logo=linux)
 ![OSX](https://img.shields.io/badge/-OSX-black?logo=apple)
