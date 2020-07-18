@@ -24,10 +24,10 @@ from _thread import interrupt_main
 from select import select
 from distutils.util import strtobool
 from string import Template
-from math import ceil
+from math import ceil, floor
 from random import randint
 from shutil import which
-from typing import List, Set, Dict, Tuple, Optional, Union, Any, Callable, ContextManager, Iterable
+from typing import List, Set, Dict, Tuple, Optional, Union, Any, Callable, ContextManager, Iterable, Type
 
 errors: List[str] = []
 try: import fcntl, termios, tty
@@ -64,52 +64,20 @@ BANNER_SRC: List[Tuple[str, str, str]] = [
 	("#a86b00", "#006e85", "██████╔╝██║        ██║      ██║   ╚██████╔╝██║"),
 	("#000000", "#000000", "╚═════╝ ╚═╝        ╚═╝      ╚═╝    ╚═════╝ ╚═╝"),
 ]
-
-#RED
-# "#E62525"
-# "#CD2121"
-# "#B31D1D"
-# "#9A1919"
-# "#801414"
-# "#000000"
-
-#GREEN
-# "#75e12d"
-# "#5bbb1b"
-# "#499914"
-# "#3b7811"
-# "#30620e"
-# "#000000"
-
-#YELLOW
-# "#fadd00"
-# "#dbc200"
-# "#b8a200"
-# "#998700"
-# "#807100"
-# "#000000"
-
-#BLUE
-# "#0084ff"
-# "#016cd0"
-# "#0157a7"
-# "#014484"
-# "#003261"
-# "#000000"
-
-VERSION: str = "0.0.3"
+VERSION: str = "0.4.1"
 
 #*?This is the template used to create the config file
 DEFAULT_CONF: Template = Template(f'#? Config file for bpytop v. {VERSION}' + '''
 
 #* Color theme, looks for a .theme file in "~/.config/bpytop/themes" and "~/.config/bpytop/user_themes", "Default" for builtin default theme
+#* Corresponding folder with a trailing / needs to be appended, example: color_theme="user_themes/monokai"
 color_theme="$color_theme"
 
 #* Update time in milliseconds, increases automatically if set below internal loops processing time, recommended 2000 ms or above for better sample times for graphs.
 update_ms=$update_ms
 
 #* Processes sorting, "pid" "program" "arguments" "threads" "user" "memory" "cpu lazy" "cpu responsive",
-#* "cpu lazy" updates sorting over time, "cpu responsive" updates sorting directly.
+#* "cpu lazy" updates top process over time, "cpu responsive" updates top process directly.
 proc_sorting="$proc_sorting"
 
 #* Reverse sorting order, True or False.
@@ -136,8 +104,21 @@ proc_gradient=$proc_gradient
 #* If process cpu usage should be of the core it's running on or usage of the total available cpu power.
 proc_per_core=$proc_per_core
 
-#* Optional filter for shown disks, should be names of mountpoints, "root" replaces "/", separate multiple values with space.
+#* Optional filter for shown disks, should be last folder in path of a mountpoint, "root" replaces "/", separate multiple values with comma.
+#* Begin line with "exclude=" to change to exclude filter, oterwise defaults to "most include" filter. Example: disks_filter="exclude=boot, home"
 disks_filter="$disks_filter"
+
+#* Show graphs instead of meters for memory values.
+mem_graphs=$mem_graphs
+
+#* If swap memory should be shown in memory box.
+show_swap=$show_swap
+
+#* Show swap as a disk, ignores show_swap value above, inserts itself after first disk.
+swap_disk=$swap_disk
+
+#* If mem box should be split to also show disks info.
+show_disks=$show_disks
 
 #* Enable check for new version from github.com/aristocratos/bpytop at start.
 update_check=$update_check
@@ -265,7 +246,7 @@ def timerd(func):
 
 class Config:
 	'''Holds all config variables and functions for loading from and saving to disk'''
-	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name", "proc_gradient", "proc_per_core", "disks_filter", "update_check", "log_level"]
+	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name", "proc_gradient", "proc_per_core", "disks_filter", "update_check", "log_level", "mem_graphs", "show_swap", "swap_disk", "show_disks"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	update_ms: int = 2500
@@ -280,6 +261,10 @@ class Config:
 	proc_per_core: bool = False
 	disks_filter: str = ""
 	update_check: bool = True
+	mem_graphs: bool = True
+	show_swap: bool = False
+	swap_disk: bool = True
+	show_disks: bool = True
 	log_level: str = "WARNING"
 
 	warnings: List[str] = []
@@ -383,8 +368,7 @@ class Term:
 	"""Terminal info and commands"""
 	width: int = os.get_terminal_size().columns	#* Current terminal width in columns
 	height: int = os.get_terminal_size().lines	#* Current terminal height in lines
-	resized: bool = False						#* Flag indicating if terminal was recently resized
-	_resizing: bool = False
+	resized: bool = False
 	_w : int = 0
 	_h : int = 0
 	fg: str = "" 								#* Default foreground color
@@ -398,11 +382,11 @@ class Term:
 	@classmethod
 	def refresh(cls, *args):
 		"""Update width, height and set resized flag if terminal has been resized"""
-		if cls._resizing == True: return
+		if cls.resized == True: return
 		cls._w, cls._h = os.get_terminal_size()
 		while (cls._w, cls._h) != (cls.width, cls.height):
-			cls._resizing = True
 			cls.resized = True
+			Collector.collect_interrupt = True
 			cls.width, cls.height = cls._w, cls._h
 			Draw.now(Term.clear)
 			Draw.now(f'{create_box(cls._w // 2 - 25, cls._h // 2 - 2, 50, 3, "resizing")}{THEME.main_fg}{Fx.b}{Mv.r(12)}Width : {cls._w}   Height: {cls._h}')
@@ -414,7 +398,7 @@ class Term:
 				cls._w, cls._h = os.get_terminal_size()
 			sleep(0.3)
 			cls._w, cls._h = os.get_terminal_size()
-		cls._resizing = False
+		cls.resized = False
 		Box.calc_sizes()
 		Box.draw_bg(now=True if not Init.running else False)
 
@@ -500,12 +484,9 @@ class Mv:
 	@staticmethod
 	def down(x: int) -> str:			#* Move cursor down x lines
 		return f'\033[{x}B'
-	@staticmethod
-	def save() -> str:					#* Save cursor position
-		return "\033[s"
-	@staticmethod
-	def restore() -> str:				#* Restore saved cursor postion
-		return "\033[u"
+
+	save: str = "\033[s" 				#* Save cursor position
+	restore: str = "\033[u" 			#* Restore saved cursor postion
 	t = to
 	r = right
 	l = left
@@ -975,7 +956,7 @@ class Symbol:
 	div_up: str			= "┬"
 	div_down: str		= "┴"
 	graph_up: Dict[float, str] = {
-	0.0 : "⠀", 0.1 : "⢀", 0.2 : "⢠", 0.3 : "⢰", 0.4 : "⢸",
+	0.0 : " ", 0.1 : "⢀", 0.2 : "⢠", 0.3 : "⢰", 0.4 : "⢸",
 	1.0 : "⡀", 1.1 : "⣀", 1.2 : "⣠", 1.3 : "⣰", 1.4 : "⣸",
 	2.0 : "⡄", 2.1 : "⣄", 2.2 : "⣤", 2.3 : "⣴", 2.4 : "⣼",
 	3.0 : "⡆", 3.1 : "⣆", 3.2 : "⣦", 3.3 : "⣶", 3.4 : "⣾",
@@ -985,7 +966,7 @@ class Symbol:
 	graph_up_small[0.0] = "\033[1C"
 
 	graph_down: Dict[float, str] = {
-	0.0 : "⠀", 0.1 : "⠈", 0.2 : "⠘", 0.3 : "⠸", 0.4 : "⢸",
+	0.0 : " ", 0.1 : "⠈", 0.2 : "⠘", 0.3 : "⠸", 0.4 : "⢸",
 	1.0 : "⠁", 1.1 : "⠉", 1.2 : "⠙", 1.3 : "⠹", 1.4 : "⢹",
 	2.0 : "⠃", 2.1 : "⠋", 2.2 : "⠛", 2.3 : "⠻", 2.4 : "⢻",
 	3.0 : "⠇", 3.1 : "⠏", 3.2 : "⠟", 3.3 : "⠿", 3.4 : "⢿",
@@ -1001,6 +982,7 @@ class Graph:
 	'''Class for creating and adding to graphs
 	* __str__ : returns graph as a string
 	* add(value: int) : adds a value to graph and returns it as a string
+	* __call__ : same as add
 	'''
 	out: str
 	width: int
@@ -1018,11 +1000,14 @@ class Graph:
 		self.graphs: Dict[bool, List[str]] = {False : [], True : []}
 		self.current: bool = True
 		self.colors: List[str] = []
-		if isinstance(color, list):
+		if isinstance(color, list) and height > 1:
 			for i in range(1, height + 1): self.colors.insert(0, color[i * 100 // height]) #* Calculate colors of graph
 			if invert: self.colors.reverse()
-		elif isinstance(color, Color):
+		elif isinstance(color, Color) and height > 1:
 			self.colors = [ f'{color}' for _ in range(height) ]
+		else:
+			if isinstance(color, list): self.colors = color
+			elif isinstance(color, Color): self.colors = [ f'{color}' for _ in range(101) ]
 		self.width = width
 		self.height = height
 		self.invert = invert
@@ -1074,15 +1059,18 @@ class Graph:
 						else: value[side] = round((val - h_low) * 4 / (h_high - h_low) + 0.1)
 				if new: self.last = data[v]
 				self.graphs[self.current][h] += self.symbol[float(value["left"] + value["right"] / 10)]
-		self.last = data[-1]
+		if data: self.last = data[-1]
 		self.out = ""
 
-		for h in range(self.height):
-			if h > 0: self.out += f'{Mv.d(1)}{Mv.l(self.width)}'
-			self.out += f'{"" if not self.colors else self.colors[h]}{self.graphs[self.current][h if not self.invert else (self.height - 1) - h]}'
+		if self.height == 1:
+			self.out += f'{"" if not self.colors else self.colors[self.last]}{self.graphs[self.current][0]}'
+		elif self.height > 1:
+			for h in range(self.height):
+				if h > 0: self.out += f'{Mv.d(1)}{Mv.l(self.width)}'
+				self.out += f'{"" if not self.colors else self.colors[h]}{self.graphs[self.current][h if not self.invert else (self.height - 1) - h]}'
 		if self.colors: self.out += f'{Term.fg}'
 
-	def add(self, value: int):
+	def add(self, value: int) -> str:
 		self.current = not self.current
 		if self.height == 1:
 			if self.graphs[self.current][0].startswith(self.symbol[0.0]):
@@ -1095,6 +1083,9 @@ class Graph:
 		if self.max_value: value = (value + self.offset) * 100 // (self.max_value + self.offset) if value < self.max_value else 100
 		self._create([value])
 		return self.out
+
+	def __call__(self, value: int) -> str:
+		return self.add(value)
 
 	def __str__(self):
 		return self.out
@@ -1162,14 +1153,10 @@ class Meter:
 
 class Meters:
 	cpu: Meter
-	mem_used: Meter
-	mem_available: Meter
-	mem_cached: Meter
-	mem_free: Meter
-	swap_used: Meter
-	swap_free: Meter
-	disks_used: Meter
-	disks_free: Meter
+	mem: Dict[str, Union[Meter, Graph]] = {}
+	swap: Dict[str, Union[Meter, Graph]] = {}
+	disks_used: Dict[str, Meter] = {}
+	disks_free: Dict[str, Meter] = {}
 
 class Box:
 	'''Box class with all needed attributes for create_box() function'''
@@ -1186,6 +1173,7 @@ class Box:
 	_b_mem_h: int
 	redraw_all: bool
 	buffers: List[str] = []
+	resized: bool = False
 
 	@classmethod
 	def calc_sizes(cls):
@@ -1195,10 +1183,17 @@ class Box:
 			sub.resized = True # type: ignore
 
 	@classmethod
+	def draw_update_ms(cls, now: bool = True):
+		Draw.buffer("update_ms!" if now and not Menu.active else "update_ms", f'{Mv.to(CpuBox.y - 1, CpuBox.x + CpuBox.width - len(str(CONFIG.update_ms)) - 7)}{THEME.cpu_box(Symbol.title_left)}{Fx.b}{THEME.hi_fg("+")} '
+			f'{THEME.title(str(CONFIG.update_ms))} {THEME.hi_fg("+")}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}', save=True if Menu.active else False)
+		if now and not Menu.active: Draw.clear("update_ms")
+
+	@classmethod
 	def draw_bg(cls, now: bool = True):
 		'''Draw all boxes outlines and titles'''
 		Draw.buffer("bg!" if now and not Menu.active else "bg", "".join(sub._draw_bg() for sub in cls.__subclasses__()), z=1000, save=True if Menu.active else False) # type: ignore
 		if now and not Menu.active: Draw.clear("bg")
+		cls.draw_update_ms(now=now)
 
 class SubBox:
 	box_x: int = 0
@@ -1215,7 +1210,6 @@ class CpuBox(Box, SubBox):
 	height_p = 32
 	width_p = 100
 	resized: bool = True
-	redraw: bool = True
 	buffer: str = "cpu"
 	Box.buffers.append(buffer)
 
@@ -1228,11 +1222,12 @@ class CpuBox(Box, SubBox):
 		cls.box_columns = ceil((THREADS + 1) / (cls.height - 5))
 		if cls.box_columns * (24 + 13 if CONFIG.check_temp else 24) < cls.width - (cls.width // 4): cls.column_size = 2
 		elif cls.box_columns * (19 + 6 if CONFIG.check_temp else 19) < cls.width - (cls.width // 4): cls.column_size = 1
-		else: cls.box_columns = (cls.width - cls.width // 4) // (11 + 6 if CONFIG.check_temp else 11)
+		elif cls.box_columns * (10 + 6 if CONFIG.check_temp else 10) < cls.width - (cls.width // 4): cls.column_size = 0
+		else: cls.box_columns = (cls.width - cls.width // 4) // (10 + 6 if CONFIG.check_temp else 10); cls.column_size = 0
 
-		if cls.column_size == 2: cls.box_width = (24 + 13 if CONFIG.check_temp else 24) * cls.box_columns
-		elif cls.column_size == 1: cls.box_width = (19 + 6 if CONFIG.check_temp else 19) * cls.box_columns
-		else: cls.box_width = (11 + 6 if CONFIG.check_temp else 11) * cls.box_columns
+		if cls.column_size == 2: cls.box_width = (24 + 13 if CONFIG.check_temp else 24) * cls.box_columns - ((cls.box_columns - 1) * 1)
+		elif cls.column_size == 1: cls.box_width = (19 + 6 if CONFIG.check_temp else 19) * cls.box_columns - ((cls.box_columns - 1) * 1)
+		else: cls.box_width = (11 + 6 if CONFIG.check_temp else 11) * cls.box_columns + 1
 		cls.box_height = ceil(THREADS / cls.box_columns) + 4
 
 		if cls.box_height > cls.height - 2: cls.box_height = cls.height - 2
@@ -1246,12 +1241,9 @@ class CpuBox(Box, SubBox):
 		f'{create_box(x=cls.box_x, y=cls.box_y, width=cls.box_width, height=cls.box_height, line_color=THEME.div_line, fill=False, title=CPU_NAME[:18 if CONFIG.check_temp else 9])}')
 
 	@classmethod
-	def _draw_fg(cls, cpu):
-		# Draw.buffer(cls.buffer, f'{Mv.to(1,1)}Cpu usage: {cpu.cpu_usage}\nCpu freq: {cpu.cpu_freq}\nLoad avg: {cpu.load_avg}\
-		# \nTemps: {cpu.cpu_temp}\n', save=True if Menu.active else False)
-		cpu = CpuCollector #! remove
+	def _draw_fg(cls):
+		cpu = CpuCollector
 		out: str = ""
-		misc: str = ""
 		lavg: str = ""
 		x, y, w, h = cls.x + 1, cls.y + 1, cls.width - 2, cls.height - 2
 		bx, by, bw, bh = cls.box_x + 1, cls.box_y + 1, cls.box_width - 2, cls.box_height - 2
@@ -1260,7 +1252,7 @@ class CpuBox(Box, SubBox):
 		if cls.resized:
 			Graphs.cpu["up"] = Graph(w - bw - 3, hh, THEME.gradient["cpu"], cpu.cpu_usage[0])
 			Graphs.cpu["down"] = Graph(w - bw - 3, h - hh, THEME.gradient["cpu"], cpu.cpu_usage[0], invert=True)
-			Meters.cpu = Meter(cpu.cpu_usage[0][-1], 10 if cls.box_columns == 1 else (bw - 16 - 13 if CONFIG.check_temp else bw - 16), "cpu")
+			Meters.cpu = Meter(cpu.cpu_usage[0][-1], (bw - 9 - 13 if CONFIG.check_temp else bw - 9), "cpu")
 			if cls.column_size > 0:
 				for n in range(THREADS):
 					Graphs.cores[n] = Graph(5 * cls.column_size, 1, None, cpu.cpu_usage[n + 1])
@@ -1270,19 +1262,15 @@ class CpuBox(Box, SubBox):
 					for n in range(1, THREADS + 1):
 						Graphs.temps[n] = Graph(5, 1, None, cpu.cpu_temp[n], max_value=cpu.cpu_temp_crit, offset=-23)
 
-		if cls.resized or cls.redraw:
-			misc += (f'{Mv.to(y - 1, x + w - len(str(CONFIG.update_ms)) - 7)}{THEME.cpu_box(Symbol.title_left)}{Fx.b}{THEME.hi_fg("+")} '
-				f'{THEME.title(str(CONFIG.update_ms))} {THEME.hi_fg("+")}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}')
-
 		cx = cy = cc = 0
-		ccw = (bw + 2) // cls.box_columns
+		ccw = (bw + 1) // cls.box_columns
 		freq: str = f'{cpu.cpu_freq} Mhz' if cpu.cpu_freq < 1000 else f'{float(cpu.cpu_freq / 1000):.1f} GHz'
 		out += (f'{Mv.to(by - 1, bx + bw - 9)}{THEME.div_line(Symbol.title_left)}{Fx.b}{THEME.title(freq)}{Fx.ub}{THEME.div_line(Symbol.title_right)}'
-				f'{Mv.to(y, x)}{Graphs.cpu["up"].add(cpu.cpu_usage[0][-1])}{Mv.to(y + hh, x)}{Graphs.cpu["down"].add(cpu.cpu_usage[0][-1])}'
-				f'{THEME.main_fg}{Mv.to(by + cy, bx + cx)}{"CPU    " if cls.box_columns == 1 else "CPU Total  "}{Meters.cpu(cpu.cpu_usage[0][-1])}'
+				f'{Mv.to(y, x)}{Graphs.cpu["up"](cpu.cpu_usage[0][-1])}{Mv.to(y + hh, x)}{Graphs.cpu["down"](cpu.cpu_usage[0][-1])}'
+				f'{THEME.main_fg}{Mv.to(by + cy, bx + cx)}{"CPU "}{Meters.cpu(cpu.cpu_usage[0][-1])}'
 				f'{THEME.gradient["cpu"][cpu.cpu_usage[0][-1]]}{cpu.cpu_usage[0][-1]:>4}{THEME.main_fg}%')
 		if CONFIG.check_temp:
-				out += (f'{THEME.inactive_fg}  ⡀⡀⡀⡀⡀{Mv.l(5)}{THEME.gradient["temp"][cpu.cpu_temp[0][-1]]}{Graphs.temps[0].add(cpu.cpu_temp[0][-1])}'
+				out += (f'{THEME.inactive_fg}  ⡀⡀⡀⡀⡀{Mv.l(5)}{THEME.gradient["temp"][cpu.cpu_temp[0][-1]]}{Graphs.temps[0](cpu.cpu_temp[0][-1])}'
 						f'{cpu.cpu_temp[0][-1]:>4}{THEME.main_fg}°C')
 
 		cy += 1
@@ -1290,13 +1278,13 @@ class CpuBox(Box, SubBox):
 		for n in range(1, THREADS + 1):
 			out += f'{THEME.main_fg}{Mv.to(by + cy, bx + cx)}{"Core" + str(n):<{7 if cls.column_size > 0 else 5}}'
 			if cls.column_size > 0:
-				out += f'{THEME.inactive_fg}{"⡀" * (5 * cls.column_size)}{Mv.l(5 * cls.column_size)}{THEME.gradient["cpu"][cpu.cpu_usage[n][-1]]}{Graphs.cores[n-1].add(cpu.cpu_usage[n][-1])}'
+				out += f'{THEME.inactive_fg}{"⡀" * (5 * cls.column_size)}{Mv.l(5 * cls.column_size)}{THEME.gradient["cpu"][cpu.cpu_usage[n][-1]]}{Graphs.cores[n-1](cpu.cpu_usage[n][-1])}'
 			else:
 				out += f'{THEME.gradient["cpu"][cpu.cpu_usage[n][-1]]}'
 			out += f'{cpu.cpu_usage[n][-1]:>4}{THEME.main_fg}%'
 			if CONFIG.check_temp:
 				if cls.column_size > 1:
-					out += f'{THEME.inactive_fg}  ⡀⡀⡀⡀⡀{Mv.l(5)}{THEME.gradient["temp"][cpu.cpu_temp[n][-1]]}{Graphs.temps[n].add(cpu.cpu_temp[n][-1])}'
+					out += f'{THEME.inactive_fg}  ⡀⡀⡀⡀⡀{Mv.l(5)}{THEME.gradient["temp"][cpu.cpu_temp[n][-1]]}{Graphs.temps[n](cpu.cpu_temp[n][-1])}'
 				else:
 					out += f'{THEME.gradient["temp"][cpu.cpu_temp[n][-1]]}'
 				out += f'{cpu.cpu_temp[n][-1]:>4}{THEME.main_fg}°C'
@@ -1318,11 +1306,8 @@ class CpuBox(Box, SubBox):
 		out += f'{Mv.to(y + h - 1, x + 1)}{THEME.inactive_fg}up {cpu.uptime}'
 
 
-
-		out += Mv.to(Term.height - 5, 1) #! Remove
-		if misc: Draw.buffer("cpu_misc", misc, save=True)
-		Draw.buffer(cls.buffer, f'{out}{misc}{Term.fg}', save=Menu.active)
-		cls.redraw = cls.resized = False
+		Draw.buffer(cls.buffer, f'{out}{Term.fg}', save=Menu.active)
+		cls.resized = False
 
 
 
@@ -1333,12 +1318,20 @@ class MemBox(Box):
 	width_p = 45
 	x = 1
 	y = 1
+	mem_meter: int = 0
+	mem_size: int = 0
+	disk_meter: int = 0
 	divider: int = 0
 	mem_width: int = 0
 	disks_width: int = 0
-	redraw: bool = True
+	graph_height: int
+	resized: bool = True
+	redraw: bool = False
 	buffer: str = "mem"
+	swap_on: bool = CONFIG.show_swap
 	Box.buffers.append(buffer)
+	mem_names: List[str] = ["used", "available", "cached", "free"]
+	swap_names: List[str] = ["used", "free"]
 
 	@classmethod
 	def _calc_size(cls):
@@ -1346,18 +1339,134 @@ class MemBox(Box):
 		cls.height = round(Term.height * cls.height_p / 100) + 1
 		Box._b_mem_h = cls.height
 		cls.y = Box._b_cpu_h + 1
-		cls.mem_width = cls.disks_width = round((cls.width-1) / 2)
-		if cls.mem_width + cls.disks_width < cls.width - 2: cls.mem_width += 1
-		cls.divider = cls.x + cls.mem_width + 1
-		cls.redraw_all = True
+		if CONFIG.show_disks:
+			cls.mem_width = ceil((cls.width - 3) / 2)
+			cls.disks_width = cls.width - cls.mem_width - 3
+			if cls.mem_width + cls.disks_width < cls.width - 2: cls.mem_width += 1
+			cls.divider = cls.x + cls.mem_width
+		else:
+			cls.mem_width = cls.width - 1
+
+		if cls.height - (3 if cls.swap_on and not CONFIG.swap_disk else 2) > 2 * (6 if cls.swap_on and not CONFIG.swap_disk else 4): cls.mem_size = 3
+		elif cls.mem_width > 25: cls.mem_size = 2
+		else: cls.mem_size = 1
+
+		cls.mem_meter = cls.width - (cls.disks_width if CONFIG.show_disks else 0) - (9 if cls.mem_size > 2 else 20)
+		if cls.mem_size == 1: cls.mem_meter += 6
+		if cls.mem_meter < 1: cls.mem_meter = 0
+
+		if CONFIG.mem_graphs:
+			cls.graph_height = round(((cls.height - (2 if cls.swap_on and not CONFIG.swap_disk else 1)) - (2 if cls.mem_size == 3 else 1) * (6 if cls.swap_on and not CONFIG.swap_disk else 4)) / (6 if cls.swap_on and not CONFIG.swap_disk else 4))
+			if cls.graph_height == 0: cls.graph_height = 1
+			if cls.graph_height > 1: cls.mem_meter += 6
+		else:
+			cls.graph_height = 0
+
+		if CONFIG.show_disks:
+			cls.disk_meter = cls.width - cls.mem_width - 23
+			if cls.disks_width < 25:
+				cls.disk_meter += 10
+			if cls.disk_meter < 1: cls.disk_meter = 0
 
 	@classmethod
 	def _draw_bg(cls) -> str:
-		return (f'{create_box(box=cls, line_color=THEME.mem_box)}'
-		f'{Mv.to(cls.y, cls.divider + 2)}{THEME.mem_box(Symbol.title_left)}{Fx.b}{THEME.title("disks")}{Fx.ub}{THEME.mem_box(Symbol.title_right)}'
-		f'{Mv.to(cls.y, cls.divider)}{THEME.mem_box(Symbol.div_up)}'
-		f'{Mv.to(cls.y + cls.height - 1, cls.divider)}{THEME.mem_box(Symbol.div_down)}{THEME.div_line}'
-		f'{"".join(f"{Mv.to(cls.y + i, cls.divider)}{Symbol.v_line}" for i in range(1, cls.height - 1))}')
+		out: str = ""
+		out += f'{create_box(box=cls, line_color=THEME.mem_box)}'
+		if CONFIG.show_disks:
+			out += (f'{Mv.to(cls.y, cls.divider + 2)}{THEME.mem_box(Symbol.title_left)}{Fx.b}{THEME.title("disks")}{Fx.ub}{THEME.mem_box(Symbol.title_right)}'
+					f'{Mv.to(cls.y, cls.divider)}{THEME.mem_box(Symbol.div_up)}'
+					f'{Mv.to(cls.y + cls.height - 1, cls.divider)}{THEME.mem_box(Symbol.div_down)}{THEME.div_line}'
+					f'{"".join(f"{Mv.to(cls.y + i, cls.divider)}{Symbol.v_line}" for i in range(1, cls.height - 1))}')
+		return out
+
+	@classmethod
+	def _draw_fg(cls):
+		mem = MemCollector
+		out: str = ""
+		gbg: str = ""
+		gmv: str = ""
+		gli: str = ""
+		x, y, h = cls.x + 1, cls.y + 1, cls.height - 2
+		if cls.resized:
+			Meters.mem = {}
+			Meters.swap = {}
+			Meters.disks_used = {}
+			Meters.disks_free = {}
+			if cls.mem_meter > 0:
+				for name in cls.mem_names:
+					if CONFIG.mem_graphs:
+						Meters.mem[name] = Graph(cls.mem_meter, cls.graph_height, THEME.gradient[name], mem.vlist[name])
+					else:
+						Meters.mem[name] = Meter(mem.percent[name], cls.mem_meter, name)
+				if cls.swap_on:
+					for name in cls.swap_names:
+						if CONFIG.mem_graphs and not CONFIG.swap_disk:
+							Meters.swap[name] = Graph(cls.mem_meter, cls.graph_height, THEME.gradient[name], mem.swap_vlist[name])
+						elif CONFIG.swap_disk:
+							Meters.disks_used["__swap"] = Meter(mem.swap_percent["used"], cls.disk_meter, "used")
+							if len(mem.disks) * 3 <= h + 1:
+								Meters.disks_free["__swap"] = Meter(mem.swap_percent["free"], cls.disk_meter, "free")
+							break
+						else:
+							Meters.swap[name] = Meter(mem.swap_percent[name], cls.mem_meter, name)
+			if cls.disk_meter > 0:
+				for name in mem.disks.keys():
+					Meters.disks_used[name] = Meter(mem.disks[name]["used_percent"], cls.disk_meter, "used")
+					if len(mem.disks) * 3 <= h + 1:
+						Meters.disks_free[name] = Meter(mem.disks[name]["free_percent"], cls.disk_meter, "free")
+		#* Mem
+		out += f'{Mv.to(y, x+1)}{THEME.title}{Fx.b}Total:{mem.string["total"]:>{cls.mem_width - 9}}{Fx.ub}{THEME.main_fg}'
+		cx = 1; cy = 1
+		# if cls.graph_height == 1:
+		# 	gbg = f'{THEME.inactive_fg}{"⡀" * cls.mem_meter}{Mv.l(cls.mem_meter)}{THEME.main_fg}'
+		if cls.graph_height > 0:
+			gli = f'{Mv.l(2)}{THEME.mem_box(Symbol.title_right)}{THEME.div_line}{Symbol.h_line * (cls.mem_width - 1)}{"" if CONFIG.show_disks else THEME.mem_box}{Symbol.title_left}{Mv.l(cls.mem_width - 1)}{THEME.title}'
+		if cls.graph_height >= 2:
+			gbg = f'{Mv.l(1)}'
+			gmv = f'{Mv.l(cls.mem_width - 2)}{Mv.u(cls.graph_height - 1)}'
+
+
+
+		for name in cls.mem_names:
+			if cls.mem_size > 2:
+				out += (f'{Mv.to(y+cy, x+cx)}{gli}{name.capitalize()[:None if cls.mem_width > 21 else 5]+":":<{1 if cls.mem_width > 21 else 6.6}}{Mv.to(y+cy, x+cx + cls.mem_width - 3 - (len(mem.string[name])))}{mem.string[name]}'
+						f'{Mv.to(y+cy+1, x+cx)}{gbg}{Meters.mem[name](mem.percent[name])}{gmv}{str(mem.percent[name])+"%":>4}'); cy += 2 if not cls.graph_height else cls.graph_height + 1
+			else:
+				out += f'{Mv.to(y+cy, x+cx)}{name.capitalize():{5.5 if cls.mem_size > 1 else 1.1}} {gbg}{Meters.mem[name](mem.percent[name])}{mem.string[name][:None if cls.mem_size > 1 else -2]:>{9 if cls.mem_size > 1 else 7}}'; cy += 1 if not cls.graph_height else cls.graph_height
+		#* Swap
+		if cls.swap_on and CONFIG.show_swap and not CONFIG.swap_disk:
+			if h - cy > 5:
+				if cls.graph_height > 0: out += f'{Mv.to(y+cy, x+cx)}{gli}'
+				cy += 1
+			out += f'{Mv.to(y+cy, x+cx)}{THEME.title}{Fx.b}Swap:{mem.swap_string["total"]:>{cls.mem_width - 8}}{Fx.ub}{THEME.main_fg}'; cy += 1
+			for name in cls.swap_names:
+				if cls.mem_size > 2:
+					out += (f'{Mv.to(y+cy, x+cx)}{gli}{name.capitalize()[:None if cls.mem_width > 21 else 5]+":":<{1 if cls.mem_width > 21 else 6.6}}{Mv.to(y+cy, x+cx + cls.mem_width - 3 - (len(mem.swap_string[name])))}{mem.swap_string[name]}'
+							f'{Mv.to(y+cy+1, x+cx)}{gbg}{Meters.swap[name](mem.swap_percent[name])}{gmv}{str(mem.swap_percent[name])+"%":>4}'); cy += 2 if not cls.graph_height else cls.graph_height + 1
+				else:
+					out += f'{Mv.to(y+cy, x+cx)}{name.capitalize():{5.5 if cls.mem_size > 1 else 1.1}} {gbg}{Meters.swap[name](mem.swap_percent[name])}{mem.swap_string[name][:None if cls.mem_size > 1 else -2]:>{9 if cls.mem_size > 1 else 7}}'; cy += 1 if not cls.graph_height else cls.graph_height
+
+		if cls.graph_height > 0 and not cy == h: out += f'{Mv.to(y+cy, x+cx)}{gli}'
+
+		#* Disks
+		if CONFIG.show_disks:
+			cx = x + cls.mem_width - 1; cy = 0
+			for name, item in mem.disks.items():
+				if cy > h - 2: break
+				out += (f'{Mv.to(y+cy, x+cx)}{THEME.title}{Fx.b}{item["name"]:{cls.disks_width - 2}.12}{Mv.to(y+cy, x + cx + cls.disks_width - 11)}{item["total"][:None if cls.disks_width >= 25 else -2]:>9}'
+						f'{Mv.to(y+cy, x + cx + (cls.disks_width // 2) - (len(item["io"]) // 2) - 2)}{Fx.ub}{THEME.main_fg}{item["io"]}{Fx.ub}{THEME.main_fg}{Mv.to(y+cy+1, x+cx)}')
+				out += f'Used:{str(item["used_percent"]) + "%":>4} ' if cls.disks_width >= 25 else "U "
+				out += f'{Meters.disks_used[name]}{item["used"][:None if cls.disks_width >= 25 else -2]:>{9 if cls.disks_width >= 25 else 7}}'; cy += 2
+
+				if len(mem.disks) * 3 <= h + 1:
+					if cy > h - 1: break
+					out += Mv.to(y+cy, x+cx)
+					out += f'Free:{str(item["free_percent"]) + "%":>4} ' if cls.disks_width >= 25 else f'{"F "}'
+					out += f'{Meters.disks_free[name]}{item["free"][:None if cls.disks_width >= 25 else -2]:>{9 if cls.disks_width >= 25 else 7}}'; cy += 1
+					if len(mem.disks) * 4 <= h + 1: cy += 1
+
+		Draw.buffer(cls.buffer, f'{out}{Term.fg}', save=Menu.active)
+		cls.resized = False
 
 class NetBox(Box, SubBox):
 	name = "net"
@@ -1443,6 +1552,10 @@ class Collector:
 	def stop(cls):
 		if cls.started and cls.thread.is_alive():
 			cls.stopping = True
+			cls.started = False
+			cls.collect_queue = []
+			cls.collect_idle.set()
+			cls.collect_done.set()
 			try:
 				cls.thread.join()
 			except:
@@ -1457,16 +1570,23 @@ class Collector:
 				cls.collect_run.wait(0.1)
 				if not cls.collect_run.is_set():
 					continue
+				draw_buffers = []
+				#if cls.collect_interrupt and bkp_queue:
+				#	for q in bkp_queue:
+				#		if q not in cls.collect_queue: cls.collect_queue.append(q)
+				#bkp_queue = []
+				cls.collect_interrupt = False
 				cls.collect_run.clear()
 				cls.collect_idle.clear()
 				while cls.collect_queue:
 					collector = cls.collect_queue.pop()
 					collector._collect()
 					collector._draw()
+					#bkp_queue.append(collector)
 					draw_buffers.append(collector.buffer)
-				if cls.draw_now and not Menu.active:
+					if cls.collect_interrupt: break
+				if cls.draw_now and not Menu.active and not cls.collect_interrupt:
 					Draw.out(*draw_buffers)
-				draw_buffers = []
 				cls.collect_idle.set()
 				cls.collect_done.set()
 		except Exception as e:
@@ -1475,7 +1595,7 @@ class Collector:
 			clean_quit(1, thread=True)
 
 	@classmethod
-	def collect(cls, *collectors: object, draw_now: bool = True, interrupt: bool = False):
+	def collect(cls, *collectors, draw_now: bool = True, interrupt: bool = False):
 		'''Setup collect queue for _runner'''
 		#* Set interrupt flag if True to stop _runner prematurely
 		cls.collect_interrupt = interrupt
@@ -1485,7 +1605,6 @@ class Collector:
 		cls.collect_interrupt = False
 		#* Set draw_now flag if True to draw to screen instead of buffer
 		cls.draw_now = draw_now
-
 		#* Append any collector given as argument to _runner queue
 		if collectors:
 			cls.collect_queue = [*collectors]
@@ -1499,9 +1618,7 @@ class Collector:
 
 
 class CpuCollector(Collector):
-	'''Collects cpu usage for cpu and cores, cpu frequency, load_avg
-	_collect(): Collects data
-	_draw(): calls CpuBox._draw_fg()'''
+	'''Collects cpu usage for cpu and cores, cpu frequency, load_avg, uptime and cpu temps'''
 	cpu_usage: List[List[int]] = []
 	cpu_temp: List[List[int]] = []
 	cpu_temp_high: int = 0
@@ -1619,7 +1736,172 @@ class CpuCollector(Collector):
 
 	@classmethod
 	def _draw(cls):
-		CpuBox._draw_fg(cls)
+		CpuBox._draw_fg()
+
+class MemCollector(Collector):
+	'''Collects memory and disks information'''
+	values: Dict[str, int] = {}
+	vlist: Dict[str, List[int]] = {}
+	percent: Dict[str, int] = {}
+	string: Dict[str, str] = {}
+
+	swap_values: Dict[str, int] = {}
+	swap_vlist: Dict[str, List[int]] = {}
+	swap_percent: Dict[str, int] = {}
+	swap_string: Dict[str, str] = {}
+
+	disks: Dict[str, Dict]
+	disk_hist: Dict[str, Tuple] = {}
+
+	excludes: List[str] = ["squashfs"]
+	if SYSTEM == "BSD": excludes += ["devfs", "tmpfs", "procfs", "linprocfs", "gvfs", "fusefs"]
+
+	buffer: str = MemBox.buffer
+
+	@classmethod
+	def _collect(cls):
+		#* Collect memory
+		mem = psutil.virtual_memory()
+		if hasattr(mem, "cached"):
+			cls.values["cached"] = mem.cached
+		else:
+			cls.values["cached"] = mem.active
+		cls.values["total"], cls.values["free"], cls.values["available"] = mem.total, mem.free, mem.available
+		cls.values["used"] = cls.values["total"] - cls.values["available"]
+
+		for key, value in cls.values.items():
+			cls.string[key] = floating_humanizer(value)
+			if key == "total": continue
+			cls.percent[key] = round(value * 100 / cls.values["total"])
+			if CONFIG.mem_graphs:
+				if not key in cls.vlist: cls.vlist[key] = []
+				cls.vlist[key].append(cls.percent[key])
+				if len(cls.vlist[key]) > MemBox.width: del cls.vlist[key][0]
+
+		#* Collect swap
+		if CONFIG.show_swap or CONFIG.swap_disk:
+			swap = psutil.swap_memory()
+			cls.swap_values["total"], cls.swap_values["free"] = swap.total, swap.free
+			cls.swap_values["used"] = cls.swap_values["total"] - cls.swap_values["free"]
+
+			MemBox.swap_on = bool(swap.total)
+			if swap.total:
+				MemBox.swap_on = True
+				for key, value in cls.swap_values.items():
+					cls.swap_string[key] = floating_humanizer(value)
+					if key == "total": continue
+					cls.swap_percent[key] = round(value * 100 / cls.swap_values["total"])
+					if CONFIG.mem_graphs:
+						if not key in cls.swap_vlist: cls.swap_vlist[key] = []
+						cls.swap_vlist[key].append(cls.swap_percent[key])
+						if len(cls.swap_vlist[key]) > MemBox.width: del cls.swap_vlist[key][0]
+			else:
+				MemBox.swap_on = False
+		else:
+			MemBox.swap_on = False
+
+
+		if not CONFIG.show_disks: return
+		#* Collect disks usage
+		disk_read: int = 0
+		disk_write: int = 0
+		dev_name: str
+		disk_name: str
+		filtering: Tuple = ()
+		filter_exclude: bool = False
+		io_string: str
+		u_percent: int
+		disk_list: List[str] = []
+		cls.disks = {}
+
+		if CONFIG.disks_filter:
+			if CONFIG.disks_filter.startswith("exclude="):
+				filter_exclude = True
+				filtering = tuple(v.strip() for v in CONFIG.disks_filter.replace("exclude=", "").strip().split(","))
+			else:
+				filtering = tuple(v.strip() for v in CONFIG.disks_filter.strip().split(","))
+
+		io_counters = psutil.disk_io_counters(perdisk=True if SYSTEM == "Linux" else False, nowrap=True)
+
+		for disk in psutil.disk_partitions():
+			disk_io = None
+			io_string = ""
+			disk_name = disk.mountpoint.rsplit('/', 1)[-1] if not disk.mountpoint == "/" else "root"
+			while disk_name in disk_list: disk_name += "_"
+			disk_list += [disk_name]
+			if cls.excludes and disk.fstype in cls.excludes:
+				continue
+			if filtering and ((not filter_exclude and not disk_name.endswith(filtering)) or (filter_exclude and disk_name.endswith(filtering))):
+				continue
+			#elif filtering and disk_name.endswith(filtering)
+			if SYSTEM == "MacOS" and disk.mountpoint == "/private/var/vm":
+				continue
+			try:
+				disk_u = psutil.disk_usage(disk.mountpoint)
+			except:
+				pass
+
+			u_percent = round(disk_u.percent)
+			cls.disks[disk.device] = {}
+			cls.disks[disk.device]["name"] = disk_name
+			cls.disks[disk.device]["used_percent"] = u_percent
+			cls.disks[disk.device]["free_percent"] = 100 - u_percent
+			for name in ["total", "used", "free"]:
+				cls.disks[disk.device][name] = floating_humanizer(getattr(disk_u, name, 0))
+
+			#* Collect disk io
+			try:
+				if SYSTEM == "Linux":
+					dev_name = os.path.realpath(disk.device).rsplit('/', 1)[-1]
+					if dev_name.startswith("md"):
+						try:
+							dev_name = dev_name[:dev_name.index("p")]
+						except:
+							pass
+					disk_io = io_counters[dev_name]
+				elif disk.mountpoint == "/":
+					disk_io = io_counters
+				else:
+					raise Exception
+				disk_read = disk_io.read_bytes - cls.disk_hist[disk.device][0]
+				disk_write = disk_io.write_bytes - cls.disk_hist[disk.device][1]
+			except:
+				pass
+				disk_read = disk_write = 0
+
+			if disk_io:
+				cls.disk_hist[disk.device] = (disk_io.read_bytes, disk_io.write_bytes)
+				if MemBox.disks_width > 30:
+					if disk_read > 0:
+						io_string += f'▲{floating_humanizer(disk_read, short=True)} '
+					if disk_write > 0:
+						io_string += f'▼{floating_humanizer(disk_write, short=True)}'
+				elif disk_read + disk_write > 0:
+					io_string += f'▼▲{floating_humanizer(disk_read + disk_write, short=True)}'
+
+			cls.disks[disk.device]["io"] = io_string
+
+		if CONFIG.swap_disk:
+			cls.disks["__swap"] = {}
+			cls.disks["__swap"]["name"] = "swap"
+			cls.disks["__swap"]["used_percent"] = cls.swap_percent["used"]
+			cls.disks["__swap"]["free_percent"] = cls.swap_percent["free"]
+			for name in ["total", "used", "free"]:
+				cls.disks["__swap"][name] = cls.swap_string[name]
+			cls.disks["__swap"]["io"] = ""
+			if len(cls.disks) > 2:
+				try:
+					new = { list(cls.disks)[0] : cls.disks.pop(list(cls.disks)[0])}
+					new["__swap"] = cls.disks.pop("__swap")
+					new.update(cls.disks)
+					cls.disks = new
+				except:
+					pass
+
+
+	@classmethod
+	def _draw(cls):
+		MemBox._draw_fg()
 
 #class ProcCollector(Collector): #! add interrupt on _collect and _draw
 
@@ -1630,10 +1912,14 @@ def testing_collectors():
 	# Box.calc_sizes()
 	Box.draw_bg()
 
-	for _ in range(60):
-		Collector.collect(CpuCollector)
+	#for _ in range(1000):
+	while True:
+		Collector.collect()
 		Collector.collect_done.wait()
+		Draw.now(Mv.to(1, 1))
 		sleep(1)
+
+	Draw.now(Mv.to(Term.height - 5, 1))
 	#Draw.now(f'Cpu usage: {CpuCollector.cpu_usage}\nCpu freq: {CpuCollector.cpu_freq}\nLoad avg: {CpuCollector.load_avg}\n\
 	#	Temps: {CpuCollector.cpu_temp}\n')
 
@@ -1768,6 +2054,7 @@ def clean_quit(errcode: int = 0, errmsg: str = "", thread: bool = False):
 		errlog.info(f'Exiting. Runtime {timedelta(seconds=round(time() - SELF_START, 0))} \n')
 	else:
 		errlog.warning(f'Exiting with errorcode ({errcode}). Runtime {timedelta(seconds=round(time() - SELF_START, 0))} \n')
+		if not errmsg: errmsg = f'Bpytop exited with errorcode ({errcode}). See {CONFIG_DIR}/error.log for more information!'
 	if errmsg: print(errmsg)
 
 	raise SystemExit(errcode)
@@ -2002,7 +2289,7 @@ if __name__ == "__main__":
 
 		@staticmethod
 		def fail(err):
-			Draw.buffer("+init!", f'{Mv.restore()}{Symbol.fail}')
+			Draw.buffer("+init!", f'{Mv.restore}{Symbol.fail}')
 			errlog.exception(f'{err}')
 			sleep(2)
 			clean_quit(1, errmsg=f'Error during init! See {CONFIG_DIR}/error.log for more information.')
@@ -2019,7 +2306,7 @@ if __name__ == "__main__":
 					perc = f'{str((_i + 1) * 10) + "%":>5}'
 					Draw.buffer("+banner", f'{Mv.to(Term.height // 2 - 3 + _i, Term.width // 2 - 28)}{Fx.trans(perc)}{Symbol.v_line}')
 				Draw.out("banner")
-				Draw.buffer("+init!", f'{Color.fg("#cc")}{Fx.b}{Mv.to(Term.height // 2 - 3, Term.width // 2 - 21)}{Mv.save()}')
+				Draw.buffer("+init!", f'{Color.fg("#cc")}{Fx.b}{Mv.to(Term.height // 2 - 3, Term.width // 2 - 21)}{Mv.save}')
 
 			if start or Term.resized:
 				cls.initbg_data = [randint(0, 100) for _ in range(Term.width * 2)]
@@ -2030,7 +2317,7 @@ if __name__ == "__main__":
 
 			if not testing:
 				cls.draw_bg(10)
-			Draw.buffer("+init!", f'{Mv.restore()}{Symbol.ok}\n{Mv.r(Term.width // 2 - 22)}{Mv.save()}')
+			Draw.buffer("+init!", f'{Mv.restore}{Symbol.ok}\n{Mv.r(Term.width // 2 - 22)}{Mv.save}')
 
 		@classmethod
 		def draw_bg(cls, times: int = 10):
@@ -2057,7 +2344,7 @@ if __name__ == "__main__":
 	if not testing: Init.success(start=True)
 
 	#? Load theme
-	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Loading theme and creating colors... ")}{Mv.save()}')
+	Draw.buffer("+init!", f'{Mv.restore}{Fx.trans("Loading theme and creating colors... ")}{Mv.save}')
 	try:
 		THEME: Theme = Theme(CONFIG.color_theme)
 	except Exception as e:
@@ -2066,7 +2353,7 @@ if __name__ == "__main__":
 		Init.success()
 
 	#? Setup boxes
-	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Doing some maths and drawing... ")}{Mv.save()}')
+	Draw.buffer("+init!", f'{Mv.restore}{Fx.trans("Doing some maths and drawing... ")}{Mv.save}')
 	try:
 		Box.calc_sizes()
 		Box.draw_bg(now=False)
@@ -2076,7 +2363,7 @@ if __name__ == "__main__":
 		Init.success()
 
 	#? Setup signal handlers for SIGSTP, SIGCONT, SIGINT and SIGWINCH
-	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Setting up signal handlers... ")}{Mv.save()}')
+	Draw.buffer("+init!", f'{Mv.restore}{Fx.trans("Setting up signal handlers... ")}{Mv.save}')
 	try:
 		signal.signal(signal.SIGTSTP, now_sleeping) #* Ctrl-Z
 		signal.signal(signal.SIGCONT, now_awake)	#* Resume
@@ -2088,7 +2375,7 @@ if __name__ == "__main__":
 		Init.success()
 
 	#? Start a separate thread for reading keyboard input
-	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Starting input reader thread... ")}{Mv.save()}')
+	Draw.buffer("+init!", f'{Mv.restore}{Fx.trans("Starting input reader thread... ")}{Mv.save}')
 	try:
 		Key.start()
 	except Exception as e:
@@ -2097,7 +2384,7 @@ if __name__ == "__main__":
 		Init.success()
 
 	#? Start a separate thread for data collection and drawing
-	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Starting data collection and drawer thread... ")}{Mv.save()}')
+	Draw.buffer("+init!", f'{Mv.restore}{Fx.trans("Starting data collection and drawer thread... ")}{Mv.save}')
 	try:
 		Collector.start()
 	except Exception as e:
@@ -2106,7 +2393,7 @@ if __name__ == "__main__":
 		Init.success()
 
 	#? Collect data and draw to buffer
-	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Collecting data and drawing... ")}{Mv.save()}')
+	Draw.buffer("+init!", f'{Mv.restore}{Fx.trans("Collecting data and drawing... ")}{Mv.save}')
 	try:
 		#Collector.collect(draw_now=False)
 		pass
@@ -2115,15 +2402,15 @@ if __name__ == "__main__":
 	else:
 		Init.success()
 
-	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Collecting nuclear launch codes... ")}{Mv.save()}')
+	Draw.buffer("+init!", f'{Mv.restore}{Fx.trans("Collecting nuclear launch codes... ")}{Mv.save}')
 	Init.success()
-	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Launching missiles... ")}{Mv.save()}')
+	Draw.buffer("+init!", f'{Mv.restore}{Fx.trans("Launching missiles... ")}{Mv.save}')
 	Init.success()
-	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Alien invasion... ")}{Mv.save()}')
+	Draw.buffer("+init!", f'{Mv.restore}{Fx.trans("Alien invasion... ")}{Mv.save}')
 	Init.success()
 
 	#? Draw to screen
-	Draw.buffer("+init!", f'{Mv.restore()}{Fx.trans("Finishing up... ")}{Mv.save()}')
+	Draw.buffer("+init!", f'{Mv.restore}{Fx.trans("Finishing up... ")}{Mv.save}')
 	try:
 		#Collector.collect_done.wait()
 		pass
