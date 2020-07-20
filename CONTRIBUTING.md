@@ -8,6 +8,7 @@
 
 * Split up multiple unrelated changes in multiple pull requests.
 
+* If it's a fix for a unreported bug, make a bug report and link the pull request.
 
 * Purely cosmetic changes won't be accepted without a very good explanation of its value.
   * (Some design choices are for better configurability of syntax highlighting.)
