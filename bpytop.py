@@ -23,12 +23,13 @@ from datetime import timedelta
 from _thread import interrupt_main
 from collections import defaultdict
 from select import select
+from itertools import cycle
 from distutils.util import strtobool
 from string import Template
 from math import ceil, floor
 from random import randint
 from shutil import which
-from typing import List, Set, Dict, Tuple, Optional, Union, Any, Callable, ContextManager, Iterable, Type
+from typing import List, Set, Dict, Tuple, Optional, Union, Any, Callable, ContextManager, Iterable, Type, NamedTuple
 
 errors: List[str] = []
 try: import fcntl, termios, tty
@@ -1610,14 +1611,14 @@ class MemBox(Box):
 			Draw.buffer("mem_misc", out_misc, only_save=True)
 
 		#* Mem
-		out += f'{Mv.to(y, x+1)}{THEME.title}{Fx.b}Total:{mem.string["total"]:>{cls.mem_width - 9}}{Fx.ub}{THEME.main_fg}'
 		cx = 1; cy = 1
+
+		out += f'{Mv.to(y, x+1)}{THEME.title}{Fx.b}Total:{mem.string["total"]:>{cls.mem_width - 9}}{Fx.ub}{THEME.main_fg}'
 		if cls.graph_height > 0:
 			gli = f'{Mv.l(2)}{THEME.mem_box(Symbol.title_right)}{THEME.div_line}{Symbol.h_line * (cls.mem_width - 1)}{"" if CONFIG.show_disks else THEME.mem_box}{Symbol.title_left}{Mv.l(cls.mem_width - 1)}{THEME.title}'
 		if cls.graph_height >= 2:
 			gbg = f'{Mv.l(1)}'
 			gmv = f'{Mv.l(cls.mem_width - 2)}{Mv.u(cls.graph_height - 1)}'
-
 
 		big_mem: bool = True if cls.mem_width > 21 else False
 		for name in cls.mem_names:
@@ -1633,6 +1634,7 @@ class MemBox(Box):
 			if h - cy > 5:
 				if cls.graph_height > 0: out += f'{Mv.to(y+cy, x+cx)}{gli}'
 				cy += 1
+
 			out += f'{Mv.to(y+cy, x+cx)}{THEME.title}{Fx.b}Swap:{mem.swap_string["total"]:>{cls.mem_width - 8}}{Fx.ub}{THEME.main_fg}'
 			cy += 1
 			for name in cls.swap_names:
@@ -1754,9 +1756,11 @@ class ProcBox(Box):
 	width_p = 55
 	x = 1
 	y = 1
+	current_y: int = 0
 	select_max: int = 0
 	selected: int = 0
-	selected_pid: int
+	selected_pid: int = 0
+	filtering: bool = False
 	moved: bool = False
 	start: int = 1
 	count: int = 0
@@ -1781,7 +1785,6 @@ class ProcBox(Box):
 		cls.detailed_y = cls.y
 		cls.detailed_height = 8
 		cls.detailed_width = cls.width
-		cls.select_max = cls.height - 3
 		cls.redraw = True
 		cls.resized = True
 
@@ -1790,7 +1793,7 @@ class ProcBox(Box):
 		return create_box(box=cls, line_color=THEME.proc_box)
 
 	@classmethod
-	def selector(cls, key: str) -> bool:
+	def selector(cls, key: str, mouse_pos: Tuple[int, int] = (0, 0)):
 		old: Tuple[int, int] = (cls.start, cls.selected)
 		if key == "up":
 			if cls.selected == 1 and cls.start > 1:
@@ -1818,18 +1821,35 @@ class ProcBox(Box):
 		elif key == "end":
 			if cls.start < ProcCollector.num_procs - cls.select_max + 1: cls.start = ProcCollector.num_procs - cls.select_max + 1
 			elif cls.selected < cls.select_max: cls.selected = cls.select_max
+		elif key == "mouse_click":
+			if mouse_pos[0] > cls.x + cls.width - 4 and mouse_pos[1] > cls.current_y and mouse_pos[1] < cls.current_y + cls.select_max:
+				if mouse_pos[1] == cls.current_y + 1:
+					cls.start = 1
+				elif mouse_pos[1] == cls.current_y + cls.select_max - 1:
+					cls.start = ProcCollector.num_procs - cls.select_max + 1
+				else:
+					cls.start = round((mouse_pos[1] - cls.current_y - 1) * ((ProcCollector.num_procs - cls.select_max - 2) / (cls.select_max - 2)))
+			else:
+				cls.selected = mouse_pos[1] - cls.current_y if mouse_pos[1] >= cls.current_y else cls.selected
+		elif key == "mouse_unselect":
+			cls.selected = 0
 
+		if cls.start > ProcCollector.num_procs - cls.select_max + 1 and ProcCollector.num_procs > cls.select_max: cls.start = ProcCollector.num_procs - cls.select_max + 1
+		elif cls.start > ProcCollector.num_procs: cls.start = ProcCollector.num_procs
 		if cls.start < 1: cls.start = 1
-		if cls.start > ProcCollector.num_procs - cls.select_max + 1: cls.start = ProcCollector.num_procs - cls.select_max + 1
+		if cls.selected > ProcCollector.num_procs and ProcCollector.num_procs < cls.select_max: cls.selected = ProcCollector.num_procs
+		elif cls.selected > cls.select_max: cls.selected = cls.select_max
+		if cls.selected < 0: cls.selected = 0
+
 		if old != (cls.start, cls.selected):
 			cls.moved = True
-			return True
-		else:
-			return False
+			Collector.collect(ProcCollector, proc_interrupt=True, only_draw=True)
+
 
 	@classmethod
 	def _draw_fg(cls):
 		proc = ProcCollector
+		if proc.proc_interrupt: return
 		if proc.redraw: cls.redraw = True
 		out: str = ""
 		out_misc: str = ""
@@ -1838,47 +1858,65 @@ class ProcBox(Box):
 		prog_len: int; arg_len: int; val: int; c_color: str; m_color: str; t_color: str; sort_pos: int; tree_len: int; is_selected: bool; calc: int
 		l_count: int = 0
 		loc_string: str
+		scroll_pos: int = 0
 		indent: str = ""
 		offset: int = 0
 		vals: List[str]
-		c_color = m_color = t_color = Fx.b
 		g_color: str = ""
+		s_len: int = 0
+		if proc.search_filter: s_len = len(proc.search_filter[:10])
 		end: str = ""
 
-		if w > 67: arg_len = w - 53; prog_len = 15
-		else: arg_len = 0; prog_len = w - 38
+		if w > 67:
+			arg_len = w - 53 - (1 if proc.num_procs > cls.select_max else 0)
+			prog_len = 15
+		else:
+			arg_len = 0
+			prog_len = w - 38 - (1 if proc.num_procs > cls.select_max else 0)
 		if CONFIG.proc_tree:
 			tree_len = arg_len + prog_len + 6
 			arg_len = 0
 
 		if cls.resized or cls.redraw:
+			cls.select_max = h - 1
+			cls.current_y = y
 			sort_pos = x + w - len(CONFIG.proc_sorting) - 7
 			Key.mouse["left"] = [[sort_pos + i, y-1] for i in range(3)]
 			Key.mouse["right"] = [[sort_pos + len(CONFIG.proc_sorting) + 3 + i, y-1] for i in range(3)]
 			Key.mouse["e"] = [[sort_pos - 5 + i, y-1] for i in range(4)]
 
-
-			out_misc += (f'{Mv.to(y-1, x + 15)}{THEME.proc_box(Symbol.h_line * (w - 16))}'
+			out_misc += (f'{Mv.to(y-1, x + 8)}{THEME.proc_box(Symbol.h_line * (w - 9))}'
 				f'{Mv.to(y-1, sort_pos)}{THEME.proc_box(Symbol.title_left)}{Fx.b}{THEME.hi_fg("<")} {THEME.title(CONFIG.proc_sorting)} '
-				f'{THEME.hi_fg(">")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
-				f'{Mv.to(y-1, sort_pos - 6)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_tree else ""}'
-				f'{THEME.title("tre")}{THEME.hi_fg("e")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
-			if w > 50:
+				f'{THEME.hi_fg(">")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
+
+			if w > 37 + s_len:
+				out_misc += (f'{Mv.to(y-1, sort_pos - 6)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_tree else ""}'
+					f'{THEME.title("tre")}{THEME.hi_fg("e")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
+			if w > 45 + s_len:
 				Key.mouse["r"] = [[sort_pos - 14 + i, y-1] for i in range(7)]
 				out_misc += (f'{Mv.to(y-1, sort_pos - 15)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_reversed else ""}'
 					f'{THEME.hi_fg("r")}{THEME.title("everse")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
-			if w > 58:
-				Key.mouse["c"] = [[sort_pos - 22 + i, y-1] for i in range(6)]
-				out_misc += (f'{Mv.to(y-1, sort_pos - 23)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_colors else ""}'
-					f'{THEME.hi_fg("c")}{THEME.title("olors")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
-			if w > 68:
-				Key.mouse["g"] = [[sort_pos - 32 + i, y-1] for i in range(8)]
-				out_misc += (f'{Mv.to(y-1, sort_pos - 33)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_gradient else ""}{THEME.hi_fg("g")}'
-					f'{THEME.title("radient")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
-			if w > 78:
-				Key.mouse["o"] = [[sort_pos - 42 + i, y-1] for i in range(8)]
-				out_misc += (f'{Mv.to(y-1, sort_pos - 43)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_per_core else ""}'
+			if w > 55 + s_len:
+				Key.mouse["o"] = [[sort_pos - 24 + i, y-1] for i in range(8)]
+				out_misc += (f'{Mv.to(y-1, sort_pos - 25)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_per_core else ""}'
 					f'{THEME.title("per-c")}{THEME.hi_fg("o")}{THEME.title("re")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
+			if w > 65 + s_len:
+				Key.mouse["g"] = [[sort_pos - 34 + i, y-1] for i in range(8)]
+				out_misc += (f'{Mv.to(y-1, sort_pos - 35)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_gradient else ""}{THEME.hi_fg("g")}'
+					f'{THEME.title("radient")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
+			if w > 73 + s_len:
+				Key.mouse["c"] = [[sort_pos - 42 + i, y-1] for i in range(6)]
+				out_misc += (f'{Mv.to(y-1, sort_pos - 43)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_colors else ""}'
+					f'{THEME.hi_fg("c")}{THEME.title("olors")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
+
+			Key.mouse["f"] = [[x+9 + i, y-1] for i in range(6 if not proc.search_filter else 2 + len(proc.search_filter[-10:]))]
+			if proc.search_filter:
+				Key.mouse["delete"] = [[x+12 + len(proc.search_filter[-10:]) + i, y-1] for i in range(3)]
+			elif "delete" in Key.mouse:
+				del Key.mouse["delete"]
+			out_misc += (f'{Mv.to(y-1, x + 8)}{THEME.proc_box(Symbol.title_left)}{Fx.b if cls.filtering or proc.search_filter else ""}{THEME.hi_fg("f")}{THEME.title}' +
+				("ilter" if not proc.search_filter and not cls.filtering else f' {proc.search_filter[-(10 if w < 83 else w - 74):]}{(Fx.bl + "█" + Fx.ubl) if cls.filtering else THEME.hi_fg(" del")}') +
+				f'{THEME.proc_box(Symbol.title_right)}')
 
 			Draw.buffer("proc_misc", out_misc, only_save=True)
 
@@ -1886,18 +1924,25 @@ class ProcBox(Box):
 		if selected == "memory": selected = "mem"
 		if selected == "threads" and not CONFIG.proc_tree and not arg_len: selected = "tr"
 		if CONFIG.proc_tree:
-			out += f'{THEME.title}{Fx.b}{Mv.to(y, x)}{" Tree:":<{tree_len-2}}' "Threads: " f'{"User:":<9}Mem%{"Cpu%":>11}{Fx.ub}{THEME.main_fg}'
+			out += (f'{THEME.title}{Fx.b}{Mv.to(y, x)}{" Tree:":<{tree_len-2}}' "Threads: " f'{"User:":<9}Mem%{"Cpu%":>11}{Fx.ub}{THEME.main_fg} ' +
+					(" " if proc.num_procs > cls.select_max else ""))
 			if selected in ["program", "arguments"]: selected = "tree"
 		else:
 			out += (f'{THEME.title}{Fx.b}{Mv.to(y, x)}{"Pid:":>7} {"Program:" if prog_len > 8 else "Prg:":<{prog_len}}' + (f'{"Arguments:":<{arg_len-4}}' if arg_len else "") +
-			f'{"Threads:" if arg_len else " Tr:"} {"User:":<9}Mem%{"Cpu%":>11}{Fx.ub}{THEME.main_fg}')
+				f'{"Threads:" if arg_len else " Tr:"} {"User:":<9}Mem%{"Cpu%":>11}{Fx.ub}{THEME.main_fg} ' +
+				(" " if proc.num_procs > cls.select_max else ""))
 			if selected == "program" and prog_len <= 8: selected = "prg"
 		selected = selected.split(" ")[0].capitalize()
 		out = out.replace(selected, f'{Fx.u}{selected}{Fx.uu}')
 		cy = 1
 
-		if cls.start > proc.num_procs - cls.select_max + 1: cls.start = proc.num_procs - cls.select_max + 1 if proc.num_procs > cls.select_max else 0
-		if cls.selected > cls.select_max: cls.selected = cls.select_max
+		if cls.start > proc.num_procs - cls.select_max + 1 and proc.num_procs > cls.select_max: cls.start = proc.num_procs - cls.select_max + 1
+		elif cls.start > proc.num_procs: cls.start = proc.num_procs
+		if cls.start < 1: cls.start = 1
+		if cls.selected > proc.num_procs and proc.num_procs < cls.select_max: cls.selected = proc.num_procs
+		elif cls.selected > cls.select_max: cls.selected = cls.select_max
+		if cls.selected < 0: cls.selected = 0
+
 
 		for n, (pid, items) in enumerate(proc.processes.items(), start=1):
 			if n < cls.start: continue
@@ -1939,6 +1984,8 @@ class ProcBox(Box):
 					else:
 						vals += [f'{THEME.gradient["cpu"][v if v <= 100 else 100]}']
 				c_color, m_color, t_color = vals
+			else:
+				c_color = m_color = t_color = Fx.b
 			if CONFIG.proc_gradient and not is_selected:
 				g_color = f'{THEME.gradient["proc"][calc * 100 // cls.select_max]}'
 			if is_selected:
@@ -1951,21 +1998,34 @@ class ProcBox(Box):
 				t_color + (f'{threads:>4} ' if threads < 1000 else "999> ") + end +
 				g_color + (f'{username:<9.9}' if len(username) < 10 else f'{username[:8]:<8}+') +
 				m_color + (f'{mem:>4.1f}' if mem < 100 else f'{mem:>4.0f} ') + end +
-				f' {THEME.inactive_fg}{"⡀"*5}{THEME.main_fg}{g_color}{c_color}' + (f' {cpu:>4.1f} ' if cpu < 100 else f'{cpu:>5.0f} ') + end)
+				f' {THEME.inactive_fg}{"⡀"*5}{THEME.main_fg}{g_color}{c_color}' + (f' {cpu:>4.1f} ' if cpu < 100 else f'{cpu:>5.0f} ') + end +
+				(" " if proc.num_procs > cls.select_max else ""))
+
 			if pid in Graphs.pid_cpu:
-				if is_selected: c_color = THEME.proc_misc
+				#if is_selected: c_color = THEME.proc_misc
 				out += f'{Mv.to(y+cy, x + w - 11)}{c_color if CONFIG.proc_colors else THEME.proc_misc}{Graphs.pid_cpu[pid](None if cls.moved else round(cpu))}{THEME.main_fg}'
-			if selected: out += f'{Fx.ub}{Term.fg}{Term.bg}'
+			if is_selected: out += f'{Fx.ub}{Term.fg}{Term.bg}{Mv.to(y+cy, x + w - 1)}{" " if proc.num_procs > cls.select_max else ""}'
 
 			cy += 1
 			if cy == h: break
 		if cy < h:
 			for i in range(h-cy):
 				out += f'{Mv.to(y+cy+i, x)}{" " * w}'
-		loc_string = f'{cls.start + cls.selected - 1}/{len(proc.processes)}'
+		loc_string = f'{cls.start + cls.selected - 1}/{proc.num_procs}'
 		out += (f'{Mv.to(y+h, x + w - 15 - len(loc_string))}{THEME.proc_box}{Symbol.h_line*10}{Symbol.title_left}{THEME.title}'
 				f'{Fx.b}{loc_string}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
 
+		if proc.num_procs > cls.select_max:
+			Key.mouse["mouse_scroll_up"] = [[x+w-1, y]]
+			Key.mouse["mouse_scroll_down"] = [[x+w-1, y+h-1]]
+			scroll_pos = round(cls.start * (cls.select_max - 2) / (proc.num_procs - (cls.select_max - 2)))
+			if scroll_pos < 0 or cls.start == 1: scroll_pos = 0
+			elif scroll_pos > h - 3 or cls.start >= proc.num_procs - cls.select_max: scroll_pos = h - 3
+			out += (f'{Mv.to(y, x+w-1)}{Fx.b}{THEME.main_fg}↑{Mv.to(y+h-1, x+w-1)}↓{Fx.ub}'
+					f'{Mv.to(y+1+scroll_pos, x+w-1)}█')
+		elif "scroll_up" in Key.mouse:
+			del Key.mouse["scroll_up"], Key.mouse["scroll_down"]
+		#▼▲ ↓  ↑
 		cls.count += 1
 		if cls.count == 100:
 			cls.count == 0
@@ -1992,6 +2052,7 @@ class Collector:
 	collect_done = threading.Event()
 	collect_queue: List = []
 	collect_interrupt: bool = False
+	proc_interrupt: bool = False
 	use_draw_list: bool = False
 
 	@classmethod
@@ -2045,15 +2106,18 @@ class Collector:
 				cls.collect_done.set()
 		except Exception as e:
 			errlog.exception(f'Data collection thread failed with exception: {e}')
+			cls.collect_idle.set()
 			cls.collect_done.set()
 			clean_quit(1, thread=True)
 
 	@classmethod
-	def collect(cls, *collectors, draw_now: bool = True, interrupt: bool = False, redraw: bool = False, only_draw: bool = False):
+	def collect(cls, *collectors, draw_now: bool = True, interrupt: bool = False, proc_interrupt: bool = False, redraw: bool = False, only_draw: bool = False):
 		'''Setup collect queue for _runner'''
 		cls.collect_interrupt = interrupt
+		cls.proc_interrupt = proc_interrupt
 		cls.collect_idle.wait()
 		cls.collect_interrupt = False
+		cls.proc_interrupt = False
 		cls.use_draw_list = False
 		cls.draw_now = draw_now
 		cls.redraw = redraw
@@ -2411,6 +2475,7 @@ class NetCollector(Collector):
 		elif cls.nic_i < 0: cls.nic_i = len(cls.nics) - 1
 		cls.new_nic = cls.nics[cls.nic_i]
 		cls.switched = True
+		Collector.collect(NetCollector, redraw=True)
 
 	@classmethod
 	def _collect(cls):
@@ -2505,9 +2570,11 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 	search_filter: str = ""
 	processes: Dict = {}
 	num_procs: int = 0
+	detailed: bool = False
+	details: Dict[str, Union[str, int, float, NamedTuple]] = {}
+	details_cpu: List[int] = []
 	proc_dict: Dict = {}
 	p_values: List[str] = ["pid", "name", "cmdline", "num_threads", "username", "memory_percent", "cpu_percent", "cpu_times", "create_time"]
-	sorting_index: int = Config.sorting_options.index(CONFIG.proc_sorting)
 	sort_expr: Dict = {}
 	sort_expr["pid"] = compile("p.info['pid']", "str", "eval")
 	sort_expr["program"] = compile("p.info['name']", "str", "eval")
@@ -2529,6 +2596,39 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 		err: float = 0.0
 		n: int = 0
 
+		if cls.detailed and not cls.details.get("killed", False):
+			try:
+				det = psutil.Process(ProcBox.selected_pid)
+			except (psutil.NoSuchProcess, psutil.ZombieProcess):
+				cls.details["killed"] = True
+				cls.details["status"] = psutil.STATUS_DEAD
+			else:
+				cls.details = det.as_dict(attrs=["pid", "name", "username", "status", "cmdline", "memory_info", "memory_percent", "create_time", "num_threads", "cpu_percent", "cpu_num"], ad_value="")
+				if det.parent() != None: cls.details["parent_name"] = det.parent().name()
+				else: cls.details["parent_name"] = ""
+
+				cls.details["killed"] = False
+
+				if isinstance(cls.details["cmdline"], list): cls.details["cmdline"] = " ".join(cls.details["cmdline"]) or f'[{cls.details["name"]}]'
+
+				if hasattr(cls.details["memory_info"], "rss"): cls.details["memory_bytes"] = floating_humanizer(cls.details["memory_info"].rss) # type: ignore
+				else: cls.details["memory_bytes"] = "? Bytes"
+
+				if isinstance(cls.details["create_time"], float): cls.details["uptime"] = f'{timedelta(seconds=round(time()-cls.details["create_time"],0))}'
+				else: cls.details["uptime"] = "??:??:??"
+
+				for v in ["cpu_percent", "memory_percent"]:
+					if isinstance(cls.details[v], float):
+						if cls.details[v] >= 100: cls.details[v] = round(cls.details[v]) # type: ignore
+						elif cls.details[v] >= 10: cls.details[v] = round(cls.details[v], 1) # type: ignore
+						else: cls.details[v] = round(cls.details[v], 2) # type: ignore
+					else:
+						cls.details[v] = 0.0
+
+				cls.details_cpu.append(round(cls.details["cpu_percent"])) # type: ignore
+				if len(cls.details_cpu) > ProcBox.width: del cls.details_cpu[0]
+
+
 		if CONFIG.proc_tree and sorting == "arguments":
 			sorting = "program"
 
@@ -2539,7 +2639,7 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 			return
 
 		for p in sorted(psutil.process_iter(cls.p_values, err), key=lambda p: eval(sort_cmd), reverse=reverse):
-			if cls.collect_interrupt:
+			if cls.collect_interrupt or cls.proc_interrupt:
 				return
 			if p.info["name"] == "idle" or p.info["name"] == err or p.info["pid"] == err:
 				continue
@@ -2593,7 +2693,6 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 			else:
 				infolist[p.pid] = p.info
 				n += 1
-		cls.num_procs = n
 		if 0 in tree and 0 in tree[0]:
 			tree[0].remove(0)
 
@@ -2609,6 +2708,7 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 			except psutil.Error:
 				pass
 				cont = False
+				name = ""
 			if pid in infolist:
 				getinfo = infolist[pid]
 			else:
@@ -2655,15 +2755,16 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 		create_tree(min(tree), tree)
 
 		if cls.collect_interrupt: return
+		cls.num_procs = len(out)
 		cls.processes = out.copy()
 
 	@classmethod
 	def sorting(cls, key: str):
-		cls.sorting_index += 1 if key == "right" else -1
-		if cls.sorting_index >= len(CONFIG.sorting_options): cls.sorting_index = 0
-		elif cls.sorting_index < 0: cls.sorting_index = len(CONFIG.sorting_options) - 1
-		CONFIG.proc_sorting = CONFIG.sorting_options[cls.sorting_index]
-		ProcBox.redraw = True
+		index: int = CONFIG.sorting_options.index(CONFIG.proc_sorting) + (1 if key == "right" else -1)
+		if index >= len(CONFIG.sorting_options): index = 0
+		elif index < 0: index = len(CONFIG.sorting_options) - 1
+		CONFIG.proc_sorting = CONFIG.sorting_options[index]
+		Collector.collect(ProcCollector, interrupt=True, redraw=True)
 
 	@classmethod
 	def _draw(cls):
@@ -2955,6 +3056,7 @@ def floating_humanizer(value: Union[float, int], bit: bool = False, per_second: 
 
 	if isinstance(value, float): value = round(value * 100 * mult)
 	elif value > 0: value *= 100 * mult
+	else: value = 0
 
 	while len(f'{value}') > 5 and value >= 102400:
 		value >>= 10
@@ -2979,14 +3081,37 @@ def floating_humanizer(value: Union[float, int], bit: bool = False, per_second: 
 	return out
 
 def process_keys():
-	mouse_pos: Tuple[int, int]
+	mouse_pos: Tuple[int, int] = (0, 0)
+	filtered: bool = False
 	while Key.has_key():
 		key = Key.get()
-		if key in ["mouse_scroll_up", "mouse_scroll_down"]:
+		if key in ["mouse_scroll_up", "mouse_scroll_down", "mouse_click"]:
 			mouse_pos = Key.get_mouse()
-			if mouse_pos[0] >= ProcBox.x and mouse_pos[1] >= ProcBox.y:
+			if mouse_pos[0] >= ProcBox.x and mouse_pos[1] >= ProcBox.current_y:
 				pass
-			else: key = "_null"
+			elif key == "mouse_click":
+				key = "mouse_unselect"
+			else:
+				key = "_null"
+
+		if ProcBox.filtering:
+			if key in ["enter", "mouse_click", "mouse_unselect"]:
+				ProcBox.filtering = False
+				Collector.collect(ProcCollector, redraw=True, only_draw=True)
+				continue
+			elif key in ["escape", "delete"]:
+				ProcCollector.search_filter = ""
+				ProcBox.filtering = False
+			elif len(key) == 1:
+				ProcCollector.search_filter += key
+			elif key == "backspace" and len(ProcCollector.search_filter) > 0:
+				ProcCollector.search_filter = ProcCollector.search_filter[:-1]
+			else:
+				continue
+			Collector.collect(ProcCollector, proc_interrupt=True, redraw=True)
+			if filtered: Collector.collect_done.wait(0.1)
+			filtered = True
+			continue
 
 
 		if key == "_null":
@@ -3001,7 +3126,6 @@ def process_keys():
 			Box.draw_update_ms()
 		elif key in ["b", "n"]:
 			NetCollector.switch(key)
-			Collector.collect(NetCollector, redraw=True)
 		elif key in ["m", "escape"]:
 			Menu.main()
 		elif key == "z":
@@ -3009,7 +3133,6 @@ def process_keys():
 			Collector.collect(NetCollector)
 		elif key in ["left", "right"]:
 			ProcCollector.sorting(key)
-			Collector.collect(ProcCollector, interrupt=True, redraw=True)
 		elif key == "e":
 			CONFIG.proc_tree = not CONFIG.proc_tree
 			Collector.collect(ProcCollector, interrupt=True, redraw=True)
@@ -3027,27 +3150,30 @@ def process_keys():
 			Collector.collect(ProcCollector, interrupt=True, redraw=True)
 		elif key == "h":
 			CONFIG.mem_graphs = not CONFIG.mem_graphs
-			Collector.collect(MemCollector, redraw=True)
+			Collector.collect(MemCollector, interrupt=True, redraw=True)
 		elif key == "p":
 			CONFIG.swap_disk = not CONFIG.swap_disk
-			Collector.collect(MemCollector, redraw=True)
-		elif key in ["up", "down", "mouse_scroll_up", "mouse_scroll_down", "page_up", "page_down", "home", "end"]:
-			if ProcBox.selector(key):
-				Collector.collect(ProcCollector, only_draw=True)
+			Collector.collect(MemCollector, interrupt=True, redraw=True)
+		elif key == "f":
+			ProcBox.filtering = True
+			if not ProcCollector.search_filter: ProcBox.start = 0
+			Collector.collect(ProcCollector, redraw=True, only_draw=True)
+		elif key == "delete" and ProcCollector.search_filter:
+			ProcCollector.search_filter = ""
+			Collector.collect(ProcCollector, proc_interrupt=True, redraw=True)
+		elif key == "enter" and ProcBox.selected > 0:
+			if ProcCollector.details.get("pid", None) == ProcBox.selected_pid:
+				ProcCollector.detailed = False
+			elif psutil.pid_exists(ProcBox.selected_pid):
+				ProcCollector.detailed = True
+			else:
+				continue
+			ProcCollector.details = {}
+			ProcCollector.details_cpu = []
+			Collector.collect(ProcCollector, proc_interrupt=True, redraw=True)
 
-#? Main function --------------------------------------------------------------------------------->
-
-def main():
-	Term.refresh()
-	Timer.stamp()
-
-	while Timer.not_zero():
-		if Key.input_wait(Timer.left()) and not Menu.active:
-			process_keys()
-
-	Collector.collect()
-
-	#	Draw.buffer("!mouse_pos", f'{Key.mouse_pos}', z=0)
+		elif key in ["up", "down", "mouse_scroll_up", "mouse_scroll_down", "page_up", "page_down", "home", "end", "mouse_click", "mouse_unselect"]:
+			ProcBox.selector(key, mouse_pos)
 
 
 #? Pre main -------------------------------------------------------------------------------------->
@@ -3085,12 +3211,14 @@ if __name__ == "__main__":
 				Draw.buffer("initbg", z=10)
 				for i in range(51):
 					for _ in range(2): cls.initbg_colors.append(Color.fg(i, i, i))
-				Draw.buffer("banner", f'{Banner.draw(Term.height // 2 - 10, center=True)}{Color.fg("#50")}\n', z=2)
+				Draw.buffer("banner", (f'{Banner.draw(Term.height // 2 - 10, center=True)}{Mv.d(1)}{Mv.l(11)}{Colors.black_bg}{Colors.default}'
+						f'{Fx.b}{Fx.i}Version: {VERSION}{Fx.ui}{Fx.ub}{Term.bg}{Term.fg}{Color.fg("#50")}'), z=2)
 				for _i in range(7):
 					perc = f'{str(round((_i + 1) * 14 + 2)) + "%":>5}'
-					Draw.buffer("+banner", f'{Mv.to(Term.height // 2 - 3 + _i, Term.width // 2 - 28)}{Fx.trans(perc)}{Symbol.v_line}')
+					Draw.buffer("+banner", f'{Mv.to(Term.height // 2 - 2 + _i, Term.width // 2 - 28)}{Fx.trans(perc)}{Symbol.v_line}')
+
 				Draw.out("banner")
-				Draw.buffer("+init!", f'{Color.fg("#cc")}{Fx.b}{Mv.to(Term.height // 2 - 3, Term.width // 2 - 21)}{Mv.save}')
+				Draw.buffer("+init!", f'{Color.fg("#cc")}{Fx.b}{Mv.to(Term.height // 2 - 2, Term.width // 2 - 21)}{Mv.save}')
 
 				cls.initbg_data = [randint(0, 100) for _ in range(Term.width * 2)]
 				cls.initbg_up = Graph(Term.width, Term.height // 2, cls.initbg_colors, cls.initbg_data, invert=True)
@@ -3098,8 +3226,7 @@ if __name__ == "__main__":
 
 			if start: return
 
-
-			cls.draw_bg(5)
+			cls.draw_bg(10)
 			Draw.buffer("+init!", f'{Mv.restore}{Symbol.ok}\n{Mv.r(Term.width // 2 - 22)}{Mv.save}')
 
 		@classmethod
@@ -3117,14 +3244,13 @@ if __name__ == "__main__":
 			if cls.resized:
 				Draw.now(Term.clear)
 			else:
-				cls.draw_bg(15)
-			Draw.clear("initbg", "banner", "init")
+				cls.draw_bg(20)
+			Draw.clear("initbg", "banner", "init", saved=True)
 			del cls.initbg_up, cls.initbg_down, cls.initbg_data, cls.initbg_colors
 
 
-	#? Switch to alternate screen, clear screen, hide cursor and disable input echo
+	#? Switch to alternate screen, clear screen, hide cursor, enable mouse reporting and disable input echo
 	Draw.now(Term.alt_screen, Term.clear, Term.hide_cursor, Term.mouse_on)
-
 	Term.echo(False)
 	Term.refresh()
 
@@ -3212,13 +3338,25 @@ if __name__ == "__main__":
 	Draw.out(clear=True)
 	if DEBUG: TimeIt.stop("Init")
 
+	#? Main loop ------------------------------------------------------------------------------------->
+
+	def main():
+		while not False:
+			Term.refresh()
+			Timer.stamp()
+
+			while Timer.not_zero():
+				if Key.input_wait(Timer.left()) and not Menu.active:
+					process_keys()
+
+			Collector.collect()
+
 	#? Start main loop
-	while not False:
-		try:
-			main()
-		except Exception as e:
-			errlog.exception(f'{e}')
-			clean_quit(1)
+	try:
+		main()
+	except Exception as e:
+		errlog.exception(f'{e}')
+		clean_quit(1)
 	else:
 		#? Quit cleanly even if false starts being true...
 		clean_quit()
