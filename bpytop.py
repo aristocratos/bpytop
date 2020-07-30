@@ -23,7 +23,6 @@ from datetime import timedelta
 from _thread import interrupt_main
 from collections import defaultdict
 from select import select
-from itertools import cycle
 from distutils.util import strtobool
 from string import Template
 from math import ceil, floor
@@ -291,7 +290,8 @@ def timeit_decorator(func):
 
 class Config:
 	'''Holds all config variables and functions for loading from and saving to disk'''
-	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name", "proc_colors", "proc_gradient", "proc_per_core", "disks_filter", "update_check", "log_level", "mem_graphs", "show_swap", "swap_disk", "show_disks", "show_init"]
+	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name", "proc_colors", "proc_gradient", "proc_per_core", "disks_filter", "update_check", "log_level", "mem_graphs", "show_swap", "swap_disk", "show_disks", "show_init",
+		"mini_mode"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	update_ms: int = 2000
@@ -312,6 +312,7 @@ class Config:
 	swap_disk: bool = True
 	show_disks: bool = True
 	show_init: bool = True
+	mini_mode: bool = False
 	log_level: str = "WARNING"
 
 	warnings: List[str] = []
@@ -444,11 +445,11 @@ class Term:
 	winch = threading.Event()
 
 	@classmethod
-	def refresh(cls, *args):
+	def refresh(cls, *args, force: bool = False):
 		"""Update width, height and set resized flag if terminal has been resized"""
 		if cls.resized: cls.winch.set(); return
 		cls._w, cls._h = os.get_terminal_size()
-		if (cls._w, cls._h) == (cls.width, cls.height): return
+		if (cls._w, cls._h) == (cls.width, cls.height) and not force: return
 		while (cls._w, cls._h) != (cls.width, cls.height) or (cls._w < 80 or cls._h < 24):
 			if Init.running: Init.resized = True
 			cls.resized = True
@@ -1141,6 +1142,11 @@ class Symbol:
 	graph_down_small = graph_down.copy()
 	graph_down_small[0.0] = "\033[1C"
 	meter: str = "■"
+	up: str = "↑"
+	down: str = "↓"
+	left: str = "←"
+	right: str = "→"
+	enter: str = "↲"
 	ok: str = f'{Color.fg("#30ff50")}√{Color.fg("#cc")}'
 	fail: str = f'{Color.fg("#ff3050")}!{Color.fg("#cc")}'
 
@@ -1267,8 +1273,8 @@ class Graphs:
 	cores: List[Graph] = [NotImplemented] * THREADS
 	temps: List[Graph] = [NotImplemented] * (THREADS + 1)
 	net: Dict[str, Graph] = {}
-	detailed_cpu: Graph
-	detailed_mem: Graph
+	detailed_cpu: Graph = NotImplemented
+	detailed_mem: Graph = NotImplemented
 	pid_cpu: Dict[int, Graph] = {}
 
 class Meter:
@@ -1340,6 +1346,7 @@ class Box:
 	y: int
 	width: int
 	height: int
+	mini_mode: bool = CONFIG.mini_mode or False
 	out: str
 	bg: str
 	_b_cpu_h: int
@@ -1393,8 +1400,12 @@ class CpuBox(Box, SubBox):
 
 	@classmethod
 	def _calc_size(cls):
+		height_p: int
+		if cls.mini_mode: height_p = 20
+		else: height_p = cls.height_p
 		cls.width = round(Term.width * cls.width_p / 100)
-		cls.height = round(Term.height * cls.height_p / 100)
+		cls.height = round(Term.height * height_p / 100)
+		if cls.height < 8: cls.height = 8
 		Box._b_cpu_h = cls.height
 		#THREADS = 64
 		cls.box_columns = ceil((THREADS + 1) / (cls.height - 5))
@@ -1424,12 +1435,15 @@ class CpuBox(Box, SubBox):
 		cpu = CpuCollector
 		if cpu.redraw: cls.redraw = True
 		out: str = ""
+		out_misc: str = ""
 		lavg: str = ""
 		x, y, w, h = cls.x + 1, cls.y + 1, cls.width - 2, cls.height - 2
 		bx, by, bw, bh = cls.box_x + 1, cls.box_y + 1, cls.box_width - 2, cls.box_height - 2
 		hh: int = ceil(h / 2)
 
 		if cls.resized or cls.redraw:
+			Key.mouse["i"] = [[cls.x + 16 + i, cls.y] for i in range(6)]
+			out_misc += f'{Mv.to(cls.y, cls.x + 16)}{THEME.cpu_box(Symbol.title_left)}{Fx.b if Box.mini_mode else ""}{THEME.title("min")}{THEME.hi_fg("i")}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}'
 			Graphs.cpu["up"] = Graph(w - bw - 3, hh, THEME.gradient["cpu"], cpu.cpu_usage[0])
 			Graphs.cpu["down"] = Graph(w - bw - 3, h - hh, THEME.gradient["cpu"], cpu.cpu_usage[0], invert=True)
 			Meters.cpu = Meter(cpu.cpu_usage[0][-1], (bw - 9 - 13 if CONFIG.check_temp else bw - 9), "cpu")
@@ -1441,6 +1455,7 @@ class CpuBox(Box, SubBox):
 				if cls.column_size > 1:
 					for n in range(1, THREADS + 1):
 						Graphs.temps[n] = Graph(5, 1, None, cpu.cpu_temp[n], max_value=cpu.cpu_temp_crit, offset=-23)
+			Draw.buffer("cpu_misc", out_misc, only_save=True)
 
 		cx = cy = cc = 0
 		ccw = (bw + 1) // cls.box_columns
@@ -1487,7 +1502,7 @@ class CpuBox(Box, SubBox):
 		out += f'{Mv.to(y + h - 1, x + 1)}{THEME.inactive_fg}up {cpu.uptime}'
 
 
-		Draw.buffer(cls.buffer, f'{out}{Term.fg}', only_save=Menu.active)
+		Draw.buffer(cls.buffer, f'{out_misc}{out}{Term.fg}', only_save=Menu.active)
 		cls.resized = cls.redraw = False
 
 class MemBox(Box):
@@ -1549,6 +1564,7 @@ class MemBox(Box):
 
 	@classmethod
 	def _draw_bg(cls) -> str:
+		if cls.mini_mode: return ""
 		out: str = ""
 		out += f'{create_box(box=cls, line_color=THEME.mem_box)}'
 		if CONFIG.show_disks:
@@ -1560,6 +1576,7 @@ class MemBox(Box):
 
 	@classmethod
 	def _draw_fg(cls):
+		if cls.mini_mode: return
 		mem = MemCollector
 		if mem.redraw: cls.redraw = True
 		out: str = ""
@@ -1700,11 +1717,13 @@ class NetBox(Box, SubBox):
 
 	@classmethod
 	def _draw_bg(cls) -> str:
+		if cls.mini_mode: return ""
 		return f'{create_box(box=cls, line_color=THEME.net_box)}\
 		{create_box(x=cls.box_x, y=cls.box_y, width=cls.box_width, height=cls.box_height, line_color=THEME.div_line, fill=False, title="Download", title2="Upload")}'
 
 	@classmethod
 	def _draw_fg(cls):
+		if cls.mini_mode: return
 		net = NetCollector
 		if net.redraw: cls.redraw = True
 		if not net.nic: return
@@ -1757,6 +1776,7 @@ class ProcBox(Box):
 	x = 1
 	y = 1
 	current_y: int = 0
+	current_h: int = 0
 	select_max: int = 0
 	selected: int = 0
 	selected_pid: int = 0
@@ -1764,6 +1784,7 @@ class ProcBox(Box):
 	moved: bool = False
 	start: int = 1
 	count: int = 0
+	s_len: int = 0
 	detailed: bool = False
 	detailed_x: int = 0
 	detailed_y: int = 0
@@ -1777,14 +1798,19 @@ class ProcBox(Box):
 
 	@classmethod
 	def _calc_size(cls):
-		cls.width = round(Term.width * cls.width_p / 100)
-		cls.height = round(Term.height * cls.height_p / 100)
+		width_p: int; height_p: int
+		if cls.mini_mode:
+			width_p, height_p = 100, 80
+		else:
+			width_p, height_p = cls.width_p, cls.height_p
+		cls.width = round(Term.width * width_p / 100)
+		cls.height = round(Term.height * height_p / 100)
+		if cls.height + Box._b_cpu_h > Term.height: cls.height = Term.height - Box._b_cpu_h
 		cls.x = Term.width - cls.width + 1
 		cls.y = Box._b_cpu_h + 1
-		cls.detailed_x = cls.x
-		cls.detailed_y = cls.y
-		cls.detailed_height = 8
-		cls.detailed_width = cls.width
+		cls.current_y = cls.y
+		cls.current_h = cls.height
+		cls.select_max = cls.height - 3
 		cls.redraw = True
 		cls.resized = True
 
@@ -1795,6 +1821,7 @@ class ProcBox(Box):
 	@classmethod
 	def selector(cls, key: str, mouse_pos: Tuple[int, int] = (0, 0)):
 		old: Tuple[int, int] = (cls.start, cls.selected)
+		new_sel: int
 		if key == "up":
 			if cls.selected == 1 and cls.start > 1:
 				cls.start -= 1
@@ -1822,15 +1849,20 @@ class ProcBox(Box):
 			if cls.start < ProcCollector.num_procs - cls.select_max + 1: cls.start = ProcCollector.num_procs - cls.select_max + 1
 			elif cls.selected < cls.select_max: cls.selected = cls.select_max
 		elif key == "mouse_click":
-			if mouse_pos[0] > cls.x + cls.width - 4 and mouse_pos[1] > cls.current_y and mouse_pos[1] < cls.current_y + cls.select_max:
-				if mouse_pos[1] == cls.current_y + 1:
+			if mouse_pos[0] > cls.x + cls.width - 4 and mouse_pos[1] > cls.current_y + 1 and mouse_pos[1] < cls.current_y + 1 + cls.select_max + 1:
+				if mouse_pos[1] == cls.current_y + 2:
 					cls.start = 1
-				elif mouse_pos[1] == cls.current_y + cls.select_max - 1:
+				elif mouse_pos[1] == cls.current_y + 1 + cls.select_max:
 					cls.start = ProcCollector.num_procs - cls.select_max + 1
 				else:
-					cls.start = round((mouse_pos[1] - cls.current_y - 1) * ((ProcCollector.num_procs - cls.select_max - 2) / (cls.select_max - 2)))
+					cls.start = round((mouse_pos[1] - cls.current_y) * ((ProcCollector.num_procs - cls.select_max - 2) / (cls.select_max - 2)))
 			else:
-				cls.selected = mouse_pos[1] - cls.current_y if mouse_pos[1] >= cls.current_y else cls.selected
+				new_sel = mouse_pos[1] - cls.current_y - 1 if mouse_pos[1] >= cls.current_y - 1 else 0
+				if new_sel > 0 and new_sel == cls.selected:
+					Key.list.insert(0, "enter")
+					return
+				elif new_sel > 0 and new_sel != cls.selected:
+					cls.selected = new_sel
 		elif key == "mouse_unselect":
 			cls.selected = 0
 
@@ -1843,7 +1875,7 @@ class ProcBox(Box):
 
 		if old != (cls.start, cls.selected):
 			cls.moved = True
-			Collector.collect(ProcCollector, proc_interrupt=True, only_draw=True)
+			Collector.collect(ProcCollector, proc_interrupt=True, redraw=True, only_draw=True)
 
 
 	@classmethod
@@ -1854,18 +1886,25 @@ class ProcBox(Box):
 		out: str = ""
 		out_misc: str = ""
 		n: int = 0
-		x, y, w, h = cls.x + 1, cls.y + 1, cls.width - 2, cls.height - 2
+		x, y, w, h = cls.x + 1, cls.current_y + 1, cls.width - 2, cls.current_h - 2
 		prog_len: int; arg_len: int; val: int; c_color: str; m_color: str; t_color: str; sort_pos: int; tree_len: int; is_selected: bool; calc: int
+		dgx: int; dgw: int; dx: int; dw: int; dy: int
 		l_count: int = 0
-		loc_string: str
 		scroll_pos: int = 0
+		killed: bool = True
 		indent: str = ""
 		offset: int = 0
 		vals: List[str]
 		g_color: str = ""
 		s_len: int = 0
 		if proc.search_filter: s_len = len(proc.search_filter[:10])
+		loc_string: str = f'{cls.start + cls.selected - 1}/{proc.num_procs}'
 		end: str = ""
+
+		if proc.detailed:
+			dgx, dgw = x, w // 3
+			dx, dw = x + dgw + 2, w - dgw - 1
+			dy = cls.y + 1
 
 		if w > 67:
 			arg_len = w - 53 - (1 if proc.num_procs > cls.select_max else 0)
@@ -1877,49 +1916,156 @@ class ProcBox(Box):
 			tree_len = arg_len + prog_len + 6
 			arg_len = 0
 
+		#* Buttons and titles only redrawn if needed
 		if cls.resized or cls.redraw:
-			cls.select_max = h - 1
-			cls.current_y = y
+			s_len += len(CONFIG.proc_sorting)
+			if cls.resized or s_len != cls.s_len or proc.detailed:
+				cls.s_len = s_len
+				for k in ["e", "r", "o", "g", "c", "t", "k", "u", "enter"]:
+					if k in Key.mouse: del Key.mouse[k]
+			if proc.detailed:
+				killed = proc.details["killed"]
+				main = THEME.main_fg if cls.selected == 0 and not killed else THEME.inactive_fg
+				hi = THEME.hi_fg if cls.selected == 0 and not killed else THEME.inactive_fg
+				title = THEME.title if cls.selected == 0 and not killed else THEME.inactive_fg
+				if cls.current_y != cls.y + 8 or cls.resized or Graphs.detailed_cpu is NotImplemented:
+					cls.current_y = cls.y + 8
+					cls.current_h = cls.height - 8
+					for i in range(7): out_misc += f'{Mv.to(dy+i, x)}{" " * w}'
+					out_misc += (f'{Mv.to(dy+7, x-1)}{THEME.proc_box}{Symbol.title_right}{Symbol.h_line*w}{Symbol.title_left}'
+					f'{Mv.to(dy+7, x+1)}{THEME.proc_box(Symbol.title_left)}{Fx.b}{THEME.title(cls.name)}{Fx.ub}{THEME.proc_box(Symbol.title_right)}{THEME.div_line}')
+					for i in range(7):
+						out_misc += f'{Mv.to(dy + i, dgx + dgw + 1)}{Symbol.v_line}'
+
+				out_misc += (f'{Mv.to(dy-1, x-1)}{THEME.proc_box}{Symbol.left_up}{Symbol.h_line*w}{Symbol.right_up}'
+					f'{Mv.to(dy-1, dgx + dgw + 1)}{Symbol.div_up}'
+					f'{Mv.to(dy-1, x+1)}{THEME.proc_box(Symbol.title_left)}{Fx.b}{THEME.title(str(proc.details["pid"]))}{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
+					f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{THEME.title(proc.details["name"][:(dgw - 11)])}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
+
+				if cls.selected == 0:
+					Key.mouse["enter"] = [[dx+dw-10 + i, dy-1] for i in range(7)]
+				if cls.selected == 0 and not killed:
+					Key.mouse["t"] = [[dx+2 + i, dy-1] for i in range(9)]
+
+				out_misc += (f'{Mv.to(dy-1, dx+dw - 11)}{THEME.proc_box(Symbol.title_left)}{Fx.b}{title if cls.selected > 0 else THEME.title}close{Fx.ub} {main if cls.selected > 0 else THEME.main_fg}{Symbol.enter}{THEME.proc_box(Symbol.title_right)}'
+					f'{Mv.to(dy-1, dx+1)}{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}t{title}erminate{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
+				if dw > 28:
+					if cls.selected == 0 and not killed and not "k" in Key.mouse: Key.mouse["k"] = [[dx + 13 + i, dy-1] for i in range(4)]
+					out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}k{title}ill{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
+				if dw > 39:
+					if cls.selected == 0 and not killed and not "u" in Key.mouse: Key.mouse["u"] = [[dx + 19 + i, dy-1] for i in range(9)]
+					out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{title}interr{hi}u{title}pt{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
+
+				if Graphs.detailed_cpu is NotImplemented or cls.resized:
+					Graphs.detailed_cpu = Graph(dgw+1, 7, THEME.gradient["cpu"], proc.details_cpu)
+					Graphs.detailed_mem = Graph(dw // 3, 1, None, proc.details_mem)
+
+				cls.select_max = cls.height - 11
+				y = cls.y + 9
+				h = cls.height - 10
+
+			else:
+				if cls.current_y != cls.y or cls.resized:
+					cls.current_y = cls.y
+					cls.current_h = cls.height
+					y, h = cls.y + 1, cls.height - 2
+					out_misc += (f'{Mv.to(y-1, x-1)}{THEME.proc_box}{Symbol.left_up}{Symbol.h_line*w}{Symbol.right_up}'
+						f'{Mv.to(y-1, x+1)}{THEME.proc_box(Symbol.title_left)}{Fx.b}{THEME.title(cls.name)}{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
+						f'{Mv.to(y+7, x-1)}{THEME.proc_box(Symbol.v_line)}{Mv.r(w)}{THEME.proc_box(Symbol.v_line)}')
+				cls.select_max = cls.height - 3
+
+
 			sort_pos = x + w - len(CONFIG.proc_sorting) - 7
 			Key.mouse["left"] = [[sort_pos + i, y-1] for i in range(3)]
 			Key.mouse["right"] = [[sort_pos + len(CONFIG.proc_sorting) + 3 + i, y-1] for i in range(3)]
-			Key.mouse["e"] = [[sort_pos - 5 + i, y-1] for i in range(4)]
 
-			out_misc += (f'{Mv.to(y-1, x + 8)}{THEME.proc_box(Symbol.h_line * (w - 9))}'
+
+			out_misc += (f'{Mv.to(y-1, x + 8)}{THEME.proc_box(Symbol.h_line * (w - 9))}' +
+				("" if not proc.detailed else f"{Mv.to(dy+7, dgx + dgw + 1)}{THEME.proc_box(Symbol.div_down)}") +
 				f'{Mv.to(y-1, sort_pos)}{THEME.proc_box(Symbol.title_left)}{Fx.b}{THEME.hi_fg("<")} {THEME.title(CONFIG.proc_sorting)} '
 				f'{THEME.hi_fg(">")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
 
-			if w > 37 + s_len:
+
+			if w > 29 + s_len:
+				if not "e" in Key.mouse: Key.mouse["e"] = [[sort_pos - 5 + i, y-1] for i in range(4)]
 				out_misc += (f'{Mv.to(y-1, sort_pos - 6)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_tree else ""}'
 					f'{THEME.title("tre")}{THEME.hi_fg("e")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
-			if w > 45 + s_len:
-				Key.mouse["r"] = [[sort_pos - 14 + i, y-1] for i in range(7)]
+			if w > 37 + s_len:
+				if not "r" in Key.mouse: Key.mouse["r"] = [[sort_pos - 14 + i, y-1] for i in range(7)]
 				out_misc += (f'{Mv.to(y-1, sort_pos - 15)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_reversed else ""}'
 					f'{THEME.hi_fg("r")}{THEME.title("everse")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
-			if w > 55 + s_len:
-				Key.mouse["o"] = [[sort_pos - 24 + i, y-1] for i in range(8)]
+			if w > 47 + s_len:
+				if not "o" in Key.mouse: Key.mouse["o"] = [[sort_pos - 24 + i, y-1] for i in range(8)]
 				out_misc += (f'{Mv.to(y-1, sort_pos - 25)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_per_core else ""}'
 					f'{THEME.title("per-c")}{THEME.hi_fg("o")}{THEME.title("re")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
-			if w > 65 + s_len:
-				Key.mouse["g"] = [[sort_pos - 34 + i, y-1] for i in range(8)]
+			if w > 57 + s_len:
+				if not "g" in Key.mouse: Key.mouse["g"] = [[sort_pos - 34 + i, y-1] for i in range(8)]
 				out_misc += (f'{Mv.to(y-1, sort_pos - 35)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_gradient else ""}{THEME.hi_fg("g")}'
 					f'{THEME.title("radient")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
-			if w > 73 + s_len:
-				Key.mouse["c"] = [[sort_pos - 42 + i, y-1] for i in range(6)]
+			if w > 65 + s_len:
+				if not "c" in Key.mouse: Key.mouse["c"] = [[sort_pos - 42 + i, y-1] for i in range(6)]
 				out_misc += (f'{Mv.to(y-1, sort_pos - 43)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_colors else ""}'
 					f'{THEME.hi_fg("c")}{THEME.title("olors")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
 
-			Key.mouse["f"] = [[x+9 + i, y-1] for i in range(6 if not proc.search_filter else 2 + len(proc.search_filter[-10:]))]
+			if not "f" in Key.mouse or cls.resized: Key.mouse["f"] = [[x+9 + i, y-1] for i in range(6 if not proc.search_filter else 2 + len(proc.search_filter[-10:]))]
 			if proc.search_filter:
-				Key.mouse["delete"] = [[x+12 + len(proc.search_filter[-10:]) + i, y-1] for i in range(3)]
+				if not "delete" in Key.mouse: Key.mouse["delete"] = [[x+12 + len(proc.search_filter[-10:]) + i, y-1] for i in range(3)]
 			elif "delete" in Key.mouse:
 				del Key.mouse["delete"]
 			out_misc += (f'{Mv.to(y-1, x + 8)}{THEME.proc_box(Symbol.title_left)}{Fx.b if cls.filtering or proc.search_filter else ""}{THEME.hi_fg("f")}{THEME.title}' +
 				("ilter" if not proc.search_filter and not cls.filtering else f' {proc.search_filter[-(10 if w < 83 else w - 74):]}{(Fx.bl + "█" + Fx.ubl) if cls.filtering else THEME.hi_fg(" del")}') +
 				f'{THEME.proc_box(Symbol.title_right)}')
 
+
+			main = THEME.inactive_fg if cls.selected == 0 else THEME.main_fg
+			hi = THEME.inactive_fg if cls.selected == 0 else THEME.hi_fg
+			title = THEME.inactive_fg if cls.selected == 0 else THEME.title
+			out_misc += (f'{Mv.to(y+h, x + 1)}{THEME.proc_box}{Symbol.h_line*(w-4)}'
+					f'{Mv.to(y+h, x+1)}{THEME.proc_box(Symbol.title_left)}{main}{Symbol.up} {Fx.b}{THEME.main_fg("select")} {Fx.ub}'
+					f'{THEME.inactive_fg if cls.selected == cls.select_max else THEME.main_fg}{Symbol.down}{THEME.proc_box(Symbol.title_right)}'
+					f'{THEME.proc_box(Symbol.title_left)}{title}{Fx.b}info {Fx.ub}{main}{Symbol.enter}{THEME.proc_box(Symbol.title_right)}')
+			if not "enter" in Key.mouse: Key.mouse["enter"] = [[x + 14 + i, y+h] for i in range(6)]
+			if w - len(loc_string) > 34:
+				if not "t" in Key.mouse: Key.mouse["t"] = [[x + 22 + i, y+h] for i in range(9)]
+				out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}t{title}erminate{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
+			if w - len(loc_string) > 40:
+				if not "k" in Key.mouse: Key.mouse["k"] = [[x + 33 + i, y+h] for i in range(4)]
+				out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}k{title}ill{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
+			if w - len(loc_string) > 51:
+				if not "u" in Key.mouse: Key.mouse["u"] = [[x + 39 + i, y+h] for i in range(9)]
+				out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{title}interr{hi}u{title}pt{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
+
 			Draw.buffer("proc_misc", out_misc, only_save=True)
 
+		#* Detailed box draw
+		if proc.detailed:
+			expand: bool = True if cls.width >= 115 and "nice" in proc.details else False
+			if proc.details["status"] == psutil.STATUS_RUNNING: stat_color = Fx.b
+			elif proc.details["status"] in [psutil.STATUS_DEAD, psutil.STATUS_STOPPED, psutil.STATUS_ZOMBIE]: stat_color = THEME.inactive_fg
+			else: stat_color = ""
+			iw = round((dw - 3) // (8 if expand else 4))
+			iw2 = iw - 1
+			out += (f'{Mv.to(dy, dgx)}{Graphs.detailed_cpu(None if cls.moved or proc.details["killed"] else proc.details_cpu[-1])}'
+					f'{Mv.to(dy, dgx)}{THEME.title}{Fx.b}{0 if proc.details["killed"] else proc.details["cpu_percent"]}%{Mv.r(1)}C{proc.details["cpu_num"]}')
+			for i, l in enumerate(["C", "P", "U"]):
+				out += f'{Mv.to(dy+2+i, dgx)}{l}'
+			for i, l in enumerate(["C", "M", "D"]):
+				out += f'{Mv.to(dy+4+i, dx+1)}{l}'
+			out += (f'{Mv.to(dy, dx+1)} {"Status:":^{iw}}{"Elapsed:":^{iw}}{"Parent:":^{iw}}{"User:":^{iw}}' +
+					(f'{"Threads:":^{iw}}{"Nice:":^{iw}}{"IO Read:":^{iw}}{"IO Write:":^{iw}}{Fx.ub}' if expand else Fx.ub) +
+					f'{Mv.to(dy+1, dx+1)}{THEME.main_fg}{stat_color}{proc.details["status"]:^{iw}.{iw2}}{Fx.ub}{THEME.main_fg}{proc.details["uptime"]:^{iw}.{iw2}} '
+					f'{proc.details["parent_name"]:^{iw}.{iw2}}{proc.details["username"]:^{iw}.{iw2}}' +
+					(f'{proc.details["threads"]:^{iw}.{iw2}}{proc.details["nice"]:^{iw}.{iw2}}{proc.details["io_read"]:^{iw}.{iw2}}{proc.details["io_write"]:^{iw}.{iw2}}' if expand else "") +
+					f'{Mv.to(dy+3, dx)}{THEME.title}{Fx.b}{"Memory: " + str(round(proc.details["memory_percent"], 1)) + "%":>{dw//3-1}}{Fx.ub} {THEME.inactive_fg}{"⡀"*(dw//3)}'
+					f'{Mv.l(dw//3)}{THEME.proc_misc}{Graphs.detailed_mem(None if cls.moved else proc.details_mem[-1])} '
+					f'{THEME.title}{Fx.b}{proc.details["memory_bytes"]}{THEME.main_fg}{Fx.ub}')
+			cy = dy + (4 if len(proc.details["cmdline"]) > dw - 5 else 5)
+			for i in range(ceil(len(proc.details["cmdline"]) / (dw - 5))):
+				out += f'{Mv.to(cy+i, dx + 3)}{proc.details["cmdline"][((dw-5)*i):][:(dw-5)]:{"^" if i == 0 else "<"}{dw-5}}'
+				if i == 2: break
+
+
+		#* Processes labels
 		selected: str = CONFIG.proc_sorting
 		if selected == "memory": selected = "mem"
 		if selected == "threads" and not CONFIG.proc_tree and not arg_len: selected = "tr"
@@ -1936,6 +2082,7 @@ class ProcBox(Box):
 		out = out.replace(selected, f'{Fx.u}{selected}{Fx.uu}')
 		cy = 1
 
+		#* Checking for selection out of bounds
 		if cls.start > proc.num_procs - cls.select_max + 1 and proc.num_procs > cls.select_max: cls.start = proc.num_procs - cls.select_max + 1
 		elif cls.start > proc.num_procs: cls.start = proc.num_procs
 		if cls.start < 1: cls.start = 1
@@ -1943,7 +2090,7 @@ class ProcBox(Box):
 		elif cls.selected > cls.select_max: cls.selected = cls.select_max
 		if cls.selected < 0: cls.selected = 0
 
-
+		#* Start iteration over all processes and info
 		for n, (pid, items) in enumerate(proc.processes.items(), start=1):
 			if n < cls.start: continue
 			l_count += 1
@@ -1963,6 +2110,7 @@ class ProcBox(Box):
 				else:
 					cls.pid_counter[pid] = 0
 
+			#* Move variables and sizes around for correct display if tree view is enabled
 			if CONFIG.proc_tree:
 				indent = name
 				name = cmd
@@ -1992,6 +2140,7 @@ class ProcBox(Box):
 				c_color = m_color = t_color = g_color = end = ""
 				out += f'{THEME.selected_bg}{THEME.selected_fg}{Fx.b}'
 
+			#* Creates one line for a process with all gathered information
 			out += (f'{Mv.to(y+cy, x)}{g_color}{indent}{pid:>{(1 if CONFIG.proc_tree else 7)}} ' +
 				f'{c_color}{name:<{offset}.{offset}} {end}' +
 				(f'{g_color}{cmd:<{arg_len}.{arg_len-1}}' if arg_len else "") +
@@ -2001,8 +2150,8 @@ class ProcBox(Box):
 				f' {THEME.inactive_fg}{"⡀"*5}{THEME.main_fg}{g_color}{c_color}' + (f' {cpu:>4.1f} ' if cpu < 100 else f'{cpu:>5.0f} ') + end +
 				(" " if proc.num_procs > cls.select_max else ""))
 
+			#* Draw small cpu graph for process if cpu usage was above 1% in the last 10 updates
 			if pid in Graphs.pid_cpu:
-				#if is_selected: c_color = THEME.proc_misc
 				out += f'{Mv.to(y+cy, x + w - 11)}{c_color if CONFIG.proc_colors else THEME.proc_misc}{Graphs.pid_cpu[pid](None if cls.moved else round(cpu))}{THEME.main_fg}'
 			if is_selected: out += f'{Fx.ub}{Term.fg}{Term.bg}{Mv.to(y+cy, x + w - 1)}{" " if proc.num_procs > cls.select_max else ""}'
 
@@ -2011,13 +2160,12 @@ class ProcBox(Box):
 		if cy < h:
 			for i in range(h-cy):
 				out += f'{Mv.to(y+cy+i, x)}{" " * w}'
-		loc_string = f'{cls.start + cls.selected - 1}/{proc.num_procs}'
-		out += (f'{Mv.to(y+h, x + w - 15 - len(loc_string))}{THEME.proc_box}{Symbol.h_line*10}{Symbol.title_left}{THEME.title}'
-				f'{Fx.b}{loc_string}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
 
+		#* Draw scrollbar if needed
 		if proc.num_procs > cls.select_max:
-			Key.mouse["mouse_scroll_up"] = [[x+w-1, y]]
-			Key.mouse["mouse_scroll_down"] = [[x+w-1, y+h-1]]
+			if cls.resized:
+				Key.mouse["mouse_scroll_up"] = [[x+w-2+i, y] for i in range(3)]
+				Key.mouse["mouse_scroll_down"] = [[x+w-2+i, y+h-1] for i in range(3)]
 			scroll_pos = round(cls.start * (cls.select_max - 2) / (proc.num_procs - (cls.select_max - 2)))
 			if scroll_pos < 0 or cls.start == 1: scroll_pos = 0
 			elif scroll_pos > h - 3 or cls.start >= proc.num_procs - cls.select_max: scroll_pos = h - 3
@@ -2025,14 +2173,20 @@ class ProcBox(Box):
 					f'{Mv.to(y+1+scroll_pos, x+w-1)}█')
 		elif "scroll_up" in Key.mouse:
 			del Key.mouse["scroll_up"], Key.mouse["scroll_down"]
-		#▼▲ ↓  ↑
+
+		#* Draw current selection and number of processes
+		out += (f'{Mv.to(y+h, x + w - 3 - len(loc_string))}{THEME.proc_box}{Symbol.h_line*1}{Symbol.title_left}{THEME.title}'
+					f'{Fx.b}{loc_string}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
+
+		#* Clean up dead processes graphs and counters
 		cls.count += 1
 		if cls.count == 100:
 			cls.count == 0
 			for p in list(cls.pid_counter):
 				if not psutil.pid_exists(p):
 					del cls.pid_counter[p], Graphs.pid_cpu[p]
-		Draw.buffer(cls.buffer, f'{out}{out_misc}{Term.fg}', only_save=Menu.active)
+
+		Draw.buffer(cls.buffer, f'{out_misc}{out}{Term.fg}', only_save=Menu.active)
 		cls.redraw = cls.resized = cls.moved = False
 
 class Collector:
@@ -2571,8 +2725,10 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 	processes: Dict = {}
 	num_procs: int = 0
 	detailed: bool = False
-	details: Dict[str, Union[str, int, float, NamedTuple]] = {}
+	detailed_pid: Union[int, None] = None
+	details: Dict[str, Any] = {}
 	details_cpu: List[int] = []
+	details_mem: List[int] = []
 	proc_dict: Dict = {}
 	p_values: List[str] = ["pid", "name", "cmdline", "num_threads", "username", "memory_percent", "cpu_percent", "cpu_times", "create_time"]
 	sort_expr: Dict = {}
@@ -2596,39 +2752,6 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 		err: float = 0.0
 		n: int = 0
 
-		if cls.detailed and not cls.details.get("killed", False):
-			try:
-				det = psutil.Process(ProcBox.selected_pid)
-			except (psutil.NoSuchProcess, psutil.ZombieProcess):
-				cls.details["killed"] = True
-				cls.details["status"] = psutil.STATUS_DEAD
-			else:
-				cls.details = det.as_dict(attrs=["pid", "name", "username", "status", "cmdline", "memory_info", "memory_percent", "create_time", "num_threads", "cpu_percent", "cpu_num"], ad_value="")
-				if det.parent() != None: cls.details["parent_name"] = det.parent().name()
-				else: cls.details["parent_name"] = ""
-
-				cls.details["killed"] = False
-
-				if isinstance(cls.details["cmdline"], list): cls.details["cmdline"] = " ".join(cls.details["cmdline"]) or f'[{cls.details["name"]}]'
-
-				if hasattr(cls.details["memory_info"], "rss"): cls.details["memory_bytes"] = floating_humanizer(cls.details["memory_info"].rss) # type: ignore
-				else: cls.details["memory_bytes"] = "? Bytes"
-
-				if isinstance(cls.details["create_time"], float): cls.details["uptime"] = f'{timedelta(seconds=round(time()-cls.details["create_time"],0))}'
-				else: cls.details["uptime"] = "??:??:??"
-
-				for v in ["cpu_percent", "memory_percent"]:
-					if isinstance(cls.details[v], float):
-						if cls.details[v] >= 100: cls.details[v] = round(cls.details[v]) # type: ignore
-						elif cls.details[v] >= 10: cls.details[v] = round(cls.details[v], 1) # type: ignore
-						else: cls.details[v] = round(cls.details[v], 2) # type: ignore
-					else:
-						cls.details[v] = 0.0
-
-				cls.details_cpu.append(round(cls.details["cpu_percent"])) # type: ignore
-				if len(cls.details_cpu) > ProcBox.width: del cls.details_cpu[0]
-
-
 		if CONFIG.proc_tree and sorting == "arguments":
 			sorting = "program"
 
@@ -2636,45 +2759,102 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 
 		if CONFIG.proc_tree:
 			cls._tree(sort_cmd=sort_cmd, reverse=reverse, proc_per_cpu=proc_per_cpu, search=search)
-			return
-
-		for p in sorted(psutil.process_iter(cls.p_values, err), key=lambda p: eval(sort_cmd), reverse=reverse):
-			if cls.collect_interrupt or cls.proc_interrupt:
-				return
-			if p.info["name"] == "idle" or p.info["name"] == err or p.info["pid"] == err:
-				continue
-			if p.info["cmdline"] == err:
-				p.info["cmdline"] = ""
-			if p.info["username"] == err:
-				p.info["username"] = ""
-			if p.info["num_threads"] == err:
-				p.info["num_threads"] = 0
-			if search:
-				for value in [ p.info["name"], " ".join(p.info["cmdline"]), str(p.info["pid"]), p.info["username"] ]:
-					for s in search.split(","):
-						if s.strip() in value:
-							break
+		else:
+			for p in sorted(psutil.process_iter(cls.p_values, err), key=lambda p: eval(sort_cmd), reverse=reverse):
+				if cls.collect_interrupt or cls.proc_interrupt:
+					return
+				if p.info["name"] == "idle" or p.info["name"] == err or p.info["pid"] == err:
+					continue
+				if p.info["cmdline"] == err:
+					p.info["cmdline"] = ""
+				if p.info["username"] == err:
+					p.info["username"] = ""
+				if p.info["num_threads"] == err:
+					p.info["num_threads"] = 0
+				if search:
+					for value in [ p.info["name"], " ".join(p.info["cmdline"]), str(p.info["pid"]), p.info["username"] ]:
+						for s in search.split(","):
+							if s.strip() in value:
+								break
+						else: continue
+						break
 					else: continue
-					break
-				else: continue
 
-			cpu = p.info["cpu_percent"] if proc_per_cpu else (p.info["cpu_percent"] / psutil.cpu_count())
-			mem = p.info["memory_percent"]
+				cpu = p.info["cpu_percent"] if proc_per_cpu else (p.info["cpu_percent"] / psutil.cpu_count())
+				mem = p.info["memory_percent"]
 
-			cmd = " ".join(p.info["cmdline"]) or "[" + p.info["name"] + "]"
+				cmd = " ".join(p.info["cmdline"]) or "[" + p.info["name"] + "]"
 
-			out[p.info["pid"]] = {
-				"name" : p.info["name"],
-				"cmd" : cmd,
-				"threads" : p.info["num_threads"],
-				"username" : p.info["username"],
-				"mem" : mem,
-				"cpu" : cpu }
+				out[p.info["pid"]] = {
+					"name" : p.info["name"],
+					"cmd" : cmd,
+					"threads" : p.info["num_threads"],
+					"username" : p.info["username"],
+					"mem" : mem,
+					"cpu" : cpu }
 
-			n += 1
+				n += 1
 
-		cls.num_procs = n
-		cls.processes = out.copy()
+			cls.num_procs = n
+			cls.processes = out.copy()
+
+		if cls.detailed and not cls.details.get("killed", False):
+			expand: bool = True if ProcBox.width >= 115 else False
+			try:
+				c_pid = cls.detailed_pid
+				det = psutil.Process(c_pid)
+			except (psutil.NoSuchProcess, psutil.ZombieProcess):
+				cls.details["killed"] = True
+				cls.details["status"] = psutil.STATUS_DEAD
+				ProcBox.redraw = True
+			else:
+				cls.details = det.as_dict(attrs=["status", "memory_info", "create_time", "cpu_num"] + (["nice", "io_counters"] if expand else []), ad_value="")
+				if det.parent() != None: cls.details["parent_name"] = det.parent().name()
+				else: cls.details["parent_name"] = ""
+
+				cls.details["pid"] = c_pid
+				cls.details["name"] = cls.processes[c_pid]["name"]
+				cls.details["cmdline"] = cls.processes[c_pid]["cmd"]
+				cls.details["threads"] = f'{cls.processes[c_pid]["threads"]}'
+				cls.details["username"] = cls.processes[c_pid]["username"]
+				cls.details["memory_percent"] = cls.processes[c_pid]["mem"]
+				cls.details["cpu_percent"] = round(cls.processes[c_pid]["cpu"] * (1 if CONFIG.proc_per_core else THREADS))
+				cls.details["killed"] = False
+
+
+				if hasattr(cls.details["memory_info"], "rss"): cls.details["memory_bytes"] = floating_humanizer(cls.details["memory_info"].rss) # type: ignore
+				else: cls.details["memory_bytes"] = "? Bytes"
+
+				if isinstance(cls.details["create_time"], float):
+					uptime = timedelta(seconds=round(time()-cls.details["create_time"],0))
+					if uptime.days > 0: cls.details["uptime"] = f'{uptime.days}d {str(uptime).split(",")[1][:-3].strip()}'
+					else: cls.details["uptime"] = f'{uptime}'
+				else: cls.details["uptime"] = "??:??:??"
+
+				if expand:
+					if "nice" in cls.details: cls.details["nice"] = f'{cls.details["nice"]}'
+					if SYSTEM == "BSD":
+						if hasattr(cls.details["io_counters"], "read_count"): cls.details["io_read"] = f'{cls.details["io_counters"].read_count}'
+						else: cls.details["io_read"] = "?"
+						if hasattr(cls.details["io_counters"], "write_count"): cls.details["io_write"] = f'{cls.details["io_counters"].write_count}'
+						else: cls.details["io_write"] = "?"
+					else:
+						if hasattr(cls.details["io_counters"], "read_bytes"): cls.details["io_read"] = floating_humanizer(cls.details["io_counters"].read_bytes)
+						else: cls.details["io_read"] = "?"
+						if hasattr(cls.details["io_counters"], "write_bytes"): cls.details["io_write"] = floating_humanizer(cls.details["io_counters"].write_bytes)
+						else: cls.details["io_write"] = "?"
+
+				cls.details_cpu.append(cls.details["cpu_percent"])
+				mem = cls.details["memory_percent"]
+				if mem > 80: mem = round(mem)
+				elif mem > 60: mem = round(mem * 1.2)
+				elif mem > 30: mem = round(mem * 1.5)
+				elif mem > 10: mem = round(mem * 2)
+				elif mem > 5: mem = round(mem * 10)
+				else: mem = round(mem * 20)
+				cls.details_mem.append(mem)
+				if len(cls.details_cpu) > ProcBox.width: del cls.details_cpu[0]
+				if len(cls.details_mem) > ProcBox.width: del cls.details_mem[0]
 
 	@classmethod
 	def _tree(cls, sort_cmd, reverse: bool, proc_per_cpu: bool, search: str):
@@ -3087,7 +3267,7 @@ def process_keys():
 		key = Key.get()
 		if key in ["mouse_scroll_up", "mouse_scroll_down", "mouse_click"]:
 			mouse_pos = Key.get_mouse()
-			if mouse_pos[0] >= ProcBox.x and mouse_pos[1] >= ProcBox.current_y:
+			if mouse_pos[0] >= ProcBox.x and mouse_pos[1] >= ProcBox.current_y + 1 and mouse_pos[1] < ProcBox.current_y + ProcBox.current_h - 1:
 				pass
 			elif key == "mouse_click":
 				key = "mouse_unselect"
@@ -3158,18 +3338,32 @@ def process_keys():
 			ProcBox.filtering = True
 			if not ProcCollector.search_filter: ProcBox.start = 0
 			Collector.collect(ProcCollector, redraw=True, only_draw=True)
+		elif key == "i":
+			Box.mini_mode = not Box.mini_mode
+			Draw.clear(saved=True)
+			Term.refresh(force=True)
+		elif key in ["t", "k", "u"]:
+			errlog.debug("kill action")
 		elif key == "delete" and ProcCollector.search_filter:
 			ProcCollector.search_filter = ""
 			Collector.collect(ProcCollector, proc_interrupt=True, redraw=True)
-		elif key == "enter" and ProcBox.selected > 0:
-			if ProcCollector.details.get("pid", None) == ProcBox.selected_pid:
-				ProcCollector.detailed = False
-			elif psutil.pid_exists(ProcBox.selected_pid):
+		elif key == "enter":
+			if ProcBox.selected > 0 and ProcCollector.detailed_pid != ProcBox.selected_pid and psutil.pid_exists(ProcBox.selected_pid):
 				ProcCollector.detailed = True
+				ProcBox.selected = 0
+				ProcCollector.detailed_pid = ProcBox.selected_pid
+				ProcBox.resized = True
+			elif ProcCollector.detailed:
+				ProcCollector.detailed = False
+				ProcCollector.detailed_pid = None
+				ProcBox.resized = True
 			else:
 				continue
 			ProcCollector.details = {}
 			ProcCollector.details_cpu = []
+			ProcCollector.details_mem = []
+			Graphs.detailed_cpu = NotImplemented
+			Graphs.detailed_mem = NotImplemented
 			Collector.collect(ProcCollector, proc_interrupt=True, redraw=True)
 
 		elif key in ["up", "down", "mouse_scroll_up", "mouse_scroll_down", "page_up", "page_down", "home", "end", "mouse_click", "mouse_unselect"]:
