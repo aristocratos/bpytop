@@ -1,0 +1,3 @@
+[*.{py,sh,md,cfg,sample}]
+indent_style = tab
+indent_size = 4
