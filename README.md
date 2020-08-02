@@ -42,9 +42,10 @@ Python port of [bashtop](https://github.com/aristocratos/bashtop).
 ## Features
 
 * Easy to use, with a game inspired menu system.
+* Full mouse support, all buttons with a highlighted key is clickable and mouse scroll works in process list and menu boxes.
 * Fast and responsive UI with UP, DOWN keys process selection.
 * Function for showing detailed stats for selected process.
-* Ability to filter processes.
+* Ability to filter processes, multiple filters can be entered.
 * Easy switching between sorting options.
 * Send SIGTERM, SIGKILL, SIGINT to selected process.
 * UI menu for changing all config file options.
@@ -54,15 +55,14 @@ Python port of [bashtop](https://github.com/aristocratos/bashtop).
 
 ## Themes
 
-Bpytop uses the same the files as bashtop.
+Bpytop uses the same theme files as bashtop so any theme made for bashtop will work.
 
-See bashtop/[themes](https://github.com/aristocratos/bashtop/themes) folder for available themes.
+See [themes](themes) folder for available themes.
 
-The builtin theme downloader places the default themes in `$HOME/.config/bpytop/themes`.
-User created themes should be placed in `$HOME/.config/bpytop/user_themes` to be safe from overwrites.
+The `make install` command places the default themes in `/usr/local/share/bpytop/themes`.
+User created themes should be placed in `$HOME/.config/bpytop/themes`.
 
 Let me know if you want to contribute with new themes.
-
 
 ## Support and funding
 
@@ -113,13 +113,26 @@ Dropbear seems to not be able to set correct locale. So if accessing bashtop ove
 Main UI showing details for a selected process.
 ![Screenshot 1](Imgs/main.png)
 
+Main UI in mini mode.
+![Screenshot 2](Imgs/mini.png)
+
 Main menu.
-![Screenshot 2](Imgs/menu.png)
+![Screenshot 3](Imgs/menu.png)
 
 Options menu.
-![Screenshot 3](Imgs/options.png)
+![Screenshot 4](Imgs/options.png)
 
 ## Installation
+
+#### Dependencies installation Linux
+
+>Install python3 and git with a package manager of you choice
+
+>Install psutil python module (sudo might be required)
+
+``` bash
+python3 -m pip install psutil
+```
 
 #### Dependencies installation OSX
 
@@ -136,8 +149,9 @@ brew install python3 git
 ```
 
 >Install psutil python module
+
 ``` bash
-pip3 install psutil
+python3 -m pip install psutil
 ```
 
 >Install optional dependency osx-cpu-temp
@@ -153,7 +167,7 @@ brew install osx-cpu-temp
 ``` bash
 sudo pkg install python3 git
 sudo python3 -m ensurepip
-sudo pip3 install psutil
+sudo python3 -m pip install psutil
 ```
 
 #### Manual installation Linux, OSX and FreeBSD
@@ -161,8 +175,8 @@ sudo pip3 install psutil
 >Clone and install
 
 ``` bash
-git clone https://github.com/aristocratos/bashtop.git
-cd bashtop
+git clone https://github.com/aristocratos/bpytop.git
+cd bpytop
 sudo make install
 ```
 
@@ -172,7 +186,6 @@ sudo make install
 sudo make uninstall
 ```
 
-
 ## Configurability
 
 All options changeable from within UI.
@@ -181,56 +194,87 @@ Config files stored in "$HOME/.config/bpytop" folder
 #### bashtop.cfg: (auto generated if not found)
 
 ```bash
-#? Config file for bpytop v. 0.0.1
-#* Color theme, looks for a .theme file in "~/.config/bpytop/themes" and "~/.config/bpytop/user_themes", "Default" for builtin default theme
-color_theme = "Default"
+#? Config file for bpytop v. 1.0.0
 
-#* Update time in milliseconds, increases automatically if set below internal loops processing time, recommended 2000 ms or above for better sample times for graphs
-update_ms = 2500
+#* Color theme, looks for a .theme file in "/usr/[local/]share/bpytop/themes" and "~/.config/bpytop/themes", "Default" for builtin default theme.
+#* Prefix name by a plus sign (+) for a theme located in user themes folder, i.e. color_theme="+monokai"
+color_theme="Default"
 
-#* Processes sorting, "pid" "program" "arguments" "threads" "user" "memory" "cpu lazy" "cpu responsive"
-#* "cpu lazy" updates sorting over time, "cpu responsive" updates sorting directly
-proc_sorting = "cpu lazy"
+#* Update time in milliseconds, increases automatically if set below internal loops processing time, recommended 2000 ms or above for better sample times for graphs.
+update_ms=2000
 
-#* Reverse sorting order, True or False
-proc_reversed = False
+#* Processes sorting, "pid" "program" "arguments" "threads" "user" "memory" "cpu lazy" "cpu responsive",
+#* "cpu lazy" updates top process over time, "cpu responsive" updates top process directly.
+proc_sorting="cpu lazy"
+
+#* Reverse sorting order, True or False.
+proc_reversed=False
 
 #* Show processes as a tree
-proc_tree = False
+proc_tree=False
 
-#* Check cpu temperature, only works if "sensors", "vcgencmd" or "osx-cpu-temp" commands is available
-check_temp = True
+#* Use the cpu graph colors in the process list.
+proc_colors=True
 
-#* Draw a clock at top of screen, formatting according to strftime, empty string to disable
-draw_clock = "%X"
+#* Use a darkening gradient in the process list.
+proc_gradient=True
 
-#* Update main ui when menus are showing, set this to false if the menus is flickering too much for comfort
-background_update = True
+#* If process cpu usage should be of the core it's running on or usage of the total available cpu power.
+proc_per_core=False
 
-#* Custom cpu model name, empty string to disable
-custom_cpu_name = ""
+#* Check cpu temperature, needs "vcgencmd" on Raspberry Pi and "osx-cpu-temp" on MacOS X.
+check_temp=True
 
-#* Show color gradient in process list, True or False
-proc_gradient = True
+#* Draw a clock at top of screen, formatting according to strftime, empty string to disable.
+draw_clock="%X"
 
-#* If process cpu usage should be of the core it's running on or usage of the total available cpu power
-proc_per_core = False
+#* Update main ui in background when menus are showing, set this to false if the menus is flickering too much for comfort.
+background_update=True
 
-#* Optional filter for shown disks, should be names of mountpoints, "root" replaces "/", separate multiple values with space
-disks_filter = ""
+#* Custom cpu model name, empty string to disable.
+custom_cpu_name=""
 
-#* Enable check for new version from github.com/aristocratos/bpytop at start
-update_check = True
+#* Optional filter for shown disks, should be last folder in path of a mountpoint, "root" replaces "/", separate multiple values with comma.
+#* Begin line with "exclude=" to change to exclude filter, oterwise defaults to "most include" filter. Example: disks_filter="exclude=boot, home"
+disks_filter=""
 
-#* Enable graphs with double the horizontal resolution, increases cpu usage
-hires_graphs = False
+#* Show graphs instead of meters for memory values.
+mem_graphs=True
+
+#* If swap memory should be shown in memory box.
+show_swap=False
+
+#* Show swap as a disk, ignores show_swap value above, inserts itself after first disk.
+swap_disk=True
+
+#* If mem box should be split to also show disks info.
+show_disks=True
+
+#* Show init screen at startup, the init screen is purely cosmetical
+show_init=True
+
+#* Enable check for new version from github.com/aristocratos/bpytop at start.
+update_check=True
+
+#* Enable start in mini mode, can be toggled with ctrl+m at any time.
+mini_mode=False
+
+#* Set loglevel for "~/.config/bpytop/error.log" levels are: "ERROR" "WARNING" "INFO" "DEBUG".
+#* The level set includes all lower levels, i.e. "DEBUG" will show all logging info.
+log_level=WARNING
+
 ```
 
 #### Command line options: (not yet implemented)
 
-``` bash
-USAGE: bpytop
+``` text
+USAGE: bpytop [argument]
 
+Arguments:
+    -m, --mini            Start in minimal mode without memory and net boxes
+    -v, --version         Show version info and exit
+    -h, --help            Show this help message and exit
+    --debug               Start with loglevel set to DEBUG overriding value set in config
 ```
 
 ## TODO
