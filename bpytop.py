@@ -2714,7 +2714,7 @@ class NetCollector(Collector):
 				errlog.exception(f'{e}')
 		if not io_all: return
 		up_stat = psutil.net_if_stats()
-		for nic in sorted(psutil.net_if_addrs(), key=lambda nic: (getattr(io_all.get(nic), "bytes_recv", 0) + getattr(io_all.get(nic), "bytes_sent", 0)), reverse=True):
+		for nic in sorted(io_all.keys(), key=lambda nic: (getattr(io_all[nic], "bytes_recv", 0) + getattr(io_all[nic], "bytes_sent", 0)), reverse=True):
 			if nic not in up_stat or not up_stat[nic].isup:
 				continue
 			cls.nics.append(nic)
