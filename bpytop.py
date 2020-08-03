@@ -55,7 +55,7 @@ if errors:
 		print("\nInstall required modules!\n")
 	quit(1)
 
-VERSION: str = "1.0.0"
+VERSION: str = "1.0.1"
 
 #? Argument parser ------------------------------------------------------------------------------->
 if len(sys.argv) > 1:
@@ -3435,6 +3435,8 @@ class Menu:
 				'The init screen is purely cosmetical and',
 				'slows down start to show status messages.'],
 			"update_check" : [
+				'Not implemented yet!'
+				'',
 				'Check for updates at start.',
 				'',
 				'Checks for latest version from:',
