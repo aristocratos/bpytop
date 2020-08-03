@@ -17,7 +17,7 @@
 * [Features](#features)
 * [Themes](#themes)
 * [Support and funding](#support-and-funding)
-* [Compatibility](#compatibility)
+* [Prerequisites](#prerequisites)
 * [Dependencies](#dependencies)
 * [Screenshots](#screenshots)
 * [Installation](#installation)
@@ -72,21 +72,21 @@ Or donate through [paypal](https://paypal.me/aristocratos) or [ko-fi](https://ko
 
 Any support is greatly appreciated!
 
-## Compatibility
+## Prerequisites
 
-Should work on most modern linux distributions, on Mac OS X and on FreeBSD.
+#### Mac Os X
 
-Will not display correctly on the standard terminal on OSX!
+Will not display correctly in the standard terminal!
 Recommended alternative [iTerm2](https://www.iterm2.com/)
 
-Will also need to be run as superuser on OSX to display stats for processes not owned by user.
+Will also need to be run as superuser to display stats for processes not owned by user.
 
-The disk io stats on OSX and FreeBSD shows iostats for all disks at the top instead of per disk.
+#### Linux, Mac Os X and FreeBSD
 
 For correct display, a terminal with support for:
 
-* 24-bit truecolor
-* Wide characters
+* 24-bit truecolor ([See list of terminals with truecolor support](https://gist.github.com/XVilka/8346728))
+* Wide characters (Are sometimes problematic in web-based terminals)
 
 Also needs a UTF8 locale and a font that covers:
 
@@ -96,7 +96,7 @@ Also needs a UTF8 locale and a font that covers:
 
 #### Notice
 
-Dropbear seems to not be able to set correct locale. So if accessing bpytop over ssh, OpenSSH is recommended.
+Dropbear seems to not be able to set correct locale. So if accessing bashtop over ssh, OpenSSH is recommended.
 
 ## Dependencies
 
