@@ -2436,20 +2436,29 @@ class CpuCollector(Collector):
 					if cpu_type == "intel" or (cpu_type == "other" and len(cores) == THREADS // 2):
 						cls.cpu_temp[0].append(temp)
 						for n, t in enumerate(cores, start=1):
-							cls.cpu_temp[n].append(t)
-							cls.cpu_temp[THREADS // 2 + n].append(t)
+							try:
+								cls.cpu_temp[n].append(t)
+								cls.cpu_temp[THREADS // 2 + n].append(t)
+							except IndexError:
+								break
 					elif cpu_type == "ryzen" or cpu_type == "other":
 						cls.cpu_temp[0].append(temp)
 						if len(cores) < 1: cores.append(temp)
 						z = 1
 						for t in cores:
-							for i in range(THREADS // len(cores)):
-								cls.cpu_temp[z + i].append(t)
-							z += i
+							try:
+								for i in range(THREADS // len(cores)):
+									cls.cpu_temp[z + i].append(t)
+								z += i
+							except IndexError:
+								break
 				else:
 					cores.insert(0, temp)
 					for n, t in enumerate(cores):
-						cls.cpu_temp[n].append(t)
+						try:
+							cls.cpu_temp[n].append(t)
+						except IndexError:
+							break
 			except Exception as e:
 					errlog.exception(f'{e}')
 					cls.got_sensors = False
