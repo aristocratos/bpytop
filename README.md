@@ -124,6 +124,10 @@ Options menu.
 
 ## Installation
 
+PyPi packaging for installation with `pip` will be setup later.
+
+If you want to help speed this up, help with setting up proper testing is welcome!
+
 #### Dependencies installation Linux
 
 >Install python3 and git with a package manager of you choice
