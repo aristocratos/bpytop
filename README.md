@@ -96,7 +96,7 @@ Also needs a UTF8 locale and a font that covers:
 
 #### Notice
 
-Dropbear seems to not be able to set correct locale. So if accessing bashtop over ssh, OpenSSH is recommended.
+Dropbear seems to not be able to set correct locale. So if accessing bpytop over ssh, OpenSSH is recommended.
 
 ## Dependencies
 
@@ -256,7 +256,7 @@ show_init=True
 #* Enable check for new version from github.com/aristocratos/bpytop at start.
 update_check=True
 
-#* Enable start in mini mode, can be toggled with ctrl+m at any time.
+#* Enable start in mini mode, can be toggled with shift+m at any time.
 mini_mode=False
 
 #* Set loglevel for "~/.config/bpytop/error.log" levels are: "ERROR" "WARNING" "INFO" "DEBUG".
