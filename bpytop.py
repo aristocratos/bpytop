@@ -2364,6 +2364,7 @@ class CpuCollector(Collector):
 	for _ in range(THREADS + 1):
 		cpu_usage.append([])
 		cpu_temp.append([])
+	freq_error: bool = False
 	cpu_freq: int = 0
 	load_avg: List[float] = []
 	uptime: str = ""
@@ -2408,9 +2409,16 @@ class CpuCollector(Collector):
 			cls.cpu_usage[n].append(round(thread))
 			if len(cls.cpu_usage[n]) > Term.width * 2:
 				del cls.cpu_usage[n][0]
-
-		if hasattr(psutil.cpu_freq(), "current"):
-			cls.cpu_freq = round(psutil.cpu_freq().current)
+		try:
+			if hasattr(psutil.cpu_freq(), "current"):
+				cls.cpu_freq = round(psutil.cpu_freq().current)
+		except Exception as e:
+			if not cls.freq_error:
+				cls.freq_error = True
+				errlog.error("Exception while getting cpu frequency!")
+				errlog.exception(f'{e}')
+			else:
+				pass
 		cls.load_avg = [round(lavg, 2) for lavg in os.getloadavg()]
 		cls.uptime = str(timedelta(seconds=round(time()-psutil.boot_time(),0)))[:-3]
 
