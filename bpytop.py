@@ -154,7 +154,7 @@ show_init=$show_init
 #* Enable check for new version from github.com/aristocratos/bpytop at start.
 update_check=$update_check
 
-#* Enable start in mini mode, can be toggled with ctrl+m at any time.
+#* Enable start in mini mode, can be toggled with shift+m at any time.
 mini_mode=$mini_mode
 
 #* Set loglevel for "~/.config/bpytop/error.log" levels are: "ERROR" "WARNING" "INFO" "DEBUG".
@@ -2295,8 +2295,6 @@ class Collector:
 		'''This is meant to run in it's own thread, collecting and drawing when collect_run is set'''
 		draw_buffers: List[str] = []
 		debugged: bool = False
-		clock: str = ""
-		clock_len: int = 0
 		try:
 			while not cls.stopping:
 				if CONFIG.draw_clock: Box.draw_clock()
@@ -3706,11 +3704,11 @@ def get_cpu_name() -> str:
 	else:
 		name = cmd_out
 	nlist = name.split(" ")
-	if "Xeon" in name:
+	if "Xeon" in name and "CPU" in name:
 		name = nlist[nlist.index("CPU")+1]
 	elif "Ryzen" in name:
 		name = " ".join(nlist[nlist.index("Ryzen"):nlist.index("Ryzen")+3])
-	elif "CPU" in name:
+	elif "CPU" in name and not nlist[0] == "CPU":
 		name = nlist[nlist.index("CPU")-1]
 
 	return name
