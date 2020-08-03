@@ -730,7 +730,7 @@ class Key:
 						Draw.idle.wait()								#* Wait for Draw function to finish if busy
 						with Nonblocking(sys.stdin): 					#* Set non blocking to prevent read stall
 							input_key += sys.stdin.read(20)
-							if input_key.startswith("\033[<35;"):
+							if input_key.startswith("\033[<"):
 								_ = sys.stdin.read(1000)
 						cls.idle.set()									#* Report IO blocking done
 					#errlog.debug(f'{repr(input_key)}')
