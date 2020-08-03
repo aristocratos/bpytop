@@ -2680,6 +2680,7 @@ class NetCollector(Collector):
 	nic_i: int = 0
 	nic: str = ""
 	new_nic: str = ""
+	nic_error: bool = False
 	reset: bool = False
 	graph_raise: Dict[str, int] = {"download" : 5, "upload" : 5}
 	graph_lower: Dict[str, int] = {"download" : 5, "upload" : 5}
@@ -2696,10 +2697,15 @@ class NetCollector(Collector):
 		'''Get a list of all network devices sorted by highest throughput'''
 		cls.nic_i = 0
 		cls.nic = ""
-		io_all = psutil.net_io_counters(pernic=True)
+		try:
+			io_all = psutil.net_io_counters(pernic=True)
+		except Exception as e:
+			if not cls.nic_error:
+				cls.nic_error = True
+				errlog.exception(f'{e}')
 		if not io_all: return
 		up_stat = psutil.net_if_stats()
-		for nic in sorted(psutil.net_if_addrs(), key=lambda nic: (io_all[nic].bytes_recv + io_all[nic].bytes_sent), reverse=True):
+		for nic in sorted(psutil.net_if_addrs(), key=lambda nic: (getattr(io_all.get(nic), "bytes_recv", 0) + getattr(io_all.get(nic), "bytes_sent", 0)), reverse=True):
 			if nic not in up_stat or not up_stat[nic].isup:
 				continue
 			cls.nics.append(nic)
