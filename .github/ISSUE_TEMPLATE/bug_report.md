@@ -25,7 +25,7 @@ assignees: aristocratos
 
 **Info (please complete the following information):**
  - bpytop version: `bpytop -v`
- - psutil version: `bpytop -v`
+ - psutil version: `bpytop -v` (version 5.7.0 or above is required)
  - (Linux) Linux distribution and version:
  - (OSX/FreeBSD) Os release version:
  - Terminal used:
