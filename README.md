@@ -96,7 +96,7 @@ Also needs a UTF8 locale and a font that covers:
 
 #### Notice
 
-Dropbear seems to not be able to set correct locale. So if accessing bashtop over ssh, OpenSSH is recommended.
+Dropbear seems to not be able to set correct locale. So if accessing bpytop over ssh, OpenSSH is recommended.
 
 ## Dependencies
 
