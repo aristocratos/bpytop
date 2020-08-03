@@ -383,9 +383,15 @@ class Config:
 	def load_config(self) -> Dict[str, Union[str, int, bool]]:
 		'''Load config from file, set correct types for values and return a dict'''
 		new_config: Dict[str,Union[str, int, bool]] = {}
-		if not os.path.isfile(self.config_file): return new_config
+		conf_file: str = ""
+		if os.path.isfile(self.config_file):
+			conf_file = self.config_file
+		elif os.path.isfile("/etc/bpytop.conf"):
+			conf_file = "/etc/bpytop.conf"
+		else:
+			return new_config
 		try:
-			with open(self.config_file, "r") as f:
+			with open(conf_file, "r") as f:
 				for line in f:
 					line = line.strip()
 					if line.startswith("#? Config"):
