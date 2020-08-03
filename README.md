@@ -5,7 +5,7 @@
 ![FreeBSD](https://img.shields.io/badge/-FreeBSD-red?logo=freebsd)
 ![Usage](https://img.shields.io/badge/Usage-System%20resource%20monitor-blue)
 ![Python](https://img.shields.io/badge/Python-v3.6%5E-orange?logo=python)
-![bashtop_version](https://img.shields.io/github/v/tag/aristocratos/bpytop?label=version)
+![bpytop_version](https://img.shields.io/github/v/tag/aristocratos/bpytop?label=version)
 [![Donate](https://img.shields.io/badge/-Donate-yellow?logo=paypal)](https://paypal.me/aristocratos)
 [![Sponsor](https://img.shields.io/badge/-Sponsor-red?logo=github)](https://github.com/sponsors/aristocratos)
 [![Coffee](https://img.shields.io/badge/-Buy%20me%20a%20Coffee-grey?logo=Ko-fi)](https://ko-fi.com/aristocratos)
@@ -195,7 +195,9 @@ sudo make uninstall
 All options changeable from within UI.
 Config files stored in "$HOME/.config/bpytop" folder
 
-#### bashtop.cfg: (auto generated if not found)
+#### bpytop.cfg: (auto generated if not found)
+
+"/etc/bpytop.conf" will be used as default seed for config file creation if it exists.
 
 ```bash
 #? Config file for bpytop v. 1.0.0
