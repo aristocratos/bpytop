@@ -2498,6 +2498,8 @@ class MemCollector(Collector):
 	disk_hist: Dict[str, Tuple] = {}
 	timestamp: float = time()
 
+	io_error: bool = False
+
 	old_disks: List[str] = []
 
 	excludes: List[str] = ["squashfs"]
@@ -2573,7 +2575,16 @@ class MemCollector(Collector):
 			else:
 				filtering = tuple(v.strip() for v in CONFIG.disks_filter.strip().split(","))
 
-		io_counters = psutil.disk_io_counters(perdisk=True if SYSTEM == "Linux" else False, nowrap=True)
+		try:
+			io_counters = psutil.disk_io_counters(perdisk=True if SYSTEM == "Linux" else False, nowrap=True)
+		except ValueError as e:
+			if not cls.io_error:
+				cls.io_error = True
+				errlog.error(f'Non fatal error during disk io collection!')
+				if psutil.version_info[0] < 5 or (psutil.version_info[0] == 5 and psutil.version_info[1] < 7):
+					errlog.error(f'Caused by outdated psutil version.')
+				errlog.exception(f'{e}')
+			io_counters = None
 
 		for disk in psutil.disk_partitions():
 			disk_io = None
@@ -2602,23 +2613,25 @@ class MemCollector(Collector):
 				cls.disks[disk.device][name] = floating_humanizer(getattr(disk_u, name, 0))
 
 			#* Collect disk io
-			try:
-				if SYSTEM == "Linux":
-					dev_name = os.path.realpath(disk.device).rsplit('/', 1)[-1]
-					if dev_name.startswith("md"):
-						try:
-							dev_name = dev_name[:dev_name.index("p")]
-						except:
-							pass
-					disk_io = io_counters[dev_name]
-				elif disk.mountpoint == "/":
-					disk_io = io_counters
-				else:
-					raise Exception
-				disk_read = round((disk_io.read_bytes - cls.disk_hist[disk.device][0]) / (time() - cls.timestamp))
-				disk_write = round((disk_io.write_bytes - cls.disk_hist[disk.device][1]) / (time() - cls.timestamp))
-			except:
-				pass
+			if io_counters:
+				try:
+					if SYSTEM == "Linux":
+						dev_name = os.path.realpath(disk.device).rsplit('/', 1)[-1]
+						if dev_name.startswith("md"):
+							try:
+								dev_name = dev_name[:dev_name.index("p")]
+							except:
+								pass
+						disk_io = io_counters[dev_name]
+					elif disk.mountpoint == "/":
+						disk_io = io_counters
+					else:
+						raise Exception
+					disk_read = round((disk_io.read_bytes - cls.disk_hist[disk.device][0]) / (time() - cls.timestamp))
+					disk_write = round((disk_io.write_bytes - cls.disk_hist[disk.device][1]) / (time() - cls.timestamp))
+				except:
+					disk_read = disk_write = 0
+			else:
 				disk_read = disk_write = 0
 
 			if disk_io:
