@@ -1,5 +1,12 @@
 #Changelog
 
+## v1.0.3
+
+* Fixed: Crash on detailed info when showing tree
+* Fixed: Incorrect sorting for memory
+* FIxed: Removed unsupported osx psutil values
+* Changed: Removed shift modifiers for some keys and removed redundant toggles
+
 ## v1.0.2
 
 * Added: IndexError catch for cpu temperature collection
