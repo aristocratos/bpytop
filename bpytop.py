@@ -1988,7 +1988,7 @@ class ProcBox(Box):
 			s_len += len(CONFIG.proc_sorting)
 			if cls.resized or s_len != cls.s_len or proc.detailed:
 				cls.s_len = s_len
-				for k in ["e", "r", "c", "t", "k", "i", "enter"]:
+				for k in ["e", "r", "c", "t", "k", "i", "enter", "left"]:
 					if k in Key.mouse: del Key.mouse[k]
 			if proc.detailed:
 				killed = proc.details["killed"]
@@ -3088,6 +3088,7 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 		if index >= len(CONFIG.sorting_options): index = 0
 		elif index < 0: index = len(CONFIG.sorting_options) - 1
 		CONFIG.proc_sorting = CONFIG.sorting_options[index]
+		if "left" in Key.mouse: del Key.mouse["left"]
 		Collector.collect(ProcCollector, interrupt=True, redraw=True)
 
 	@classmethod
@@ -3171,7 +3172,7 @@ class Menu:
 					key = Key.get()
 
 				if key == "mouse_click" and not mouse_over:
-					key = "m"
+					key = "M"
 
 				if key == "q":
 					clean_quit()
@@ -3228,8 +3229,8 @@ class Menu:
 			"(Mouse 1)" : "Clicks buttons and selects in process list.",
 			"Selected (Mouse 1)" : "Show detailed information for selected process.",
 			"(Mouse scroll)" : "Scrolls any scrollable list/text under cursor.",
-			"(Esc, m)" : "Toggles main menu.",
-			"(shift+m)" : "Toggle mini mode.",
+			"(Esc, shift+m)" : "Toggles main menu.",
+			"(m)" : "Toggle mini mode.",
 			"(F2, o)" : "Shows options.",
 			"(F1, h)" : "Shows this window.",
 			"(ctrl+z)" : "Sleep program and put in background.",
@@ -3243,11 +3244,9 @@ class Menu:
 			"(b) (n)" : "Select previous/next network device.",
 			"(z)" : "Toggle totals reset for current network device",
 			"(f)" : "Input a string to filter processes with.",
-			"(shift+c)" : "Toggle colored process list.",
-			"(shift+g)" : "Toggle gradient fade out in process list.",
-			"(shift+p)" : "Toggle per-core cpu usage of processes.",
-			"(shift+r)" : "Reverse sorting order in processes box.",
-			"(shift+t)" : "Toggle processes tree view",
+			"(c)" : "Toggle per-core cpu usage of processes.",
+			"(r)" : "Reverse sorting order in processes box.",
+			"(e)" : "Toggle processes tree view",
 			"(delete)" : "Clear any entered filter.",
 			"Selected (T, t)" : "Terminate selected process with SIGTERM - 15.",
 			"Selected (K, k)" : "Kill selected process with SIGKILL - 9.",
@@ -3312,7 +3311,7 @@ class Menu:
 
 				if key == "q":
 					clean_quit()
-				elif key in ["escape", "m", "enter", "backspace", "h", "f1"]:
+				elif key in ["escape", "M", "enter", "backspace", "h", "f1"]:
 					cls.close = True
 					break
 				elif key in ["up", "mouse_scroll_up", "page_up"] and pages:
@@ -3988,9 +3987,8 @@ def process_keys():
 			Box.mini_mode = not Box.mini_mode
 			Draw.clear(saved=True)
 			Term.refresh(force=True)
-		elif key in ["t", "k", "i"] and (ProcBox.selected > 0 or ProcCollector.detailed):
+		elif key.lower() in ["t", "k", "i"] and (ProcBox.selected > 0 or ProcCollector.detailed):
 			pid: int = ProcBox.selected_pid if ProcBox.selected > 0 else ProcCollector.detailed_pid # type: ignore
-			errlog.debug(f'pid {pid}')
 			if psutil.pid_exists(pid):
 				if key == "t": sig = signal.SIGTERM
 				elif key == "k": sig = signal.SIGKILL
