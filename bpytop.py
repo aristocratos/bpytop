@@ -512,6 +512,7 @@ class Term:
 				cls.winch.clear()
 			cls._w, cls._h = os.get_terminal_size()
 
+		Key.mouse = {}
 		Box.calc_sizes()
 		if Init.running: cls.resized = False; return
 		if Menu.active: Menu.resized = True
@@ -1409,8 +1410,9 @@ class Box:
 	def draw_update_ms(cls, now: bool = True):
 		update_string: str = f'{CONFIG.update_ms}ms'
 		xpos: int = CpuBox.x + CpuBox.width - len(update_string) - 14
-		Key.mouse["+"] = [[xpos + 7 + i, CpuBox.y] for i in range(3)]
-		Key.mouse["-"] = [[CpuBox.x + CpuBox.width - 4 + i, CpuBox.y] for i in range(3)]
+		if not "+" in Key.mouse:
+			Key.mouse["+"] = [[xpos + 7 + i, CpuBox.y] for i in range(3)]
+			Key.mouse["-"] = [[CpuBox.x + CpuBox.width - 4 + i, CpuBox.y] for i in range(3)]
 		Draw.buffer("update_ms!" if now and not Menu.active else "update_ms",
 			f'{Mv.to(CpuBox.y, xpos)}{THEME.cpu_box(Symbol.h_line * 7, Symbol.title_left)}{Fx.b}{THEME.hi_fg("+")} ',
 			f'{THEME.title(update_string)} {THEME.hi_fg("-")}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}', only_save=Menu.active, once=True)
@@ -1482,9 +1484,10 @@ class CpuBox(Box, SubBox):
 
 	@classmethod
 	def _draw_bg(cls) -> str:
-		Key.mouse["m"] = [[cls.x + 10 + i, cls.y] for i in range(6)]
+		if not "M" in Key.mouse:
+			Key.mouse["M"] = [[cls.x + 10 + i, cls.y] for i in range(6)]
 		return (f'{create_box(box=cls, line_color=THEME.cpu_box)}'
-		f'{Mv.to(cls.y, cls.x + 10)}{THEME.cpu_box(Symbol.title_left)}{Fx.b}{THEME.hi_fg("m")}{THEME.title("enu")}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}'
+		f'{Mv.to(cls.y, cls.x + 10)}{THEME.cpu_box(Symbol.title_left)}{Fx.b}{THEME.hi_fg("M")}{THEME.title("enu")}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}'
 		f'{create_box(x=cls.box_x, y=cls.box_y, width=cls.box_width, height=cls.box_height, line_color=THEME.div_line, fill=False, title=CPU_NAME[:18 if CONFIG.check_temp else 9] if not CONFIG.custom_cpu_name else CONFIG.custom_cpu_name[:18 if CONFIG.check_temp else 9])}')
 
 	@classmethod
@@ -1499,8 +1502,9 @@ class CpuBox(Box, SubBox):
 		hh: int = ceil(h / 2)
 
 		if cls.resized or cls.redraw:
-			Key.mouse["M"] = [[cls.x + 16 + i, cls.y] for i in range(6)]
-			out_misc += f'{Mv.to(cls.y, cls.x + 16)}{THEME.cpu_box(Symbol.title_left)}{Fx.b if Box.mini_mode else ""}{THEME.hi_fg("M")}{THEME.title("ini")}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}'
+			if not "m" in Key.mouse:
+				Key.mouse["m"] = [[cls.x + 16 + i, cls.y] for i in range(6)]
+			out_misc += f'{Mv.to(cls.y, cls.x + 16)}{THEME.cpu_box(Symbol.title_left)}{Fx.b if Box.mini_mode else ""}{THEME.hi_fg("m")}{THEME.title("ini")}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}'
 			Graphs.cpu["up"] = Graph(w - bw - 3, hh, THEME.gradient["cpu"], cpu.cpu_usage[0])
 			Graphs.cpu["down"] = Graph(w - bw - 3, h - hh, THEME.gradient["cpu"], cpu.cpu_usage[0], invert=True)
 			Meters.cpu = Meter(cpu.cpu_usage[0][-1], (bw - 9 - 13 if cpu.got_sensors else bw - 9), "cpu")
@@ -1672,12 +1676,13 @@ class MemBox(Box):
 					Meters.disks_used[name] = Meter(mem.disks[name]["used_percent"], cls.disk_meter, "used")
 					if len(mem.disks) * 3 <= h + 1:
 						Meters.disks_free[name] = Meter(mem.disks[name]["free_percent"], cls.disk_meter, "free")
-
-			Key.mouse["g"] = [[x + cls.mem_width - 8 + i, y-1] for i in range(5)]
+			if not "g" in Key.mouse:
+				Key.mouse["g"] = [[x + cls.mem_width - 8 + i, y-1] for i in range(5)]
 			out_misc += (f'{Mv.to(y-1, x + cls.mem_width - 9)}{THEME.mem_box(Symbol.title_left)}{Fx.b if CONFIG.mem_graphs else ""}'
 				f'{THEME.hi_fg("g")}{THEME.title("raph")}{Fx.ub}{THEME.mem_box(Symbol.title_right)}')
 			if CONFIG.show_disks:
-				Key.mouse["s"] = [[x + w - 6 + i, y-1] for i in range(4)]
+				if not "s" in Key.mouse:
+					Key.mouse["s"] = [[x + w - 6 + i, y-1] for i in range(4)]
 				out_misc += (f'{Mv.to(y-1, x + w - 7)}{THEME.mem_box(Symbol.title_left)}{Fx.b if CONFIG.swap_disk else ""}'
 				f'{THEME.hi_fg("s")}{THEME.title("wap")}{Fx.ub}{THEME.mem_box(Symbol.title_right)}')
 
@@ -1792,9 +1797,10 @@ class NetBox(Box, SubBox):
 
 		if cls.resized or cls.redraw:
 			out_misc += cls._draw_bg()
-			Key.mouse["b"] = [[x+w - len(net.nic) - 9 + i, y-1] for i in range(4)]
-			Key.mouse["n"] = [[x+w - 5 + i, y-1] for i in range(4)]
-			Key.mouse["z"] = [[x+w - len(net.nic) - 14 + i, y-1] for i in range(4)]
+			if not "b" in Key.mouse:
+				Key.mouse["b"] = [[x+w - len(net.nic) - 9 + i, y-1] for i in range(4)]
+				Key.mouse["n"] = [[x+w - 5 + i, y-1] for i in range(4)]
+				Key.mouse["z"] = [[x+w - len(net.nic) - 14 + i, y-1] for i in range(4)]
 
 			out_misc += (f'{Mv.to(y-1, x+w - 25)}{THEME.net_box}{Symbol.h_line * (10 - len(net.nic))}{Symbol.title_left}{Fx.b if reset else ""}{THEME.hi_fg("z")}{THEME.title("ero")}'
 				f'{Fx.ub}{THEME.net_box(Symbol.title_right)}{Term.fg}'
@@ -1982,7 +1988,7 @@ class ProcBox(Box):
 			s_len += len(CONFIG.proc_sorting)
 			if cls.resized or s_len != cls.s_len or proc.detailed:
 				cls.s_len = s_len
-				for k in ["T", "R", "P", "G", "C", "t", "k", "i", "enter"]:
+				for k in ["e", "r", "c", "t", "k", "i", "enter"]:
 					if k in Key.mouse: del Key.mouse[k]
 			if proc.detailed:
 				killed = proc.details["killed"]
@@ -2037,8 +2043,9 @@ class ProcBox(Box):
 
 
 			sort_pos = x + w - len(CONFIG.proc_sorting) - 7
-			Key.mouse["left"] = [[sort_pos + i, y-1] for i in range(3)]
-			Key.mouse["right"] = [[sort_pos + len(CONFIG.proc_sorting) + 3 + i, y-1] for i in range(3)]
+			if not "left" in Key.mouse:
+				Key.mouse["left"] = [[sort_pos + i, y-1] for i in range(3)]
+				Key.mouse["right"] = [[sort_pos + len(CONFIG.proc_sorting) + 3 + i, y-1] for i in range(3)]
 
 
 			out_misc += (f'{Mv.to(y-1, x + 8)}{THEME.proc_box(Symbol.h_line * (w - 9))}' +
@@ -2048,25 +2055,25 @@ class ProcBox(Box):
 
 
 			if w > 29 + s_len:
-				if not "T" in Key.mouse: Key.mouse["T"] = [[sort_pos - 5 + i, y-1] for i in range(4)]
+				if not "e" in Key.mouse: Key.mouse["e"] = [[sort_pos - 5 + i, y-1] for i in range(4)]
 				out_misc += (f'{Mv.to(y-1, sort_pos - 6)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_tree else ""}'
-					f'{THEME.hi_fg("T")}{THEME.title("ree")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
+					f'{THEME.title("tre")}{THEME.hi_fg("e")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
 			if w > 37 + s_len:
-				if not "R" in Key.mouse: Key.mouse["R"] = [[sort_pos - 14 + i, y-1] for i in range(7)]
+				if not "r" in Key.mouse: Key.mouse["r"] = [[sort_pos - 14 + i, y-1] for i in range(7)]
 				out_misc += (f'{Mv.to(y-1, sort_pos - 15)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_reversed else ""}'
-					f'{THEME.hi_fg("R")}{THEME.title("everse")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
+					f'{THEME.hi_fg("r")}{THEME.title("everse")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
 			if w > 47 + s_len:
-				if not "P" in Key.mouse: Key.mouse["P"] = [[sort_pos - 24 + i, y-1] for i in range(8)]
+				if not "c" in Key.mouse: Key.mouse["c"] = [[sort_pos - 24 + i, y-1] for i in range(8)]
 				out_misc += (f'{Mv.to(y-1, sort_pos - 25)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_per_core else ""}'
-					f'{THEME.hi_fg("P")}{THEME.title("er-core")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
-			if w > 57 + s_len:
-				if not "G" in Key.mouse: Key.mouse["G"] = [[sort_pos - 34 + i, y-1] for i in range(8)]
-				out_misc += (f'{Mv.to(y-1, sort_pos - 35)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_gradient else ""}{THEME.hi_fg("G")}'
-					f'{THEME.title("radient")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
-			if w > 65 + s_len:
-				if not "C" in Key.mouse: Key.mouse["C"] = [[sort_pos - 42 + i, y-1] for i in range(6)]
-				out_misc += (f'{Mv.to(y-1, sort_pos - 43)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_colors else ""}'
-					f'{THEME.hi_fg("C")}{THEME.title("olors")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
+					f'{THEME.title("per-")}{THEME.hi_fg("c")}{THEME.title("ore")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
+			# if w > 57 + s_len:
+			# 	if not "G" in Key.mouse: Key.mouse["G"] = [[sort_pos - 34 + i, y-1] for i in range(8)]
+			# 	out_misc += (f'{Mv.to(y-1, sort_pos - 35)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_gradient else ""}{THEME.hi_fg("G")}'
+			# 		f'{THEME.title("radient")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
+			# if w > 65 + s_len:
+			# 	if not "C" in Key.mouse: Key.mouse["C"] = [[sort_pos - 42 + i, y-1] for i in range(6)]
+			# 	out_misc += (f'{Mv.to(y-1, sort_pos - 43)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_colors else ""}'
+			# 		f'{THEME.hi_fg("C")}{THEME.title("olors")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
 
 			if not "f" in Key.mouse or cls.resized: Key.mouse["f"] = [[x+9 + i, y-1] for i in range(6 if not proc.search_filter else 2 + len(proc.search_filter[-10:]))]
 			if proc.search_filter:
@@ -2124,7 +2131,7 @@ class ProcBox(Box):
 			iw = (dw - 3) // (4 + expand)
 			iw2 = iw - 1
 			out += (f'{Mv.to(dy, dgx)}{Graphs.detailed_cpu(None if cls.moved or proc.details["killed"] else proc.details_cpu[-1])}'
-					f'{Mv.to(dy, dgx)}{THEME.title}{Fx.b}{0 if proc.details["killed"] else proc.details["cpu_percent"]}%{Mv.r(1)}{"C" if dgw < 20 else "Core"}{proc.details["cpu_num"]}')
+					f'{Mv.to(dy, dgx)}{THEME.title}{Fx.b}{0 if proc.details["killed"] else proc.details["cpu_percent"]}%{Mv.r(1)}{"" if SYSTEM == "MacOS" else (("C" if dgw < 20 else "Core") + str(proc.details["cpu_num"]))}')
 			for i, l in enumerate(["C", "P", "U"]):
 				out += f'{Mv.to(dy+2+i, dgx)}{l}'
 			for i, l in enumerate(["C", "M", "D"]):
@@ -2164,7 +2171,18 @@ class ProcBox(Box):
 				is_selected = True
 				cls.selected_pid = pid
 			else: is_selected = False
-			name, cmd, threads, username, mem, cpu = items.values()
+
+			if "indent" in items:
+				indent, name, cmd, threads, username, mem, cpu = items.values()
+			else:
+				name, cmd, threads, username, mem, cpu = items.values()
+
+			if CONFIG.proc_tree:
+				offset = tree_len - len(f'{indent}{pid}')
+				if offset < 1: offset = 0
+				indent = f'{indent:.{tree_len - len(str(pid))}}'
+			else:
+				offset = prog_len - 1
 			if cpu > 1.0 or pid in Graphs.pid_cpu:
 				if pid not in Graphs.pid_cpu:
 					Graphs.pid_cpu[pid] = Graph(5, 1, None, [0])
@@ -2176,15 +2194,6 @@ class ProcBox(Box):
 				else:
 					cls.pid_counter[pid] = 0
 
-			#* Move variables and sizes around for correct display if tree view is enabled
-			if CONFIG.proc_tree:
-				indent = name
-				name = cmd
-				offset = tree_len - len(f'{indent}{pid}')
-				if offset < 1: offset = 0
-				indent = f'{indent:.{tree_len - len(str(pid))}}'
-			else:
-				offset = prog_len - 1
 			end = f'{THEME.main_fg}{Fx.ub}' if CONFIG.proc_colors else Fx.ub
 			if cls.selected > cy: calc = cls.selected - cy
 			elif cls.selected > 0 and cls.selected <= cy: calc = cy - cls.selected
@@ -2850,9 +2859,9 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 	sort_expr["pid"] = compile("p.info['pid']", "str", "eval")
 	sort_expr["program"] = compile("p.info['name']", "str", "eval")
 	sort_expr["arguments"] = compile("' '.join(str(p.info['cmdline'])) or p.info['name']", "str", "eval")
-	sort_expr["threads"] = compile("str(p.info['num_threads'])", "str", "eval")
+	sort_expr["threads"] = compile("p.info['num_threads']", "str", "eval")
 	sort_expr["user"] = compile("p.info['username']", "str", "eval")
-	sort_expr["memory"] = compile("str(p.info['memory_percent'])", "str", "eval")
+	sort_expr["memory"] = compile("p.info['memory_percent']", "str", "eval")
 	sort_expr["cpu lazy"] = compile("(sum(p.info['cpu_times'][:2] if not p.info['cpu_times'] == 0.0 else [0.0, 0.0]) * 1000 / (time() - p.info['create_time']))", "str", "eval")
 	sort_expr["cpu responsive"] = compile("(p.info['cpu_percent'] if CONFIG.proc_per_core else (p.info['cpu_percent'] / THREADS))", "str", "eval")
 
@@ -2919,13 +2928,20 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 		if cls.detailed and not cls.details.get("killed", False):
 			try:
 				c_pid = cls.detailed_pid
+				if not c_pid in cls.processes: raise psutil.NoSuchProcess
 				det = psutil.Process(c_pid)
 			except (psutil.NoSuchProcess, psutil.ZombieProcess):
 				cls.details["killed"] = True
 				cls.details["status"] = psutil.STATUS_DEAD
 				ProcBox.redraw = True
 			else:
-				cls.details = det.as_dict(attrs=["status", "memory_info", "create_time", "cpu_num"] + (["nice", "io_counters", "terminal"] if cls.expand else []), ad_value="")
+				attrs: List[str] = ["status", "memory_info", "create_time"]
+				if not SYSTEM == "MacOS": attrs.extend(["cpu_num"])
+				if cls.expand:
+					attrs.extend(["nice", "terminal"])
+					if not SYSTEM == "MacOS": attrs.extend(["io_counters"])
+
+				cls.details = det.as_dict(attrs=attrs, ad_value="")
 				if det.parent() != None: cls.details["parent_name"] = det.parent().name()
 				else: cls.details["parent_name"] = ""
 
@@ -2937,6 +2953,9 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 				cls.details["memory_percent"] = cls.processes[c_pid]["mem"]
 				cls.details["cpu_percent"] = round(cls.processes[c_pid]["cpu"] * (1 if CONFIG.proc_per_core else THREADS))
 				cls.details["killed"] = False
+				if SYSTEM == "MacOS":
+					cls.details["cpu_num"] = -1
+					cls.details["io_counters"] = ""
 
 
 				if hasattr(cls.details["memory_info"], "rss"): cls.details["memory_bytes"] = floating_humanizer(cls.details["memory_info"].rss) # type: ignore
@@ -3032,7 +3051,9 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 					if getinfo["username"] == err: username = ""
 					else: username = getinfo["username"]
 					cpu = getinfo["cpu_percent"] if proc_per_cpu else (getinfo["cpu_percent"] / psutil.cpu_count())
-					mem = p.info["memory_percent"]
+					mem = getinfo["memory_percent"]
+					if getinfo["cmdline"] == err: cmd = ""
+					else: cmd = " ".join(getinfo["cmdline"]) or "[" + getinfo["name"] + "]"
 				else:
 					threads = 0
 					username = ""
@@ -3041,6 +3062,7 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 				out[pid] = {
 					"indent" : inindent,
 					"name": name,
+					"cmd" : cmd,
 					"threads" : threads,
 					"username" : username,
 					"mem" : mem,
@@ -3926,7 +3948,7 @@ def process_keys():
 			Box.draw_update_ms()
 		elif key in ["b", "n"]:
 			NetCollector.switch(key)
-		elif key in ["m", "escape"]:
+		elif key in ["M", "escape"]:
 			Menu.main()
 		elif key in ["o", "f2"]:
 			Menu.options()
@@ -3937,19 +3959,19 @@ def process_keys():
 			Collector.collect(NetCollector)
 		elif key in ["left", "right"]:
 			ProcCollector.sorting(key)
-		elif key == "T":
+		elif key == "e":
 			CONFIG.proc_tree = not CONFIG.proc_tree
 			Collector.collect(ProcCollector, interrupt=True, redraw=True)
-		elif key == "R":
+		elif key == "r":
 			CONFIG.proc_reversed = not CONFIG.proc_reversed
 			Collector.collect(ProcCollector, interrupt=True, redraw=True)
-		elif key == "C":
-			CONFIG.proc_colors = not CONFIG.proc_colors
-			Collector.collect(ProcCollector, redraw=True, only_draw=True)
-		elif key == "G":
-			CONFIG.proc_gradient = not CONFIG.proc_gradient
-			Collector.collect(ProcCollector, redraw=True, only_draw=True)
-		elif key == "P":
+		# elif key == "C":
+		# 	CONFIG.proc_colors = not CONFIG.proc_colors
+		# 	Collector.collect(ProcCollector, redraw=True, only_draw=True)
+		# elif key == "G":
+		# 	CONFIG.proc_gradient = not CONFIG.proc_gradient
+		# 	Collector.collect(ProcCollector, redraw=True, only_draw=True)
+		elif key == "c":
 			CONFIG.proc_per_core = not CONFIG.proc_per_core
 			Collector.collect(ProcCollector, interrupt=True, redraw=True)
 		elif key == "g":
@@ -3962,7 +3984,7 @@ def process_keys():
 			ProcBox.filtering = True
 			if not ProcCollector.search_filter: ProcBox.start = 0
 			Collector.collect(ProcCollector, redraw=True, only_draw=True)
-		elif key == "M":
+		elif key == "m":
 			Box.mini_mode = not Box.mini_mode
 			Draw.clear(saved=True)
 			Term.refresh(force=True)
