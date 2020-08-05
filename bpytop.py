@@ -1468,14 +1468,19 @@ class CpuBox(Box, SubBox):
 		Box._b_cpu_h = cls.height
 		#THREADS = 64
 		cls.box_columns = ceil((THREADS + 1) / (cls.height - 5))
-		if cls.box_columns * (24 + 13 if cpu.got_sensors else 24) < cls.width - (cls.width // 4): cls.column_size = 2
-		elif cls.box_columns * (19 + 6 if cpu.got_sensors else 19) < cls.width - (cls.width // 4): cls.column_size = 1
-		elif cls.box_columns * (10 + 6 if cpu.got_sensors else 10) < cls.width - (cls.width // 4): cls.column_size = 0
-		else: cls.box_columns = (cls.width - cls.width // 4) // (10 + 6 if cpu.got_sensors else 10); cls.column_size = 0
+		if cls.box_columns * (21 + 13 if cpu.got_sensors else 21) < cls.width - (cls.width // 4):
+			cls.column_size = 2
+			cls.box_width = (21 + 13 if cpu.got_sensors else 21) * cls.box_columns - ((cls.box_columns - 1) * 1)
+		elif cls.box_columns * (16 + 6 if cpu.got_sensors else 16) < cls.width - (cls.width // 4):
+			cls.column_size = 1
+			cls.box_width = (16 + 6 if cpu.got_sensors else 15) * cls.box_columns - ((cls.box_columns - 1) * 1)
+		elif cls.box_columns * (10 + 6 if cpu.got_sensors else 10) < cls.width - (cls.width // 4):
+			cls.column_size = 0
+		else:
+			cls.box_columns = (cls.width - cls.width // 4) // (9 + 6 if cpu.got_sensors else 8); cls.column_size = 0
 
-		if cls.column_size == 2: cls.box_width = (24 + 13 if cpu.got_sensors else 24) * cls.box_columns - ((cls.box_columns - 1) * 1)
-		elif cls.column_size == 1: cls.box_width = (19 + 6 if cpu.got_sensors else 19) * cls.box_columns - ((cls.box_columns - 1) * 1)
-		else: cls.box_width = (11 + 6 if cpu.got_sensors else 11) * cls.box_columns + 1
+		if cls.column_size == 0: cls.box_width = (10 + 6 if cpu.got_sensors else 10) * cls.box_columns + 1
+
 		cls.box_height = ceil(THREADS / cls.box_columns) + 4
 
 		if cls.box_height > cls.height - 2: cls.box_height = cls.height - 2
@@ -1524,16 +1529,15 @@ class CpuBox(Box, SubBox):
 			freq: str = f'{cpu.cpu_freq} Mhz' if cpu.cpu_freq < 1000 else f'{float(cpu.cpu_freq / 1000):.1f} GHz'
 			out += f'{Mv.to(by - 1, bx + bw - 9)}{THEME.div_line(Symbol.title_left)}{Fx.b}{THEME.title(freq)}{Fx.ub}{THEME.div_line(Symbol.title_right)}'
 		out += (f'{Mv.to(y, x)}{Graphs.cpu["up"](None if cls.resized else cpu.cpu_usage[0][-1])}{Mv.to(y + hh, x)}{Graphs.cpu["down"](None if cls.resized else cpu.cpu_usage[0][-1])}'
-				f'{THEME.main_fg}{Mv.to(by + cy, bx + cx)}{"CPU "}{Meters.cpu(cpu.cpu_usage[0][-1])}'
+				f'{THEME.main_fg}{Mv.to(by + cy, bx + cx)}{Fx.b}{"CPU "}{Fx.ub}{Meters.cpu(cpu.cpu_usage[0][-1])}'
 				f'{THEME.gradient["cpu"][cpu.cpu_usage[0][-1]]}{cpu.cpu_usage[0][-1]:>4}{THEME.main_fg}%')
 		if cpu.got_sensors:
 				out += (f'{THEME.inactive_fg}  ⡀⡀⡀⡀⡀{Mv.l(5)}{THEME.gradient["temp"][cpu.cpu_temp[0][-1]]}{Graphs.temps[0](None if cls.resized else cpu.cpu_temp[0][-1])}'
 						f'{cpu.cpu_temp[0][-1]:>4}{THEME.main_fg}°C')
 
 		cy += 1
-
 		for n in range(1, THREADS + 1):
-			out += f'{THEME.main_fg}{Mv.to(by + cy, bx + cx)}{"Core" + str(n):<{7 if cls.column_size > 0 else 5}}'
+			out += f'{THEME.main_fg}{Mv.to(by + cy, bx + cx)}{Fx.b + "C" + Fx.ub if THREADS < 100 else ""}{str(n):<{3}}'
 			if cls.column_size > 0:
 				out += f'{THEME.inactive_fg}{"⡀" * (5 * cls.column_size)}{Mv.l(5 * cls.column_size)}{THEME.gradient["cpu"][cpu.cpu_usage[n][-1]]}{Graphs.cores[n-1](None if cls.resized else cpu.cpu_usage[n][-1])}'
 			else:
@@ -1544,7 +1548,7 @@ class CpuBox(Box, SubBox):
 					out += f'{THEME.inactive_fg}  ⡀⡀⡀⡀⡀{Mv.l(5)}{THEME.gradient["temp"][cpu.cpu_temp[n][-1]]}{Graphs.temps[n](None if cls.resized else cpu.cpu_temp[n][-1])}'
 				else:
 					out += f'{THEME.gradient["temp"][cpu.cpu_temp[n][-1]]}'
-				out += f'{cpu.cpu_temp[n][-1]:>4}{THEME.main_fg}°C'
+				out += f'{cpu.cpu_temp[n][-1]:>4}{THEME.main_fg}°C{THEME.div_line(Symbol.v_line)}'
 			cy += 1
 			if cy == bh:
 				cc += 1; cy = 1; cx = ccw * cc
@@ -1553,11 +1557,11 @@ class CpuBox(Box, SubBox):
 		if cy < bh - 1: cy = bh - 1
 
 		if cls.column_size == 2 and cpu.got_sensors:
-			lavg = f'Load Average:  {"   ".join(str(l) for l in cpu.load_avg):^18.18}'
+			lavg = f'  Load AVG:  {"   ".join(str(l) for l in cpu.load_avg):^18.18}'
 		elif cls.column_size == 2 or (cls.column_size == 1 and cpu.got_sensors):
-			lavg = f'L-AVG: {" ".join(str(l) for l in cpu.load_avg):^14.14}'
+			lavg = f'LAVG: {" ".join(str(l) for l in cpu.load_avg):^14.14}'
 		else:
-			lavg = f'{" ".join(str(round(l, 1)) for l in cpu.load_avg):^11.11}'
+			lavg = f'LA {" ".join(str(round(l, 1)) for l in cpu.load_avg):^11.11}'
 		out += f'{Mv.to(by + cy, bx + cx)}{THEME.main_fg}{lavg}'
 
 		out += f'{Mv.to(y + h - 1, x + 1)}{THEME.inactive_fg}up {cpu.uptime}'
