@@ -1847,6 +1847,7 @@ class ProcBox(Box):
 	select_max: int = 0
 	selected: int = 0
 	selected_pid: int = 0
+	last_selection: int = 0
 	filtering: bool = False
 	moved: bool = False
 	start: int = 1
@@ -1897,6 +1898,9 @@ class ProcBox(Box):
 			elif cls.selected > 1:
 				cls.selected -= 1
 		elif key == "down":
+			if cls.selected == 0 and ProcCollector.detailed and cls.last_selection:
+				cls.selected = cls.last_selection
+				cls.last_selection = 0
 			if cls.selected == cls.select_max and cls.start < ProcCollector.num_procs - cls.select_max + 1:
 				cls.start += 1
 			elif cls.selected < cls.select_max:
@@ -1929,6 +1933,7 @@ class ProcBox(Box):
 					Key.list.insert(0, "enter")
 					return
 				elif new_sel > 0 and new_sel != cls.selected:
+					if cls.last_selection: cls.last_selection = 0
 					cls.selected = new_sel
 		elif key == "mouse_unselect":
 			cls.selected = 0
@@ -3035,7 +3040,7 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 			nonlocal infolist, proc_per_cpu, search, out
 			name: str; threads: int; username: str; mem: float; cpu: float
 			cont: bool = True
-			getinfo: Union[Dict, None]
+			getinfo: Dict = {}
 			if cls.collect_interrupt: return
 			try:
 				name = psutil.Process(pid).name()
@@ -3046,11 +3051,11 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 				name = ""
 			if pid in infolist:
 				getinfo = infolist[pid]
-			else:
-				getinfo = None
 
 			if search and not found:
-				for value in [ name, str(pid), getinfo["username"] if getinfo else "" ]:
+				if "username" in getinfo and isinstance(getinfo["username"], float): getinfo["username"] = ""
+				if "cmdline" in getinfo and isinstance(getinfo["cmdline"], float): getinfo["cmdline"] = ""
+				for value in [ name, str(pid), getinfo.get("username", ""), " ".join(getinfo.get("cmdline", "")) ]:
 					for s in search.split(","):
 						if s.strip() in value:
 							found = True
@@ -4015,10 +4020,12 @@ def process_keys():
 		elif key == "enter":
 			if ProcBox.selected > 0 and ProcCollector.detailed_pid != ProcBox.selected_pid and psutil.pid_exists(ProcBox.selected_pid):
 				ProcCollector.detailed = True
+				ProcBox.last_selection = ProcBox.selected
 				ProcBox.selected = 0
 				ProcCollector.detailed_pid = ProcBox.selected_pid
 				ProcBox.resized = True
 			elif ProcCollector.detailed:
+				ProcBox.last_selection = 0
 				ProcCollector.detailed = False
 				ProcCollector.detailed_pid = None
 				ProcBox.resized = True
