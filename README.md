@@ -190,6 +190,16 @@ sudo make install
 sudo make uninstall
 ```
 
+#### Fedora/CentOS 8
+
+[Available](https://src.fedoraproject.org/rpms/bpytop) in the Fedora and [EPEL-8 repository](https://fedoraproject.org/wiki/EPEL).
+
+>Installation
+
+``` bash
+sudo dnf install bpytop
+```
+
 ## Configurability
 
 All options changeable from within UI.
