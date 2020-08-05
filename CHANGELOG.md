@@ -1,4 +1,8 @@
-#Changelog
+# Changelog
+
+## v1.0.5
+
+* Fixed: Attribute typo in detailed process collection
 
 ## v1.0.4
 
