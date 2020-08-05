@@ -2955,7 +2955,7 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 					attrs.extend(["nice", "terminal"])
 					if not SYSTEM == "MacOS": attrs.extend(["io_counters"])
 
-				if not c_pid in cls.processes: attrs.extend(["pid", "name", "cmdline", "threads", "username", "memory_percent", "cpu_percent"])
+				if not c_pid in cls.processes: attrs.extend(["pid", "name", "cmdline", "num_threads", "username", "memory_percent", "cpu_percent"])
 
 				cls.details = det.as_dict(attrs=attrs, ad_value="")
 				if det.parent() != None: cls.details["parent_name"] = det.parent().name()
@@ -2971,6 +2971,8 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 					cls.details["cpu_percent"] = round(cls.processes[c_pid]["cpu"] * (1 if CONFIG.proc_per_core else THREADS))
 				else:
 					cls.details["cmdline"] = " ".join(cls.details["cmdline"]) or "[" + cls.details["name"] + "]"
+					cls.details["threads"] = f'{cls.details["num_threads"]}'
+
 				cls.details["killed"] = False
 				if SYSTEM == "MacOS":
 					cls.details["cpu_num"] = -1
