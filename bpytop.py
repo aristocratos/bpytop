@@ -2443,16 +2443,22 @@ class CpuCollector(Collector):
 			try:
 				for name, entries in psutil.sensors_temperatures().items():
 					for entry in entries:
-						if entry.label.startswith(("Package", "Tdie")):
+						if entry.label.startswith(("Package", "Tdie")) and hasattr(entry, "current"):
 							cpu_type = "intel" if entry.label.startswith("Package") else "ryzen"
 							if not cls.cpu_temp_high:
-								cls.cpu_temp_high, cls.cpu_temp_crit = round(entry.high), round(entry.critical)
+								if hasattr(entry, "high") and entry.high: cls.cpu_temp_high = round(entry.high)
+								else: cls.cpu_temp_high = 80
+								if hasattr(entry, "critical") and entry.critical: cls.cpu_temp_crit = round(entry.critical)
+								else: cls.cpu_temp_crit = 95
 							temp = round(entry.current)
-						elif entry.label.startswith(("Core", "Tccd", "CPU")) or (name.lower() == "cpu" and not entry.label):
+						elif (entry.label.startswith(("Core", "Tccd", "CPU")) or (name.lower() == "cpu" and not entry.label)) and hasattr(entry, "current"):
 							if not cpu_type:
 								cpu_type = "other"
 								if not cls.cpu_temp_high:
-									cls.cpu_temp_high, cls.cpu_temp_crit = round(entry.high), round(entry.critical)
+									if hasattr(entry, "high") and entry.high: cls.cpu_temp_high = round(entry.high)
+									else: cls.cpu_temp_high = 80
+									if hasattr(entry, "critical") and entry.critical: cls.cpu_temp_crit = round(entry.critical)
+									else: cls.cpu_temp_crit = 95
 								temp = round(entry.current)
 							cores.append(round(entry.current))
 				if len(cores) < THREADS:
@@ -2928,7 +2934,6 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 		if cls.detailed and not cls.details.get("killed", False):
 			try:
 				c_pid = cls.detailed_pid
-				if not c_pid in cls.processes: raise psutil.NoSuchProcess
 				det = psutil.Process(c_pid)
 			except (psutil.NoSuchProcess, psutil.ZombieProcess):
 				cls.details["killed"] = True
@@ -2941,17 +2946,22 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 					attrs.extend(["nice", "terminal"])
 					if not SYSTEM == "MacOS": attrs.extend(["io_counters"])
 
+				if not c_pid in cls.processes: attrs.extend(["pid", "name", "cmdline", "threads", "username", "memory_percent", "cpu_percent"])
+
 				cls.details = det.as_dict(attrs=attrs, ad_value="")
 				if det.parent() != None: cls.details["parent_name"] = det.parent().name()
 				else: cls.details["parent_name"] = ""
 
 				cls.details["pid"] = c_pid
-				cls.details["name"] = cls.processes[c_pid]["name"]
-				cls.details["cmdline"] = cls.processes[c_pid]["cmd"]
-				cls.details["threads"] = f'{cls.processes[c_pid]["threads"]}'
-				cls.details["username"] = cls.processes[c_pid]["username"]
-				cls.details["memory_percent"] = cls.processes[c_pid]["mem"]
-				cls.details["cpu_percent"] = round(cls.processes[c_pid]["cpu"] * (1 if CONFIG.proc_per_core else THREADS))
+				if c_pid in cls.processes:
+					cls.details["name"] = cls.processes[c_pid]["name"]
+					cls.details["cmdline"] = cls.processes[c_pid]["cmd"]
+					cls.details["threads"] = f'{cls.processes[c_pid]["threads"]}'
+					cls.details["username"] = cls.processes[c_pid]["username"]
+					cls.details["memory_percent"] = cls.processes[c_pid]["mem"]
+					cls.details["cpu_percent"] = round(cls.processes[c_pid]["cpu"] * (1 if CONFIG.proc_per_core else THREADS))
+				else:
+					cls.details["cmdline"] = " ".join(cls.details["cmdline"]) or "[" + cls.details["name"] + "]"
 				cls.details["killed"] = False
 				if SYSTEM == "MacOS":
 					cls.details["cpu_num"] = -1
@@ -3645,9 +3655,6 @@ class Menu:
 						else:
 							CpuCollector.sensor_method = ""
 							CpuCollector.got_sensors = False
-					elif selected == "mini_mode":
-						Box.mini_mode = not Box.mini_mode
-						Draw.clear(saved=True)
 					Term.refresh(force=True)
 					cls.resized = False
 				elif key in ["left", "right"] and selected == "color_theme" and len(Theme.themes) > 1:
