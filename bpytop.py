@@ -2490,6 +2490,10 @@ class CpuCollector(Collector):
 								z += i
 							except IndexError:
 								break
+					if cls.cpu_temp[0]:
+						for n in range(1, len(cls.cpu_temp)):
+							if len(cls.cpu_temp[n]) != len(cls.cpu_temp[n-1]):
+								cls.cpu_temp[n] = cls.cpu_temp[n//2].copy()
 				else:
 					cores.insert(0, temp)
 					for n, t in enumerate(cores):
@@ -2972,6 +2976,7 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 				else:
 					cls.details["cmdline"] = " ".join(cls.details["cmdline"]) or "[" + cls.details["name"] + "]"
 					cls.details["threads"] = f'{cls.details["num_threads"]}'
+					cls.details["cpu_percent"] = round(cls.details["cpu_percent"])
 
 				cls.details["killed"] = False
 				if SYSTEM == "MacOS":
