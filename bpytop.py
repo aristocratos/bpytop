@@ -4040,6 +4040,7 @@ def process_keys():
 				ProcCollector.detailed_pid = ProcBox.selected_pid
 				ProcBox.resized = True
 			elif ProcCollector.detailed:
+				ProcBox.selected = ProcBox.last_selection
 				ProcBox.last_selection = 0
 				ProcCollector.detailed = False
 				ProcCollector.detailed_pid = None
