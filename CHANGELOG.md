@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.6
+
+* Fixed: Cpu temps index error on uneven temp collection
+* Fixed: No cpu percent in info box when filtering
+
 ## v1.0.5
 
 * Fixed: Attribute typo in detailed process collection
