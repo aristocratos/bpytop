@@ -2866,6 +2866,7 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 	search_filter: str = ""
 	processes: Dict = {}
 	num_procs: int = 0
+	det_cpu: float = 0.0
 	detailed: bool = False
 	detailed_pid: Union[int, None] = None
 	details: Dict[str, Any] = {}
@@ -2888,6 +2889,7 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 	def _collect(cls):
 		'''List all processess with pid, name, arguments, threads, username, memory percent and cpu percent'''
 		out: Dict = {}
+		cls.det_cpu = 0.0
 		sorting: str = CONFIG.proc_sorting
 		reverse: bool = not CONFIG.proc_reversed
 		proc_per_cpu: bool = CONFIG.proc_per_core
@@ -2915,6 +2917,8 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 				if p.info["num_threads"] == err:
 					p.info["num_threads"] = 0
 				if search:
+					if cls.detailed and p.info["pid"] == cls.detailed_pid:
+						cls.det_cpu = p.info["cpu_percent"]
 					for value in [ p.info["name"], " ".join(p.info["cmdline"]), str(p.info["pid"]), p.info["username"] ]:
 						for s in search.split(","):
 							if s.strip() in value:
@@ -2959,7 +2963,7 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 					attrs.extend(["nice", "terminal"])
 					if not SYSTEM == "MacOS": attrs.extend(["io_counters"])
 
-				if not c_pid in cls.processes: attrs.extend(["pid", "name", "cmdline", "num_threads", "username", "memory_percent", "cpu_percent"])
+				if not c_pid in cls.processes: attrs.extend(["pid", "name", "cmdline", "num_threads", "username", "memory_percent"])
 
 				cls.details = det.as_dict(attrs=attrs, ad_value="")
 				if det.parent() != None: cls.details["parent_name"] = det.parent().name()
@@ -2976,7 +2980,7 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 				else:
 					cls.details["cmdline"] = " ".join(cls.details["cmdline"]) or "[" + cls.details["name"] + "]"
 					cls.details["threads"] = f'{cls.details["num_threads"]}'
-					cls.details["cpu_percent"] = round(cls.details["cpu_percent"])
+					cls.details["cpu_percent"] = round(cls.det_cpu)
 
 				cls.details["killed"] = False
 				if SYSTEM == "MacOS":
@@ -3028,6 +3032,7 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 		'''List all processess in a tree view with pid, name, threads, username, memory percent and cpu percent'''
 		out: Dict = {}
 		err: float = 0.0
+		det_cpu: float = 0.0
 		infolist: Dict = {}
 		tree = defaultdict(list)
 		n: int = 0
@@ -3044,7 +3049,7 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 			tree[0].remove(0)
 
 		def create_tree(pid: int, tree: defaultdict, indent: str = "", inindent: str = " ", found: bool = False):
-			nonlocal infolist, proc_per_cpu, search, out
+			nonlocal infolist, proc_per_cpu, search, out, det_cpu
 			name: str; threads: int; username: str; mem: float; cpu: float
 			cont: bool = True
 			getinfo: Dict = {}
@@ -3060,6 +3065,8 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 				getinfo = infolist[pid]
 
 			if search and not found:
+				if cls.detailed and pid == cls.detailed_pid:
+						det_cpu = getinfo["cpu_percent"]
 				if "username" in getinfo and isinstance(getinfo["username"], float): getinfo["username"] = ""
 				if "cmdline" in getinfo and isinstance(getinfo["cmdline"], float): getinfo["cmdline"] = ""
 				for value in [ name, str(pid), getinfo.get("username", ""), " ".join(getinfo.get("cmdline", "")) ]:
@@ -3103,6 +3110,7 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 			create_tree(child, tree, indent + "  ", indent + " └─ ")
 
 		create_tree(min(tree), tree)
+		cls.det_cpu = det_cpu
 
 		if cls.collect_interrupt: return
 		cls.num_procs = len(out)
