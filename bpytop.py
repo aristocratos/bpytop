@@ -1667,7 +1667,7 @@ class MemBox(Box):
 					for name in cls.swap_names:
 						if CONFIG.mem_graphs and not CONFIG.swap_disk:
 							Meters.swap[name] = Graph(cls.mem_meter, cls.graph_height, THEME.gradient[name], mem.swap_vlist[name])
-						elif CONFIG.swap_disk:
+						elif CONFIG.swap_disk and CONFIG.show_disks:
 							Meters.disks_used["__swap"] = Meter(mem.swap_percent["used"], cls.disk_meter, "used")
 							if len(mem.disks) * 3 <= h + 1:
 								Meters.disks_free["__swap"] = Meter(mem.swap_percent["free"], cls.disk_meter, "free")
