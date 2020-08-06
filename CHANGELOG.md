@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.7
+
+* Changed: Info box now restores last selection on close
+* Fixed: Crash when starting with show_disks=False
+
 ## v1.0.6
 
 * Fixed: Cpu temps index error on uneven temp collection

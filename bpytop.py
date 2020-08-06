@@ -55,7 +55,7 @@ if errors:
 		print("\nInstall required modules!\n")
 	quit(1)
 
-VERSION: str = "1.0.6"
+VERSION: str = "1.0.7"
 
 #? Argument parser ------------------------------------------------------------------------------->
 if len(sys.argv) > 1:
