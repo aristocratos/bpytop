@@ -169,9 +169,7 @@ brew install osx-cpu-temp
 >Install with pkg and pip
 
 ``` bash
-sudo pkg install python3 git
-sudo python3 -m ensurepip
-sudo python3 -m pip install psutil
+sudo pkg install git python3 py37-psutil
 ```
 
 #### Manual installation Linux, OSX and FreeBSD
@@ -188,6 +186,16 @@ sudo make install
 
 ``` bash
 sudo make uninstall
+```
+
+#### FreeBSD package
+
+Available in [FreeBSD ports](https://www.freshports.org/sysutils/bpytop/)
+
+Install pre-built pacakge
+
+``` bash
+sudo pkg install bpytop
 ```
 
 ## Configurability
