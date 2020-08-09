@@ -18,6 +18,7 @@
 #    limitations under the License.
 
 import os, sys, threading, signal, re, subprocess, logging, logging.handlers
+import urllib.request
 from time import time, sleep, strftime, localtime
 from datetime import timedelta
 from _thread import interrupt_main
@@ -3212,6 +3213,8 @@ class Menu:
 			if cls.resized:
 				banner = (f'{Banner.draw(Term.height // 2 - 10, center=True)}{Mv.d(1)}{Mv.l(46)}{Colors.black_bg}{Colors.default}{Fx.b}← esc'
 					f'{Mv.r(30)}{Fx.i}Version: {VERSION}{Fx.ui}{Fx.ub}{Term.bg}{Term.fg}')
+				if UpdateChecker.version != VERSION:
+					banner += f'{Mv.to(Term.height, 1)}{Fx.b}{THEME.title}New release {UpdateChecker.version} available at https://github.com/aristocratos/bpytop{Fx.ub}{Term.fg}'
 				cy = 0
 				for name, menu in cls.menus.items():
 					ypos = Term.height // 2 - 2 + cy
@@ -3586,8 +3589,6 @@ class Menu:
 				'The init screen is purely cosmetical and',
 				'slows down start to show status messages.'],
 			"update_check" : [
-				'Not implemented yet!'
-				'',
 				'Check for updates at start.',
 				'',
 				'Checks for latest version from:',
@@ -3844,7 +3845,34 @@ class Timer:
 		cls.timestamp = time() - (CONFIG.update_ms / 1000)
 		Key.break_wait()
 
+class UpdateChecker:
+	version: str = VERSION
+	thread: threading.Thread
 
+	@classmethod
+	def run(cls):
+		cls.thread = threading.Thread(target=cls._checker)
+		cls.thread.start()
+
+	@classmethod
+	def _checker(cls):
+		try:
+			with urllib.request.urlopen("https://github.com/aristocratos/bpytop/raw/master/bpytop.py", timeout=5) as source: # type: ignore
+				for line in source:
+					line = line.decode("utf-8")
+					if line.startswith("VERSION: str ="):
+						cls.version = line[(line.index("=")+1):].strip('" \n')
+						break
+		except Exception as e:
+			errlog.exception(f'{e}')
+		else:
+			if cls.version != VERSION and which("notify-send"):
+				try:
+					subprocess.run(["notify-send", "-u", "normal", "BpyTop Update!",
+						f'New version of BpyTop available!\nCurrent version: {VERSION}\nNew version: {cls.version}\nDownload at github.com/aristocratos/bpytop',
+						"-i", "update-notifier", "-t", "10000"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+				except Exception as e:
+					errlog.exception(f'{e}')
 
 #? Functions ------------------------------------------------------------------------------------->
 
@@ -4243,6 +4271,7 @@ if __name__ == "__main__":
 	Draw.now(Term.alt_screen, Term.clear, Term.hide_cursor, Term.mouse_on)
 	Term.echo(False)
 	Term.refresh()
+	if CONFIG.update_check: UpdateChecker.run()
 
 	#? Draw banner and init status
 	if CONFIG.show_init:
