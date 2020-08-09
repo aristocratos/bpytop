@@ -19,7 +19,7 @@
 
 import os, sys, threading, signal, re, subprocess, logging, logging.handlers
 import urllib.request
-from time import time, sleep, strftime, localtime
+from time import time, sleep, strftime
 from datetime import timedelta
 from _thread import interrupt_main
 from collections import defaultdict
@@ -29,7 +29,7 @@ from string import Template
 from math import ceil, floor
 from random import randint
 from shutil import which
-from typing import List, Set, Dict, Tuple, Optional, Union, Any, Callable, ContextManager, Iterable, Type, NamedTuple
+from typing import List, Dict, Tuple, Union, Any, Iterable
 
 errors: List[str] = []
 try: import fcntl, termios, tty
