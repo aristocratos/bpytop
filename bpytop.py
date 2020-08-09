@@ -1493,7 +1493,7 @@ class CpuBox(Box, SubBox):
 			Key.mouse["M"] = [[cls.x + 10 + i, cls.y] for i in range(6)]
 		return (f'{create_box(box=cls, line_color=THEME.cpu_box)}'
 		f'{Mv.to(cls.y, cls.x + 10)}{THEME.cpu_box(Symbol.title_left)}{Fx.b}{THEME.hi_fg("M")}{THEME.title("enu")}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}'
-		f'{create_box(x=cls.box_x, y=cls.box_y, width=cls.box_width, height=cls.box_height, line_color=THEME.div_line, fill=False, title=CPU_NAME[:18 if CONFIG.check_temp else 9] if not CONFIG.custom_cpu_name else CONFIG.custom_cpu_name[:18 if CONFIG.check_temp else 9])}')
+		f'{create_box(x=cls.box_x, y=cls.box_y, width=cls.box_width, height=cls.box_height, line_color=THEME.div_line, fill=False, title=CPU_NAME[:cls.box_width - 14] if not CONFIG.custom_cpu_name else CONFIG.custom_cpu_name[:cls.box_width - 14])}')
 
 	@classmethod
 	def _draw_fg(cls):
@@ -2184,10 +2184,7 @@ class ProcBox(Box):
 				cls.selected_pid = pid
 			else: is_selected = False
 
-			if "indent" in items:
-				indent, name, cmd, threads, username, mem, cpu = items.values()
-			else:
-				name, cmd, threads, username, mem, cpu = items.values()
+			indent, name, cmd, threads, username, mem, cpu = [items.get(v, d) for v, d in [("indent", ""), ("name", ""), ("cmd", ""), ("threads", 0), ("username", "?"), ("mem", 0.0), ("cpu", 0.0)]]
 
 			if CONFIG.proc_tree:
 				offset = tree_len - len(f'{indent}{pid}')
@@ -2513,9 +2510,9 @@ class CpuCollector(Collector):
 		else:
 			try:
 				if cls.sensor_method == "osx-cpu-temp":
-					temp = round(float(subprocess.check_output("osx-cpu-temp", text=True).rstrip().rstrip("°C")))
+					temp = round(float(subprocess.check_output("osx-cpu-temp", text=True).strip().rstrip("°C")))
 				elif cls.sensor_method == "vcgencmd":
-					temp = round(float(subprocess.check_output("vcgencmd measure_temp", text=True).rstrip().rstrip("'C")))
+					temp = round(float(subprocess.check_output(["vcgencmd", "measure_temp"], text=True).strip().rstrip("'C")))
 			except Exception as e:
 					errlog.exception(f'{e}')
 					cls.got_sensors = False
