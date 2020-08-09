@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.0.8
+
+* Added: Set terminal title at start
+* Added: Update checker, can be toggled off in options menu
+* Added: Option to show memory in bytes for processes, enabled by default
+* Added: Options to set custom network graphs minimum scaling values and a "auto" button to toggle manual and default values.
+* Fixed: Failure to detect cpu temp on raspberry pi
+* Changed: Layout changes to cpu box
+
 ## v1.0.7
 
 * Changed: Info box now restores last selection on close
