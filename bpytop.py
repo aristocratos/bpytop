@@ -120,6 +120,9 @@ proc_gradient=$proc_gradient
 #* If process cpu usage should be of the core it's running on or usage of the total available cpu power.
 proc_per_core=$proc_per_core
 
+#* Show process memory as bytes instead of percent
+proc_mem_bytes=$proc_mem_bytes
+
 #* Check cpu temperature, needs "vcgencmd" on Raspberry Pi and "osx-cpu-temp" on MacOS X.
 check_temp=$check_temp
 
@@ -320,7 +323,8 @@ def timeit_decorator(func):
 
 class Config:
 	'''Holds all config variables and functions for loading from and saving to disk'''
-	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name", "proc_colors", "proc_gradient", "proc_per_core", "disks_filter", "update_check", "log_level", "mem_graphs", "show_swap", "swap_disk", "show_disks", "show_init", "mini_mode"]
+	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name", "proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes",
+						"disks_filter", "update_check", "log_level", "mem_graphs", "show_swap", "swap_disk", "show_disks", "show_init", "mini_mode"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	update_ms: int = 2000
@@ -330,6 +334,7 @@ class Config:
 	proc_colors: bool = True
 	proc_gradient: bool = True
 	proc_per_core: bool = False
+	proc_mem_bytes: bool = True
 	check_temp: bool = True
 	draw_clock: str = "%X"
 	background_update: bool = True
@@ -1558,7 +1563,7 @@ class CpuBox(Box, SubBox):
 		if cy < bh - 1: cy = bh - 1
 
 		if cls.column_size == 2 and cpu.got_sensors:
-			lavg = f'  Load AVG:  {"   ".join(str(l) for l in cpu.load_avg):^18.18}'
+			lavg = f' Load AVG:  {"   ".join(str(l) for l in cpu.load_avg):^19.19}'
 		elif cls.column_size == 2 or (cls.column_size == 1 and cpu.got_sensors):
 			lavg = f'LAV: {" ".join(str(l) for l in cpu.load_avg):^14.14}'
 		elif cls.column_size == 1 or (cls.column_size == 0 and cpu.got_sensors):
@@ -2130,7 +2135,9 @@ class ProcBox(Box):
 					(" " if proc.num_procs > cls.select_max else ""))
 				if selected == "program" and prog_len <= 8: selected = "prg"
 			selected = selected.split(" ")[0].capitalize()
-			out_misc += label.replace(selected, f'{Fx.u}{selected}{Fx.uu}')
+			if CONFIG.proc_mem_bytes: label = label.replace("Mem%", "MemB")
+			label = label.replace(selected, f'{Fx.u}{selected}{Fx.uu}')
+			out_misc += label
 
 			Draw.buffer("proc_misc", out_misc, only_save=True)
 
@@ -2184,7 +2191,7 @@ class ProcBox(Box):
 				cls.selected_pid = pid
 			else: is_selected = False
 
-			indent, name, cmd, threads, username, mem, cpu = [items.get(v, d) for v, d in [("indent", ""), ("name", ""), ("cmd", ""), ("threads", 0), ("username", "?"), ("mem", 0.0), ("cpu", 0.0)]]
+			indent, name, cmd, threads, username, mem, mem_b, cpu = [items.get(v, d) for v, d in [("indent", ""), ("name", ""), ("cmd", ""), ("threads", 0), ("username", "?"), ("mem", 0.0), ("mem_b", 0), ("cpu", 0.0)]]
 
 			if CONFIG.proc_tree:
 				offset = tree_len - len(f'{indent}{pid}')
@@ -2230,7 +2237,7 @@ class ProcBox(Box):
 				(f'{g_color}{cmd:<{arg_len}.{arg_len-1}}' if arg_len else "") +
 				t_color + (f'{threads:>4} ' if threads < 1000 else "999> ") + end +
 				g_color + (f'{username:<9.9}' if len(username) < 10 else f'{username[:8]:<8}+') +
-				m_color + (f'{mem:>4.1f}' if mem < 100 else f'{mem:>4.0f} ') + end +
+				m_color + ((f'{mem:>4.1f}' if mem < 100 else f'{mem:>4.0f} ') if not CONFIG.proc_mem_bytes else f'{floating_humanizer(mem_b, short=True):>4.4}') + end +
 				f' {THEME.inactive_fg}{"⡀"*5}{THEME.main_fg}{g_color}{c_color}' + (f' {cpu:>4.1f} ' if cpu < 100 else f'{cpu:>5.0f} ') + end +
 				(" " if proc.num_procs > cls.select_max else ""))
 
@@ -2905,7 +2912,7 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 		if CONFIG.proc_tree:
 			cls._tree(sort_cmd=sort_cmd, reverse=reverse, proc_per_cpu=proc_per_cpu, search=search)
 		else:
-			for p in sorted(psutil.process_iter(cls.p_values, err), key=lambda p: eval(sort_cmd), reverse=reverse):
+			for p in sorted(psutil.process_iter(cls.p_values + ["memory_info"] if CONFIG.proc_mem_bytes else [], err), key=lambda p: eval(sort_cmd), reverse=reverse):
 				if cls.collect_interrupt or cls.proc_interrupt:
 					return
 				if p.info["name"] == "idle" or p.info["name"] == err or p.info["pid"] == err:
@@ -2929,6 +2936,10 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 
 				cpu = p.info["cpu_percent"] if proc_per_cpu else (p.info["cpu_percent"] / psutil.cpu_count())
 				mem = p.info["memory_percent"]
+				if CONFIG.proc_mem_bytes and hasattr(p.info["memory_info"], "rss"):
+					mem_b = p.info["memory_info"].rss
+				else:
+					mem_b = 0
 
 				cmd = " ".join(p.info["cmdline"]) or "[" + p.info["name"] + "]"
 
@@ -2938,6 +2949,7 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 					"threads" : p.info["num_threads"],
 					"username" : p.info["username"],
 					"mem" : mem,
+					"mem_b" : mem_b,
 					"cpu" : cpu }
 
 				n += 1
@@ -3036,7 +3048,7 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 		infolist: Dict = {}
 		tree = defaultdict(list)
 		n: int = 0
-		for p in sorted(psutil.process_iter(cls.p_values, err), key=lambda p: eval(sort_cmd), reverse=reverse):
+		for p in sorted(psutil.process_iter(cls.p_values + ["memory_info"] if CONFIG.proc_mem_bytes else [], err), key=lambda p: eval(sort_cmd), reverse=reverse):
 			if cls.collect_interrupt: return
 			try:
 				tree[p.ppid()].append(p.pid)
@@ -3087,8 +3099,12 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 					mem = getinfo["memory_percent"]
 					if getinfo["cmdline"] == err: cmd = ""
 					else: cmd = " ".join(getinfo["cmdline"]) or "[" + getinfo["name"] + "]"
+					if CONFIG.proc_mem_bytes and hasattr(getinfo["memory_info"], "rss"):
+						mem_b = getinfo["memory_info"].rss
+					else:
+						mem_b = 0
 				else:
-					threads = 0
+					threads = mem_b = 0
 					username = ""
 					mem = cpu = 0.0
 
@@ -3099,6 +3115,7 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 					"threads" : threads,
 					"username" : username,
 					"mem" : mem,
+					"mem_b" : mem_b,
 					"cpu" : cpu }
 
 			if pid not in tree:
@@ -3453,6 +3470,11 @@ class Menu:
 				'',
 				'If true and process is multithreaded',
 				'cpu usage can reach over 100%.'],
+			"proc_mem_bytes" : [
+				'Show memory as bytes in process list.',
+				' ',
+				'True or False.'
+			],
 			"check_temp" : [
 				'Enable cpu temperature reporting.',
 				'',
@@ -3926,7 +3948,11 @@ def floating_humanizer(value: Union[float, int], bit: bool = False, per_second: 
 			out = f'{value}'
 
 
-	if short: out = out.split(".")[0]
+	if short:
+		out = out.split(".")[0]
+		if len(out) > 3:
+			out = f'{int(out[0]) + 1}'
+			selector += 1
 	out += f'{"" if short else " "}{unit[selector][0] if short else unit[selector]}'
 	if per_second: out += "ps" if bit else "/s"
 
