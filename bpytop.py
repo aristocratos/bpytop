@@ -151,6 +151,13 @@ swap_disk=$swap_disk
 #* If mem box should be split to also show disks info.
 show_disks=$show_disks
 
+#* Minimum value the network graphs scales down to, default "10K" = 10 KibiBytes, possible units "K" (KiB), "M" (MiB), "G" (GiB), no unit for bytes.
+net_download_min="$net_download_min"
+net_upload_min="$net_upload_min"
+
+#* Start in network graphs auto rescaling mode, ignores any values set above and rescale down to default value "10K".
+net_auto_min=$net_auto_min
+
 #* Show init screen at startup, the init screen is purely cosmetical
 show_init=$show_init
 
@@ -324,7 +331,7 @@ def timeit_decorator(func):
 class Config:
 	'''Holds all config variables and functions for loading from and saving to disk'''
 	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name", "proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes",
-						"disks_filter", "update_check", "log_level", "mem_graphs", "show_swap", "swap_disk", "show_disks", "show_init", "mini_mode"]
+						"disks_filter", "update_check", "log_level", "mem_graphs", "show_swap", "swap_disk", "show_disks", "net_download_min", "net_upload_min", "net_auto_min", "show_init", "mini_mode"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	update_ms: int = 2000
@@ -345,6 +352,9 @@ class Config:
 	show_swap: bool = True
 	swap_disk: bool = True
 	show_disks: bool = True
+	net_download_min: str = "10K"
+	net_upload_min: str = "10K"
+	net_auto_min: bool = False
 	show_init: bool = True
 	mini_mode: bool = False
 	log_level: str = "WARNING"
@@ -1810,13 +1820,18 @@ class NetBox(Box, SubBox):
 		if cls.resized or cls.redraw:
 			out_misc += cls._draw_bg()
 			if not "b" in Key.mouse:
-				Key.mouse["b"] = [[x+w - len(net.nic) - 9 + i, y-1] for i in range(4)]
+				Key.mouse["b"] = [[x+w - len(net.nic[:10]) - 9 + i, y-1] for i in range(4)]
 				Key.mouse["n"] = [[x+w - 5 + i, y-1] for i in range(4)]
-				Key.mouse["z"] = [[x+w - len(net.nic) - 14 + i, y-1] for i in range(4)]
+				Key.mouse["z"] = [[x+w - len(net.nic[:10]) - 14 + i, y-1] for i in range(4)]
 
-			out_misc += (f'{Mv.to(y-1, x+w - 25)}{THEME.net_box}{Symbol.h_line * (10 - len(net.nic))}{Symbol.title_left}{Fx.b if reset else ""}{THEME.hi_fg("z")}{THEME.title("ero")}'
+
+			out_misc += (f'{Mv.to(y-1, x+w - 25)}{THEME.net_box}{Symbol.h_line * (10 - len(net.nic[:10]))}{Symbol.title_left}{Fx.b if reset else ""}{THEME.hi_fg("z")}{THEME.title("ero")}'
 				f'{Fx.ub}{THEME.net_box(Symbol.title_right)}{Term.fg}'
 				f'{THEME.net_box}{Symbol.title_left}{Fx.b}{THEME.hi_fg("<b")} {THEME.title(net.nic[:10])} {THEME.hi_fg("n>")}{Fx.ub}{THEME.net_box(Symbol.title_right)}{Term.fg}')
+			if w - len(net.nic[:10]) - 20 > 6:
+				if not "a" in Key.mouse: Key.mouse["a"] = [[x+w - 20 - len(net.nic[:10]) + i, y-1] for i in range(4)]
+				out_misc += (f'{Mv.to(y-1, x+w - 21 - len(net.nic[:10]))}{THEME.net_box(Symbol.title_left)}{Fx.b if net.auto_min else ""}{THEME.hi_fg("a")}{THEME.title("uto")}'
+				f'{Fx.ub}{THEME.net_box(Symbol.title_right)}{Term.fg}')
 			Draw.buffer("net_misc", out_misc, only_save=True)
 
 		cy = 0
@@ -2742,13 +2757,15 @@ class NetCollector(Collector):
 	reset: bool = False
 	graph_raise: Dict[str, int] = {"download" : 5, "upload" : 5}
 	graph_lower: Dict[str, int] = {"download" : 5, "upload" : 5}
-	min_top: int = 10<<10
+	#min_top: int = 10<<10
 	#* Stats structure = stats[netword device][download, upload][total, last, top, graph_top, offset, speed, redraw, graph_raise, graph_low] = int, List[int], bool
 	stats: Dict[str, Dict[str, Dict[str, Any]]] = {}
 	#* Strings structure strings[network device][download, upload][total, byte_ps, bit_ps, top, graph_top] = str
 	strings: Dict[str, Dict[str, Dict[str, str]]] = {}
 	switched: bool = False
 	timestamp: float = time()
+	net_min: Dict[str, int] = {"download" : -1, "upload" : -1}
+	auto_min: bool = CONFIG.net_auto_min
 
 	@classmethod
 	def _get_nics(cls):
@@ -2786,6 +2803,15 @@ class NetCollector(Collector):
 		stat: Dict
 		up_stat = psutil.net_if_stats()
 
+		if cls.net_min["download"] == -1 or cls.net_min["upload"] == -1:
+			cls.net_min["download"] = 10 << 10 if cls.auto_min else units_to_bytes(CONFIG.net_download_min)
+			cls.net_min["upload"] = 10 << 10 if cls.auto_min else units_to_bytes(CONFIG.net_upload_min)
+			try:
+				cls.stats[cls.nic]["download"].update({"graph_top" : cls.net_min["download"], "graph_lower" : 7})
+				cls.stats[cls.nic]["upload"].update({"graph_top" : cls.net_min["upload"], "graph_lower" : 7})
+			except:
+				pass
+
 		if cls.switched:
 			cls.nic = cls.new_nic
 			cls.switched = False
@@ -2802,7 +2828,7 @@ class NetCollector(Collector):
 			cls.stats[cls.nic] = {}
 			cls.strings[cls.nic] = { "download" : {}, "upload" : {}}
 			for direction, value in ["download", io_all.bytes_recv], ["upload", io_all.bytes_sent]:
-				cls.stats[cls.nic][direction] = { "total" : value, "last" : value, "top" : 0, "graph_top" : cls.min_top, "offset" : 0, "speed" : [], "redraw" : True, "graph_raise" : 5, "graph_lower" : 5 }
+				cls.stats[cls.nic][direction] = { "total" : value, "last" : value, "top" : 0, "graph_top" : cls.net_min[direction], "offset" : 0, "speed" : [], "redraw" : True, "graph_raise" : 5, "graph_lower" : 5 }
 				for v in ["total", "byte_ps", "bit_ps", "top", "graph_top"]:
 					cls.strings[cls.nic][direction][v] = ""
 
@@ -2843,7 +2869,7 @@ class NetCollector(Collector):
 			if speed > stat["graph_top"]:
 				stat["graph_raise"] += 1
 				if stat["graph_lower"] > 0: stat["graph_lower"] -= 1
-			elif stat["graph_top"] > cls.min_top and speed < stat["graph_top"] // 10:
+			elif stat["graph_top"] > cls.net_min[direction] and speed < stat["graph_top"] // 10:
 				stat["graph_lower"] += 1
 				if stat["graph_raise"] > 0: stat["graph_raise"] -= 1
 
@@ -2852,7 +2878,7 @@ class NetCollector(Collector):
 					stat["graph_top"] = round(max(stat["speed"][-10:]) / 0.8)
 				elif stat["graph_lower"] >= 5:
 					stat["graph_top"] = max(stat["speed"][-10:]) * 3
-				if stat["graph_top"] < cls.min_top: stat["graph_top"] = cls.min_top
+				if stat["graph_top"] < cls.net_min[direction]: stat["graph_top"] = cls.net_min[direction]
 				stat["graph_raise"] = 0
 				stat["graph_lower"] = 0
 				stat["redraw"] = True
@@ -3529,6 +3555,31 @@ class Menu:
 				'Split memory box to also show disks.',
 				'',
 				'True or False.'],
+			"net_download_min" : [
+				'Min value the network graphs scales down to.',
+				'',
+				'Default "10K" = 10 KibiBytes.',
+				'Possible units:',
+				'"K" (KiB), "M" (MiB), "G" (GiB),',
+				'no unit for bytes.',
+				'',
+				'Default values can be toggled with auto button.'],
+			"net_upload_min" : [
+				'Min value the network graphs scales down to.',
+				'',
+				'Default "10K" = 10 KibiBytes.',
+				'Possible units:',
+				'"K" (KiB), "M" (MiB), "G" (GiB),',
+				'no unit for bytes.',
+				'',
+				'Default values can be toggled with auto button.'],
+			"net_auto_min" : [
+				'Start in network graphs auto rescaling mode.',
+				'',
+				'Ignores any values set above at start and',
+				'rescale down to default value "10K".',
+				'',
+				'True or False.'],
 			"show_init" : [
 				'Show init screen at startup.',
 				'',
@@ -3668,6 +3719,8 @@ class Menu:
 									CONFIG.update_ms = int(input_val)
 							elif isinstance(getattr(CONFIG, selected), str):
 								setattr(CONFIG, selected, input_val)
+								if selected.startswith("net_"):
+									NetCollector.net_min = {"download" : -1, "upload" : -1}
 							Term.refresh(force=True)
 							cls.resized = False
 					elif key == "backspace" and len(input_val) > 0:
@@ -3684,7 +3737,7 @@ class Menu:
 				elif key in ["escape", "o", "f2"]:
 					cls.close = True
 					break
-				elif key == "enter" and selected in ["update_ms", "disks_filter", "custom_cpu_name"]:
+				elif key == "enter" and selected in ["update_ms", "disks_filter", "custom_cpu_name", "net_download_min", "net_upload_min"]:
 					inputting = True
 					input_val = str(getattr(CONFIG, selected))
 				elif key == "left" and selected == "update_ms" and CONFIG.update_ms - 100 >= 100:
@@ -3958,6 +4011,31 @@ def floating_humanizer(value: Union[float, int], bit: bool = False, per_second: 
 
 	return out
 
+def units_to_bytes(value: str) -> int:
+	if not value: return 0
+	out: int = 0
+	mult: int = 0
+	value_i: int = 0
+	units: Dict[str, int] = {"K" : 1, "M" : 2, "G" : 3}
+	try:
+		if value[-1].upper() in units:
+			mult = units[value[-1].upper()]
+			value = value[:-1]
+
+		if "." in value and value.replace(".", "").isdigit():
+			if mult > 0:
+				value_i = round(float(value) * 1024)
+				mult -= 1
+			else:
+				value_i = round(float(value))
+		elif value.isdigit():
+			value_i = int(value)
+
+		out = int(value_i) << 10 * mult
+	except ValueError:
+		out = 0
+	return out
+
 def process_keys():
 	mouse_pos: Tuple[int, int] = (0, 0)
 	filtered: bool = False
@@ -4012,7 +4090,11 @@ def process_keys():
 			Menu.help()
 		elif key == "z":
 			NetCollector.reset = not NetCollector.reset
-			Collector.collect(NetCollector)
+			Collector.collect(NetCollector, redraw=True)
+		elif key == "a":
+			NetCollector.auto_min = not NetCollector.auto_min
+			NetCollector.net_min = {"download" : -1, "upload" : -1}
+			Collector.collect(NetCollector, redraw=True)
 		elif key in ["left", "right"]:
 			ProcCollector.sorting(key)
 		elif key == "e":
