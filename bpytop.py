@@ -547,6 +547,11 @@ class Term:
 		new_attr = [iflag, oflag, cflag, lflag, ispeed, ospeed, cc]
 		termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, new_attr)
 
+	@staticmethod
+	def title(text: str = "") -> str:
+		if text: text = f' {text}'
+		return f'\033]0;{os.environ.get("TERMINAL_TITLE", "")}{text}\a'
+
 class Fx:
 	"""Text effects
 	* trans(string: str): Replace whitespace with escape move right to not overwrite background behind whitespace.
@@ -3955,13 +3960,13 @@ def now_sleeping(signum, frame):
 	"""Reset terminal settings and stop background input read before putting to sleep"""
 	Key.stop()
 	Collector.stop()
-	Draw.now(Term.clear, Term.normal_screen, Term.show_cursor, Term.mouse_off, Term.mouse_direct_off)
+	Draw.now(Term.clear, Term.normal_screen, Term.show_cursor, Term.mouse_off, Term.mouse_direct_off, Term.title())
 	Term.echo(True)
 	os.kill(os.getpid(), signal.SIGSTOP)
 
 def now_awake(signum, frame):
 	"""Set terminal settings and restart background input read"""
-	Draw.now(Term.alt_screen, Term.clear, Term.hide_cursor, Term.mouse_on)
+	Draw.now(Term.alt_screen, Term.clear, Term.hide_cursor, Term.mouse_on, Term.title("BpyTOP"))
 	Term.echo(False)
 	Key.start()
 	Term.refresh()
@@ -3986,7 +3991,7 @@ def clean_quit(errcode: int = 0, errmsg: str = "", thread: bool = False):
 	Key.stop()
 	Collector.stop()
 	if not errcode: CONFIG.save_config()
-	Draw.now(Term.clear, Term.normal_screen, Term.show_cursor, Term.mouse_off, Term.mouse_direct_off)
+	Draw.now(Term.clear, Term.normal_screen, Term.show_cursor, Term.mouse_off, Term.mouse_direct_off, Term.title())
 	Term.echo(True)
 	if errcode == 0:
 		errlog.info(f'Exiting. Runtime {timedelta(seconds=round(time() - SELF_START, 0))} \n')
@@ -4268,7 +4273,7 @@ if __name__ == "__main__":
 
 
 	#? Switch to alternate screen, clear screen, hide cursor, enable mouse reporting and disable input echo
-	Draw.now(Term.alt_screen, Term.clear, Term.hide_cursor, Term.mouse_on)
+	Draw.now(Term.alt_screen, Term.clear, Term.hide_cursor, Term.mouse_on, Term.title("BpyTOP"))
 	Term.echo(False)
 	Term.refresh()
 	if CONFIG.update_check: UpdateChecker.run()
