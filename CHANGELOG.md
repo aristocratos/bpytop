@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.9
+
+* Fixed: Raspberry pi cpu temp, again.
+
 ## v1.0.8
 
 * Added: Set terminal title at start
