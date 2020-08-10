@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.10
+
+* Fixed: Raspberry pi cpu temps, actually fixed this time...
+
 ## v1.0.9
 
 * Fixed: Raspberry pi cpu temp, again.
