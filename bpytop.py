@@ -2540,7 +2540,7 @@ class CpuCollector(Collector):
 				if cls.sensor_method == "osx-cpu-temp":
 					temp = round(float(subprocess.check_output("osx-cpu-temp", text=True).strip().rstrip("°C")))
 				elif cls.sensor_method == "vcgencmd":
-					temp = round(float(subprocess.check_output(["vcgencmd", "measure_temp"], text=True)[5:-2]))
+					temp = round(float(subprocess.check_output(["vcgencmd", "measure_temp"], text=True).strip()[5:-2]))
 			except Exception as e:
 					errlog.exception(f'{e}')
 					cls.got_sensors = False
