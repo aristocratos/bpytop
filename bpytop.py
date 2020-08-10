@@ -54,7 +54,7 @@ if errors:
 		print("\nUnsupported platform!\n")
 	else:
 		print("\nInstall required modules!\n")
-	quit(1)
+	raise SystemExit(1)
 
 VERSION: str = "1.0.8"
 
@@ -180,7 +180,7 @@ if not os.path.isdir(CONFIG_DIR):
 		os.mkdir(f'{CONFIG_DIR}/themes')
 	except PermissionError:
 		print(f'ERROR!\nNo permission to write to "{CONFIG_DIR}" directory!')
-		quit(1)
+		raise SystemExit(1)
 CONFIG_FILE: str = f'{CONFIG_DIR}/bpytop.conf'
 THEME_DIR: str = ""
 for td in ["local/", ""]:
@@ -291,7 +291,7 @@ try:
 	errlog.addHandler(eh)
 except PermissionError:
 	print(f'ERROR!\nNo permission to write to "{CONFIG_DIR}" directory!')
-	quit(1)
+	raise SystemExit(1)
 
 #? Timers for testing and debugging -------------------------------------------------------------->
 
@@ -472,7 +472,7 @@ try:
 		CONFIG.warnings = []
 except Exception as e:
 	errlog.exception(f'{e}')
-	quit(1)
+	raise SystemExit(1)
 
 
 #? Classes --------------------------------------------------------------------------------------->
@@ -2540,7 +2540,7 @@ class CpuCollector(Collector):
 				if cls.sensor_method == "osx-cpu-temp":
 					temp = round(float(subprocess.check_output("osx-cpu-temp", text=True).strip().rstrip("°C")))
 				elif cls.sensor_method == "vcgencmd":
-					temp = round(float(subprocess.check_output(["vcgencmd", "measure_temp"], text=True).strip().rstrip("'C")))
+					temp = round(float(subprocess.check_output(["vcgencmd", "measure_temp"], text=True)[5:-2]))
 			except Exception as e:
 					errlog.exception(f'{e}')
 					cls.got_sensors = False
@@ -3257,7 +3257,7 @@ class Menu:
 					key = Key.get()
 
 				if key == "mouse_click" and not mouse_over:
-					key = "M"
+					key = "m"
 
 				if key == "q":
 					clean_quit()
