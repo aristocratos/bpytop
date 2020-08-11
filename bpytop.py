@@ -2539,9 +2539,15 @@ class CpuCollector(Collector):
 		else:
 			try:
 				if cls.sensor_method == "osx-cpu-temp":
-					temp = round(float(subprocess.check_output("osx-cpu-temp", text=True).strip().rstrip("°C")))
+					temp = round(float(subprocess.check_output("osx-cpu-temp", text=True).strip()[:-2]))
+					if not cls.cpu_temp_high:
+						cls.cpu_temp_high = 85
+						cls.cpu_temp_crit = 100
 				elif cls.sensor_method == "vcgencmd":
 					temp = round(float(subprocess.check_output(["vcgencmd", "measure_temp"], text=True).strip()[5:-2]))
+					if not cls.cpu_temp_high:
+						cls.cpu_temp_high = 60
+						cls.cpu_temp_crit = 80
 			except Exception as e:
 					errlog.exception(f'{e}')
 					cls.got_sensors = False
