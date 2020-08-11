@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.11
+
+* Fixed: getsensors detection of vcgencmd
+* Fixed: Load AVG being drawn outside box on small sizes
+* Fixed: Slowdown when showing memory in percent instead of bytes
+* Fixed: Cpu temperature colors not converted to percent of cpu critical temp
+* Fixed: Crash on sorting change when lacking permissions
+
 ## v1.0.10
 
 * Fixed: Raspberry pi cpu temps, actually fixed this time...
