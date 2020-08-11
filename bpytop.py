@@ -2442,7 +2442,7 @@ class CpuCollector(Collector):
 			except: pass
 		if not cls.sensor_method and SYSTEM == "Linux":
 			try:
-				if which("vcgencmd") and subprocess.check_output("vcgencmd measure_temp", text=True).rstrip().endswith("'C"):
+				if which("vcgencmd") and subprocess.check_output(["vcgencmd", "measure_temp"], text=True).strip().endswith("'C"):
 					cls.sensor_method = "vcgencmd"
 			except: pass
 		cls.got_sensors = True if cls.sensor_method else False
