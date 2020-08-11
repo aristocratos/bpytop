@@ -2945,7 +2945,7 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 		if CONFIG.proc_tree:
 			cls._tree(sort_cmd=sort_cmd, reverse=reverse, proc_per_cpu=proc_per_cpu, search=search)
 		else:
-			for p in sorted(psutil.process_iter(cls.p_values + ["memory_info"] if CONFIG.proc_mem_bytes else [], err), key=lambda p: eval(sort_cmd), reverse=reverse):
+			for p in sorted(psutil.process_iter(cls.p_values + (["memory_info"] if CONFIG.proc_mem_bytes else []), err), key=lambda p: eval(sort_cmd), reverse=reverse):
 				if cls.collect_interrupt or cls.proc_interrupt:
 					return
 				if p.info["name"] == "idle" or p.info["name"] == err or p.info["pid"] == err:
