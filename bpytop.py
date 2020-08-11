@@ -1578,15 +1578,16 @@ class CpuBox(Box, SubBox):
 
 		if cy < bh - 1: cy = bh - 1
 
-		if cls.column_size == 2 and cpu.got_sensors:
-			lavg = f' Load AVG:  {"   ".join(str(l) for l in cpu.load_avg):^19.19}'
-		elif cls.column_size == 2 or (cls.column_size == 1 and cpu.got_sensors):
-			lavg = f'LAV: {" ".join(str(l) for l in cpu.load_avg):^14.14}'
-		elif cls.column_size == 1 or (cls.column_size == 0 and cpu.got_sensors):
-			lavg = f'L {" ".join(str(round(l, 1)) for l in cpu.load_avg):^11.11}'
-		else:
-			lavg = f'{" ".join(str(round(l, 1)) for l in cpu.load_avg[:2]):^7.7}'
-		out += f'{Mv.to(by + cy, bx + cx)}{THEME.main_fg}{lavg}{THEME.div_line(Symbol.v_line)}'
+		if cy < bh and cc < cls.box_columns:
+			if cls.column_size == 2 and cpu.got_sensors:
+				lavg = f' Load AVG:  {"   ".join(str(l) for l in cpu.load_avg):^19.19}'
+			elif cls.column_size == 2 or (cls.column_size == 1 and cpu.got_sensors):
+				lavg = f'LAV: {" ".join(str(l) for l in cpu.load_avg):^14.14}'
+			elif cls.column_size == 1 or (cls.column_size == 0 and cpu.got_sensors):
+				lavg = f'L {" ".join(str(round(l, 1)) for l in cpu.load_avg):^11.11}'
+			else:
+				lavg = f'{" ".join(str(round(l, 1)) for l in cpu.load_avg[:2]):^7.7}'
+			out += f'{Mv.to(by + cy, bx + cx)}{THEME.main_fg}{lavg}{THEME.div_line(Symbol.v_line)}'
 
 		out += f'{Mv.to(y + h - 1, x + 1)}{THEME.inactive_fg}up {cpu.uptime}'
 
@@ -3257,11 +3258,11 @@ class Menu:
 					key = Key.get()
 
 				if key == "mouse_click" and not mouse_over:
-					key = "m"
+					key = "M"
 
 				if key == "q":
 					clean_quit()
-				elif key in ["escape", "m"]:
+				elif key in ["escape", "M"]:
 					cls.close = True
 					break
 				elif key in ["up", "mouse_scroll_up", "shift_tab"]:
@@ -3740,7 +3741,7 @@ class Menu:
 
 				elif key == "q":
 					clean_quit()
-				elif key in ["escape", "o", "f2"]:
+				elif key in ["escape", "o", "M", "f2"]:
 					cls.close = True
 					break
 				elif key == "enter" and selected in ["update_ms", "disks_filter", "custom_cpu_name", "net_download_min", "net_upload_min"]:
