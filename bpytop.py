@@ -2900,7 +2900,7 @@ class NetCollector(Collector):
 		NetBox._draw_fg()
 
 
-class ProcCollector(Collector): #! add interrupt on _collect and _draw
+class ProcCollector(Collector):
 	'''Collects process stats'''
 	buffer: str = ProcBox.buffer
 	search_filter: str = ""
@@ -2917,10 +2917,10 @@ class ProcCollector(Collector): #! add interrupt on _collect and _draw
 	p_values: List[str] = ["pid", "name", "cmdline", "num_threads", "username", "memory_percent", "cpu_percent", "cpu_times", "create_time"]
 	sort_expr: Dict = {}
 	sort_expr["pid"] = compile("p.info['pid']", "str", "eval")
-	sort_expr["program"] = compile("p.info['name']", "str", "eval")
-	sort_expr["arguments"] = compile("' '.join(str(p.info['cmdline'])) or p.info['name']", "str", "eval")
-	sort_expr["threads"] = compile("p.info['num_threads']", "str", "eval")
-	sort_expr["user"] = compile("p.info['username']", "str", "eval")
+	sort_expr["program"] = compile("'' if p.info['name'] == 0.0 else p.info['name']", "str", "eval")
+	sort_expr["arguments"] = compile("' '.join(str(p.info['cmdline'])) or ('' if p.info['name'] == 0.0 else p.info['name'])", "str", "eval")
+	sort_expr["threads"] = compile("0 if p.info['num_threads'] == 0.0 else p.info['num_threads']", "str", "eval")
+	sort_expr["user"] = compile("'' if p.info['username'] == 0.0 else p.info['username']", "str", "eval")
 	sort_expr["memory"] = compile("p.info['memory_percent']", "str", "eval")
 	sort_expr["cpu lazy"] = compile("(sum(p.info['cpu_times'][:2] if not p.info['cpu_times'] == 0.0 else [0.0, 0.0]) * 1000 / (time() - p.info['create_time']))", "str", "eval")
 	sort_expr["cpu responsive"] = compile("(p.info['cpu_percent'] if CONFIG.proc_per_core else (p.info['cpu_percent'] / THREADS))", "str", "eval")
