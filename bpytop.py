@@ -1553,7 +1553,7 @@ class CpuBox(Box, SubBox):
 				f'{THEME.main_fg}{Mv.to(by + cy, bx + cx)}{Fx.b}{"CPU "}{Fx.ub}{Meters.cpu(cpu.cpu_usage[0][-1])}'
 				f'{THEME.gradient["cpu"][cpu.cpu_usage[0][-1]]}{cpu.cpu_usage[0][-1]:>4}{THEME.main_fg}%')
 		if cpu.got_sensors:
-				out += (f'{THEME.inactive_fg} ⡀⡀⡀⡀⡀{Mv.l(5)}{THEME.gradient["temp"][cpu.cpu_temp[0][-1]]}{Graphs.temps[0](None if cls.resized else cpu.cpu_temp[0][-1])}'
+				out += (f'{THEME.inactive_fg} ⡀⡀⡀⡀⡀{Mv.l(5)}{THEME.gradient["temp"][100 if cpu.cpu_temp[0][-1] >= cpu.cpu_temp_crit else (cpu.cpu_temp[0][-1] * 100 // cpu.cpu_temp_crit)]}{Graphs.temps[0](None if cls.resized else cpu.cpu_temp[0][-1])}'
 						f'{cpu.cpu_temp[0][-1]:>4}{THEME.main_fg}°C')
 
 		cy += 1
@@ -1566,7 +1566,7 @@ class CpuBox(Box, SubBox):
 			out += f'{cpu.cpu_usage[n][-1]:>{3 if cls.column_size < 2 else 4}}{THEME.main_fg}%'
 			if cpu.got_sensors:
 				if cls.column_size > 1:
-					out += f'{THEME.inactive_fg} ⡀⡀⡀⡀⡀{Mv.l(5)}{THEME.gradient["temp"][cpu.cpu_temp[n][-1]]}{Graphs.temps[n](None if cls.resized else cpu.cpu_temp[n][-1])}'
+					out += f'{THEME.inactive_fg} ⡀⡀⡀⡀⡀{Mv.l(5)}{THEME.gradient["temp"][100 if cpu.cpu_temp[n][-1] >= cpu.cpu_temp_crit else (cpu.cpu_temp[n][-1] * 100 // cpu.cpu_temp_crit)]}{Graphs.temps[n](None if cls.resized else cpu.cpu_temp[n][-1])}'
 				else:
 					out += f'{THEME.gradient["temp"][cpu.cpu_temp[n][-1]]}'
 				out += f'{cpu.cpu_temp[n][-1]:>4}{THEME.main_fg}°C'
