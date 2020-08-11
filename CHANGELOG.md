@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.12
+
+* Fixed: Cpu high and cpu crit for osx and raspberry pi
+
 ## v1.0.11
 
 * Fixed: getsensors detection of vcgencmd
