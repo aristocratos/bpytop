@@ -3087,7 +3087,7 @@ class ProcCollector(Collector):
 		infolist: Dict = {}
 		tree = defaultdict(list)
 		n: int = 0
-		for p in sorted(psutil.process_iter(cls.p_values + ["memory_info"] if CONFIG.proc_mem_bytes else [], err), key=lambda p: eval(sort_cmd), reverse=reverse):
+		for p in sorted(psutil.process_iter(cls.p_values + (["memory_info"] if CONFIG.proc_mem_bytes else []), err), key=lambda p: eval(sort_cmd), reverse=reverse):
 			if cls.collect_interrupt: return
 			try:
 				tree[p.ppid()].append(p.pid)
