@@ -4276,13 +4276,14 @@ if __name__ == "__main__":
 			else:
 				cls.draw_bg(20)
 			Draw.clear("initbg", "banner", "init", saved=True)
+			if cls.resized: return
 			del cls.initbg_up, cls.initbg_down, cls.initbg_data, cls.initbg_colors
 
 
 	#? Switch to alternate screen, clear screen, hide cursor, enable mouse reporting and disable input echo
 	Draw.now(Term.alt_screen, Term.clear, Term.hide_cursor, Term.mouse_on, Term.title("BpyTOP"))
 	Term.echo(False)
-	Term.refresh()
+	Term.refresh(force=True)
 	if CONFIG.update_check: UpdateChecker.run()
 
 	#? Draw banner and init status
