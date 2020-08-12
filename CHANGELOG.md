@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.13
+
+* Fixed: Cpu usage bug when showing tree and memory in percent
+* Fixed: Check for minimum terminal size at start when init screen is enabled
+
 ## v1.0.12
 
 * Fixed: Cpu high and cpu crit for osx and raspberry pi
