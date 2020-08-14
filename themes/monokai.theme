@@ -30,6 +30,9 @@ theme[selected_fg]="#F8F8F2"
 # Color of inactive/disabled text
 theme[inactive_fg]="#595647"
 
+# Color of text appearing on top of graphs, i.e uptime and current network graph scaling
+theme[graph_text]="#797667"
+
 # Misc colors for processes box including mini cpu graphs, details memory graph and details status text
 theme[proc_misc]="#A6E22E"
 
