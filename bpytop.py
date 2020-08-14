@@ -207,6 +207,8 @@ DEFAULT_THEME: Dict[str, str] = {
 	"selected_bg" : "#7e2626",
 	"selected_fg" : "#ee",
 	"inactive_fg" : "#40",
+	"graph_text" : "#60",
+	"meter_bg" : "#40",
 	"proc_misc" : "#0de756",
 	"cpu_box" : "#3d7b46",
 	"mem_box" : "#8a882e",
@@ -236,7 +238,10 @@ DEFAULT_THEME: Dict[str, str] = {
 	"download_end" : "#b0a9de",
 	"upload_start" : "#510554",
 	"upload_mid" : "#7d4180",
-	"upload_end" : "#dcafde"
+	"upload_end" : "#dcafde",
+	"process_start" : "#80d0a3",
+	"process_mid" : "#dcd179",
+	"process_end" : "#d45454",
 }
 
 MENUS: Dict[str, Dict[str, Tuple[str, ...]]] = {
@@ -1038,7 +1043,7 @@ class Theme:
 	cached: Dict[str, Dict[str, str]] = { "Default" : DEFAULT_THEME }
 	current: str = ""
 
-	main_bg = main_fg = title = hi_fg = selected_bg = selected_fg = inactive_fg = proc_misc = cpu_box = mem_box = net_box = proc_box = div_line = temp_start = temp_mid = temp_end = cpu_start = cpu_mid = cpu_end = free_start = free_mid = free_end = cached_start = cached_mid = cached_end = available_start = available_mid = available_end = used_start = used_mid = used_end = download_start = download_mid = download_end = upload_start = upload_mid = upload_end = NotImplemented
+	main_bg = main_fg = title = hi_fg = selected_bg = selected_fg = inactive_fg = proc_misc = cpu_box = mem_box = net_box = proc_box = div_line = temp_start = temp_mid = temp_end = cpu_start = cpu_mid = cpu_end = free_start = free_mid = free_end = cached_start = cached_mid = cached_end = available_start = available_mid = available_end = used_start = used_mid = used_end = download_start = download_mid = download_end = upload_start = upload_mid = upload_end = graph_text = meter_bg = process_start = process_mid = process_end = NotImplemented
 
 	gradient: Dict[str, List[str]] = {
 		"temp" : [],
@@ -1050,7 +1055,8 @@ class Theme:
 		"download" : [],
 		"upload" : [],
 		"proc" : [],
-		"proc_color" : []
+		"proc_color" : [],
+		"process" : [],
 	}
 	def __init__(self, theme: str):
 		self.refresh()
@@ -1074,21 +1080,32 @@ class Theme:
 			tdict = DEFAULT_THEME
 		self.current = theme
 		#if CONFIG.color_theme != theme: CONFIG.color_theme = theme
+		if not "graph_text" in tdict and "inactive_fg" in tdict:
+			tdict["graph_text"] = tdict["inactive_fg"]
+		if not "meter_bg" in tdict and "inactive_fg" in tdict:
+			tdict["meter_bg"] = tdict["inactive_fg"]
+		if not "process_start" in tdict and "cpu_start" in tdict:
+			tdict["process_start"] = tdict["cpu_start"]
+			tdict["process_mid"] = tdict.get("cpu_mid", "")
+			tdict["process_end"] = tdict.get("cpu_end", "")
+
+
 		#* Get key names from DEFAULT_THEME dict to not leave any color unset if missing from theme dict
 		for item, value in DEFAULT_THEME.items():
 			default = False if item not in ["main_fg", "main_bg"] else True
 			depth = "fg" if item not in ["main_bg", "selected_bg"] else "bg"
-			if item in tdict.keys():
+			if item in tdict:
 				setattr(self, item, Color(tdict[item], depth=depth, default=default))
 			else:
 				setattr(self, item, Color(value, depth=depth, default=default))
+
 		#* Create color gradients from one, two or three colors, 101 values indexed 0-100
-		self.proc_start = self.main_fg; self.proc_mid = Colors.null; self.proc_end = self.inactive_fg
-		self.proc_color_start = self.inactive_fg; self.proc_color_mid = Colors.null; self.proc_color_end = self.cpu_start
+		self.proc_start, self.proc_mid, self.proc_end = self.main_fg, Colors.null, self.inactive_fg
+		self.proc_color_start, self.proc_color_mid, self.proc_color_end = self.inactive_fg, Colors.null, self.process_start
 
 		rgb: Dict[str, Tuple[int, int, int]]
 		colors: List[List[int]] = []
-		for name in self.gradient.keys():
+		for name in self.gradient:
 			rgb = { "start" : getattr(self, f'{name}_start').dec, "mid" : getattr(self, f'{name}_mid').dec, "end" : getattr(self, f'{name}_end').dec }
 			colors = [ list(getattr(self, f'{name}_start')) ]
 			if rgb["end"][0] >= 0:
@@ -1356,7 +1373,7 @@ class Meter:
 	def __init__(self, value: int, width: int, gradient_name: str):
 		self.gradient_name = gradient_name
 		self.color_gradient = THEME.gradient[gradient_name]
-		self.color_inactive = THEME.inactive_fg
+		self.color_inactive = THEME.meter_bg
 		self.width = width
 		self.saved = {}
 		self.out = self._create(value)
@@ -1589,7 +1606,7 @@ class CpuBox(Box, SubBox):
 				lavg = f'{" ".join(str(round(l, 1)) for l in cpu.load_avg[:2]):^7.7}'
 			out += f'{Mv.to(by + cy, bx + cx)}{THEME.main_fg}{lavg}{THEME.div_line(Symbol.v_line)}'
 
-		out += f'{Mv.to(y + h - 1, x + 1)}{THEME.inactive_fg}up {cpu.uptime}'
+		out += f'{Mv.to(y + h - 1, x + 1)}{THEME.graph_text}up {cpu.uptime}'
 
 
 		Draw.buffer(cls.buffer, f'{out_misc}{out}{Term.fg}', only_save=Menu.active)
@@ -1861,7 +1878,7 @@ class NetBox(Box, SubBox):
 				else: cy += 1
 			stats["redraw"] = False
 
-		out += f'{Mv.to(y, x)}{THEME.inactive_fg(net.strings[net.nic]["download"]["graph_top"])}{Mv.to(y+h-1, x)}{THEME.inactive_fg(net.strings[net.nic]["upload"]["graph_top"])}'
+		out += f'{Mv.to(y, x)}{THEME.graph_text(net.strings[net.nic]["download"]["graph_top"])}{Mv.to(y+h-1, x)}{THEME.graph_text(net.strings[net.nic]["upload"]["graph_top"])}'
 
 		Draw.buffer(cls.buffer, f'{out_misc}{out}{Term.fg}', only_save=Menu.active)
 		cls.redraw = cls.resized = False
@@ -2241,9 +2258,9 @@ class ProcBox(Box):
 				for v in [int(cpu), int(mem), int(threads // 3)]:
 					if CONFIG.proc_gradient:
 						val = ((v if v <= 100 else 100) + 100) - calc * 100 // cls.select_max
-						vals += [f'{THEME.gradient["proc_color" if val < 100 else "cpu"][val if val < 100 else val - 100]}']
+						vals += [f'{THEME.gradient["proc_color" if val < 100 else "process"][val if val < 100 else val - 100]}']
 					else:
-						vals += [f'{THEME.gradient["cpu"][v if v <= 100 else 100]}']
+						vals += [f'{THEME.gradient["process"][v if v <= 100 else 100]}']
 				c_color, m_color, t_color = vals
 			else:
 				c_color = m_color = t_color = Fx.b
@@ -3750,7 +3767,7 @@ class Menu:
 				elif key in ["escape", "o", "M", "f2"]:
 					cls.close = True
 					break
-				elif key == "enter" and selected in ["update_ms", "disks_filter", "custom_cpu_name", "net_download_min", "net_upload_min"]:
+				elif key == "enter" and selected in ["update_ms", "disks_filter", "custom_cpu_name", "net_download_min", "net_upload_min", "draw_clock"]:
 					inputting = True
 					input_val = str(getattr(CONFIG, selected))
 				elif key == "left" and selected == "update_ms" and CONFIG.update_ms - 100 >= 100:
