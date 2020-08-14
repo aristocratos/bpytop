@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.14
+
+* Added: New theme values "graph_text", "meter_bg", "process_start", "process_mid" and "process_end", see default_black.theme for reference.
+* Updated: default_black.theme with new values
+* Updated: monokai.theme and gruvbox_dark.theme with "graph_text" value.
+
 ## v1.0.13
 
 * Fixed: Cpu usage bug when showing tree and memory in percent

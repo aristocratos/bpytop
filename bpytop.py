@@ -56,7 +56,7 @@ if errors:
 		print("\nInstall required modules!\n")
 	raise SystemExit(1)
 
-VERSION: str = "1.0.13"
+VERSION: str = "1.0.14"
 
 #? Argument parser ------------------------------------------------------------------------------->
 if len(sys.argv) > 1:
@@ -464,7 +464,7 @@ try:
 		errlog.setLevel(getattr(logging, CONFIG.log_level))
 		if CONFIG.log_level == "DEBUG": DEBUG = True
 	errlog.info(f'New instance of bpytop version {VERSION} started with pid {os.getpid()}')
-	errlog.info(f'Loglevel set to {CONFIG.log_level}')
+	errlog.info(f'Loglevel set to {"DEBUG" if DEBUG else CONFIG.log_level}')
 	errlog.debug(f'Using psutil version {".".join(str(x) for x in psutil.version_info)}')
 	errlog.debug(f'CMD: {" ".join(sys.argv)}')
 	if CONFIG.info:
