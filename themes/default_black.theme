@@ -18,17 +18,23 @@ theme[main_fg]="#cc"
 # Title color for boxes
 theme[title]="#ee"
 
-# Higlight color for keyboard shortcuts
+# Highlight color for keyboard shortcuts
 theme[hi_fg]="#90"
 
 # Background color of selected item in processes box
-theme[selected_bg]="#7e2626" 
+theme[selected_bg]="#7e2626"
 
 # Foreground color of selected item in processes box
 theme[selected_fg]="#ee"
 
 # Color of inactive/disabled text
 theme[inactive_fg]="#40"
+
+# Color of text appearing on top of graphs, i.e uptime and current network graph scaling
+theme[graph_text]="#60"
+
+# Background color of the percentage meters
+theme[meter_bg]="#40"
 
 # Misc colors for processes box including mini cpu graphs, details memory graph and details status text
 theme[proc_misc]="#0de756"
@@ -87,3 +93,8 @@ theme[download_end]="#b0a9de"
 theme[upload_start]="#510554"
 theme[upload_mid]="#7d4180"
 theme[upload_end]="#dcafde"
+
+# Process box color gradient for threads, mem and cpu usage
+theme[process_start]="#80d0a3"
+theme[process_mid]="#dcd179"
+theme[process_end]="#d45454"
