@@ -2450,7 +2450,7 @@ class CpuCollector(Collector):
 				temps = psutil.sensors_temperatures()
 				if temps:
 					for name, entries in temps.items():
-						if name.lower() == "cpu":
+						if name.lower().startswith("cpu"):
 							cls.sensor_method = "psutil"
 							break
 						for entry in entries:
@@ -2506,14 +2506,14 @@ class CpuCollector(Collector):
 								if hasattr(entry, "critical") and entry.critical: cls.cpu_temp_crit = round(entry.critical)
 								else: cls.cpu_temp_crit = 95
 							temp = round(entry.current)
-						elif (entry.label.startswith(("Core", "Tccd", "CPU")) or (name.lower() == "cpu" and not entry.label)) and hasattr(entry, "current"):
+						elif (entry.label.startswith(("Core", "Tccd", "CPU")) or (name.lower().startswith("cpu") and not entry.label)) and hasattr(entry, "current"):
 							if not cpu_type:
 								cpu_type = "other"
 								if not cls.cpu_temp_high:
 									if hasattr(entry, "high") and entry.high: cls.cpu_temp_high = round(entry.high)
-									else: cls.cpu_temp_high = 80
+									else: cls.cpu_temp_high = 60 if name == "cpu_thermal" else 80
 									if hasattr(entry, "critical") and entry.critical: cls.cpu_temp_crit = round(entry.critical)
-									else: cls.cpu_temp_crit = 95
+									else: cls.cpu_temp_crit = 80 if name == "cpu_thermal" else 95
 								temp = round(entry.current)
 							cores.append(round(entry.current))
 				if len(cores) < THREADS:
