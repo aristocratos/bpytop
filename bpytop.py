@@ -2879,7 +2879,7 @@ class NetCollector(Collector):
 			speed = stat["speed"][-1]
 
 			if cls.net_min[direction] == -1:
-				cls.net_min[direction] = units_to_bytes(CONFIG.net_download)
+				cls.net_min[direction] = units_to_bytes(getattr(CONFIG, "net_" + direction))
 				stat["graph_top"] = cls.net_min[direction]
 				stat["graph_lower"] = 7
 				if not cls.auto_min:
