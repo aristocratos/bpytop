@@ -152,12 +152,15 @@ swap_disk=$swap_disk
 #* If mem box should be split to also show disks info.
 show_disks=$show_disks
 
-#* Minimum value the network graphs scales down to, default "10K" = 10 KibiBytes, possible units "K" (KiB), "M" (MiB), "G" (GiB), no unit for bytes.
-net_download_min="$net_download_min"
-net_upload_min="$net_upload_min"
+#* Set fixed values for network graphs, default "10M" = 10 Mibibytes, possible units "K", "M", "G", append with "bit" for bits instead of bytes, i.e "100mbit"
+net_download="$net_download"
+net_upload="$net_upload"
 
-#* Start in network graphs auto rescaling mode, ignores any values set above and rescale down to default value "10K".
-net_auto_min=$net_auto_min
+#* Start in network graphs auto rescaling mode, ignores any values set above and rescales down to 10 Kibibytes at the lowest.
+net_auto=$net_auto
+
+#* If the network graphs color gradient should scale to bandwith usage or auto scale, bandwith usage is based on "net_download" and "net_upload" values
+net_color_fixed=$net_color_fixed
 
 #* Show init screen at startup, the init screen is purely cosmetical
 show_init=$show_init
@@ -337,7 +340,7 @@ def timeit_decorator(func):
 class Config:
 	'''Holds all config variables and functions for loading from and saving to disk'''
 	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name", "proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes",
-						"disks_filter", "update_check", "log_level", "mem_graphs", "show_swap", "swap_disk", "show_disks", "net_download_min", "net_upload_min", "net_auto_min", "show_init", "mini_mode"]
+						"disks_filter", "update_check", "log_level", "mem_graphs", "show_swap", "swap_disk", "show_disks", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "mini_mode"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	update_ms: int = 2000
@@ -358,9 +361,10 @@ class Config:
 	show_swap: bool = True
 	swap_disk: bool = True
 	show_disks: bool = True
-	net_download_min: str = "10K"
-	net_upload_min: str = "10K"
-	net_auto_min: bool = False
+	net_download: str = "10M"
+	net_upload: str = "10M"
+	net_color_fixed: bool = False
+	net_auto: bool = False
 	show_init: bool = True
 	mini_mode: bool = False
 	log_level: str = "WARNING"
@@ -1249,7 +1253,7 @@ class Graph:
 	last: int
 	symbol: Dict[float, str]
 
-	def __init__(self, width: int, height: int, color: Union[List[str], Color, None], data: List[int], invert: bool = False, max_value: int = 0, offset: int = 0, color_max_value: int = None):
+	def __init__(self, width: int, height: int, color: Union[List[str], Color, None], data: List[int], invert: bool = False, max_value: int = 0, offset: int = 0, color_max_value: Union[int, None] = None):
 		self.graphs: Dict[bool, List[str]] = {False : [], True : []}
 		self.current: bool = True
 		self.width = width
@@ -1259,7 +1263,7 @@ class Graph:
 		if not data: data = [0]
 		if max_value:
 			self.max_value = max_value
-			data = [ (v + offset) * 100 // (max_value + offset) if v < max_value else 100 for v in data ] #* Convert values to percentage values of max_value with max_value as ceiling
+			data = [ min(100, (v + offset) * 100 // (max_value + offset)) for v in data ] #* Convert values to percentage values of max_value with max_value as ceiling
 		else:
 			self.max_value = 0
 		if color_max_value:
@@ -1873,7 +1877,8 @@ class NetBox(Box, SubBox):
 			stats = net.stats[net.nic][direction]
 			if stats["redraw"] or cls.resized:
 				if cls.redraw: stats["redraw"] = True
-				Graphs.net[direction] = Graph(w - bw - 3, cls.graph_height[direction], THEME.gradient[direction], stats["speed"], max_value=stats["graph_top"], invert=False if direction == "download" else True, color_max_value=stats["top"])
+				Graphs.net[direction] = Graph(w - bw - 3, cls.graph_height[direction], THEME.gradient[direction], stats["speed"], max_value=stats["graph_top"],
+					invert=False if direction == "download" else True, color_max_value=net.net_min.get(direction) if CONFIG.net_color_fixed else None)
 			out += f'{Mv.to(y if direction == "download" else y + cls.graph_height["download"], x)}{Graphs.net[direction](None if stats["redraw"] else stats["speed"][-1])}'
 
 			out += f'{Mv.to(by+cy, bx)}{THEME.main_fg}{cls.symbols[direction]} {strings["byte_ps"]:<10.10}{Mv.to(by+cy, bx+bw - 12)}{"(" + strings["bit_ps"] + ")":>12.12}'
@@ -2804,7 +2809,7 @@ class NetCollector(Collector):
 	switched: bool = False
 	timestamp: float = time()
 	net_min: Dict[str, int] = {"download" : -1, "upload" : -1}
-	auto_min: bool = CONFIG.net_auto_min
+	auto_min: bool = CONFIG.net_auto
 
 	@classmethod
 	def _get_nics(cls):
@@ -2842,15 +2847,6 @@ class NetCollector(Collector):
 		stat: Dict
 		up_stat = psutil.net_if_stats()
 
-		if cls.net_min["download"] == -1 or cls.net_min["upload"] == -1:
-			cls.net_min["download"] = 10 << 10 if cls.auto_min else units_to_bytes(CONFIG.net_download_min)
-			cls.net_min["upload"] = 10 << 10 if cls.auto_min else units_to_bytes(CONFIG.net_upload_min)
-			try:
-				cls.stats[cls.nic]["download"].update({"graph_top" : cls.net_min["download"], "graph_lower" : 7})
-				cls.stats[cls.nic]["upload"].update({"graph_top" : cls.net_min["upload"], "graph_lower" : 7})
-			except:
-				pass
-
 		if cls.switched:
 			cls.nic = cls.new_nic
 			cls.switched = False
@@ -2867,7 +2863,7 @@ class NetCollector(Collector):
 			cls.stats[cls.nic] = {}
 			cls.strings[cls.nic] = { "download" : {}, "upload" : {}}
 			for direction, value in ["download", io_all.bytes_recv], ["upload", io_all.bytes_sent]:
-				cls.stats[cls.nic][direction] = { "total" : value, "last" : value, "top" : 0, "graph_top" : cls.net_min[direction], "offset" : 0, "speed" : [], "redraw" : True, "graph_raise" : 5, "graph_lower" : 5 }
+				cls.stats[cls.nic][direction] = { "total" : value, "last" : value, "top" : 0, "graph_top" : 0, "offset" : 0, "speed" : [], "redraw" : True, "graph_raise" : 0, "graph_lower" : 7 }
 				for v in ["total", "byte_ps", "bit_ps", "top", "graph_top"]:
 					cls.strings[cls.nic][direction][v] = ""
 
@@ -2881,6 +2877,14 @@ class NetCollector(Collector):
 			stat["speed"].append(round((stat["total"] - stat["last"]) / (time() - cls.timestamp)))
 			stat["last"] = stat["total"]
 			speed = stat["speed"][-1]
+
+			if cls.net_min[direction] == -1:
+				cls.net_min[direction] = units_to_bytes(CONFIG.net_download)
+				stat["graph_top"] = cls.net_min[direction]
+				stat["graph_lower"] = 7
+				if not cls.auto_min:
+					stat["redraw"] = True
+					strings["graph_top"] = floating_humanizer(stat["graph_top"], short=True)
 
 			if stat["offset"] and stat["offset"] > stat["total"]:
 				cls.reset = True
@@ -2905,23 +2909,23 @@ class NetCollector(Collector):
 				stat["top"] = speed
 				strings["top"] = floating_humanizer(stat["top"], bit=True, per_second=True)
 
-			if speed > stat["graph_top"]:
-				stat["graph_raise"] += 1
-				if stat["graph_lower"] > 0: stat["graph_lower"] -= 1
-			elif stat["graph_top"] > cls.net_min[direction] and speed < stat["graph_top"] // 10:
-				stat["graph_lower"] += 1
-				if stat["graph_raise"] > 0: stat["graph_raise"] -= 1
+			if cls.auto_min:
+				if speed > stat["graph_top"]:
+					stat["graph_raise"] += 1
+					if stat["graph_lower"] > 0: stat["graph_lower"] -= 1
+				elif stat["graph_top"] > cls.net_min[direction] and speed < stat["graph_top"] // 10:
+					stat["graph_lower"] += 1
+					if stat["graph_raise"] > 0: stat["graph_raise"] -= 1
 
-			if stat["graph_raise"] >= 5 or stat["graph_lower"] >= 5:
-				if stat["graph_raise"] >= 5:
-					stat["graph_top"] = round(max(stat["speed"][-10:]) / 0.8)
-				elif stat["graph_lower"] >= 5:
-					stat["graph_top"] = max(stat["speed"][-10:]) * 3
-				if stat["graph_top"] < cls.net_min[direction]: stat["graph_top"] = cls.net_min[direction]
-				stat["graph_raise"] = 0
-				stat["graph_lower"] = 0
-				stat["redraw"] = True
-				strings["graph_top"] = floating_humanizer(stat["graph_top"], short=True)
+				if stat["graph_raise"] >= 5 or stat["graph_lower"] >= 5:
+					if stat["graph_raise"] >= 5:
+						stat["graph_top"] = round(max(stat["speed"][-10:]) / 0.8)
+					elif stat["graph_lower"] >= 5:
+						stat["graph_top"] = max(10 << 10, max(stat["speed"][-10:]) * 3)
+					stat["graph_raise"] = 0
+					stat["graph_lower"] = 0
+					stat["redraw"] = True
+					strings["graph_top"] = floating_humanizer(stat["graph_top"], short=True)
 
 		cls.timestamp = time()
 
@@ -3596,31 +3600,45 @@ class Menu:
 				'Split memory box to also show disks.',
 				'',
 				'True or False.'],
-			"net_download_min" : [
-				'Min value the network graphs scales down to.',
+			"net_download" : [
+				'Fixed network graph download value.',
 				'',
-				'Default "10K" = 10 KibiBytes.',
+				'Default "10M" = 10 MibiBytes.',
 				'Possible units:',
-				'"K" (KiB), "M" (MiB), "G" (GiB),',
-				'no unit for bytes.',
+				'"K" (KiB), "M" (MiB), "G" (GiB).',
 				'',
-				'Default values can be toggled with auto button.'],
-			"net_upload_min" : [
-				'Min value the network graphs scales down to.',
+				'Append "bit" for bits instead of bytes,',
+				'i.e "100Mbit"',
 				'',
-				'Default "10K" = 10 KibiBytes.',
+				'Can be toggled with auto button.'],
+			"net_upload" : [
+				'Fixed network graph upload value.',
+				'',
+				'Default "10M" = 10 MibiBytes.',
 				'Possible units:',
-				'"K" (KiB), "M" (MiB), "G" (GiB),',
-				'no unit for bytes.',
+				'"K" (KiB), "M" (MiB), "G" (GiB).',
 				'',
-				'Default values can be toggled with auto button.'],
-			"net_auto_min" : [
+				'Append "bit" for bits instead of bytes,',
+				'i.e "100Mbit"',
+				'',
+				'Can be toggled with auto button.'],
+			"net_auto" : [
 				'Start in network graphs auto rescaling mode.',
 				'',
 				'Ignores any values set above at start and',
-				'rescale down to default value "10K".',
+				'rescales down to 10KibiBytes at he lowest.',
 				'',
 				'True or False.'],
+			"net_color_fixed" : [
+				'Set network graphs color gradient to fixed.',
+				'',
+				'If True the network graphs color is based',
+				'on the total bandwidth usage instead of',
+				'the current autoscaling.',
+				'',
+				'The bandwidth usage is based on the',
+				'"net_download" and "net_upload" values set',
+				'above.'],
 			"show_init" : [
 				'Show init screen at startup.',
 				'',
@@ -3776,7 +3794,7 @@ class Menu:
 				elif key in ["escape", "o", "M", "f2"]:
 					cls.close = True
 					break
-				elif key == "enter" and selected in ["update_ms", "disks_filter", "custom_cpu_name", "net_download_min", "net_upload_min", "draw_clock"]:
+				elif key == "enter" and selected in ["update_ms", "disks_filter", "custom_cpu_name", "net_download", "net_upload", "draw_clock"]:
 					inputting = True
 					input_val = str(getattr(CONFIG, selected))
 				elif key == "left" and selected == "update_ms" and CONFIG.update_ms - 100 >= 100:
@@ -3793,6 +3811,8 @@ class Menu:
 						else:
 							CpuCollector.sensor_method = ""
 							CpuCollector.got_sensors = False
+					if selected in ["net_auto", "net_color_fixed"]:
+						NetBox.redraw = True
 					Term.refresh(force=True)
 					cls.resized = False
 				elif key in ["left", "right"] and selected == "color_theme" and len(Theme.themes) > 1:
@@ -4081,11 +4101,20 @@ def units_to_bytes(value: str) -> int:
 	if not value: return 0
 	out: int = 0
 	mult: int = 0
+	bit: bool = False
 	value_i: int = 0
-	units: Dict[str, int] = {"K" : 1, "M" : 2, "G" : 3}
+	units: Dict[str, int] = {"k" : 1, "m" : 2, "g" : 3}
 	try:
-		if value[-1].upper() in units:
-			mult = units[value[-1].upper()]
+		if value.lower().endswith("s"):
+			value = value[:-1]
+		if value.lower().endswith("bit"):
+			bit = True
+			value = value[:-3]
+		elif value.lower().endswith("byte"):
+			value = value[:-4]
+
+		if value[-1].lower() in units:
+			mult = units[value[-1].lower()]
 			value = value[:-1]
 
 		if "." in value and value.replace(".", "").isdigit():
@@ -4097,7 +4126,8 @@ def units_to_bytes(value: str) -> int:
 		elif value.isdigit():
 			value_i = int(value)
 
-		out = int(value_i) << 10 * mult
+		if bit: value_i = round(value_i / 8)
+		out = int(value_i) << (10 * mult)
 	except ValueError:
 		out = 0
 	return out
