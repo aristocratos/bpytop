@@ -1243,23 +1243,15 @@ class Graph:
 	colors: List[str]
 	invert: bool
 	max_value: int
+	color_max_value: int
 	offset: int
 	current: bool
 	last: int
 	symbol: Dict[float, str]
 
-	def __init__(self, width: int, height: int, color: Union[List[str], Color, None], data: List[int], invert: bool = False, max_value: int = 0, offset: int = 0):
+	def __init__(self, width: int, height: int, color: Union[List[str], Color, None], data: List[int], invert: bool = False, max_value: int = 0, offset: int = 0, color_max_value: int = None):
 		self.graphs: Dict[bool, List[str]] = {False : [], True : []}
 		self.current: bool = True
-		self.colors: List[str] = []
-		if isinstance(color, list) and height > 1:
-			for i in range(1, height + 1): self.colors.insert(0, color[i * 100 // height]) #* Calculate colors of graph
-			if invert: self.colors.reverse()
-		elif isinstance(color, Color) and height > 1:
-			self.colors = [ f'{color}' for _ in range(height) ]
-		else:
-			if isinstance(color, list): self.colors = color
-			elif isinstance(color, Color): self.colors = [ f'{color}' for _ in range(101) ]
 		self.width = width
 		self.height = height
 		self.invert = invert
@@ -1270,6 +1262,23 @@ class Graph:
 			data = [ (v + offset) * 100 // (max_value + offset) if v < max_value else 100 for v in data ] #* Convert values to percentage values of max_value with max_value as ceiling
 		else:
 			self.max_value = 0
+		if color_max_value:
+			self.color_max_value = color_max_value
+		else:
+			self.color_max_value = self.max_value
+		if self.color_max_value and self.max_value:
+			color_scale = int(100.0 * self.max_value / self.color_max_value)
+		else:
+			color_scale = 100
+		self.colors: List[str] = []
+		if isinstance(color, list) and height > 1:
+			for i in range(1, height + 1): self.colors.insert(0, color[min(100, i * color_scale // height)]) #* Calculate colors of graph
+			if invert: self.colors.reverse()
+		elif isinstance(color, Color) and height > 1:
+			self.colors = [ f'{color}' for _ in range(height) ]
+		else:
+			if isinstance(color, list): self.colors = color
+			elif isinstance(color, Color): self.colors = [ f'{color}' for _ in range(101) ]
 		if self.height == 1:
 			self.symbol = Symbol.graph_down_small if invert else Symbol.graph_up_small
 		else:
@@ -1864,7 +1873,7 @@ class NetBox(Box, SubBox):
 			stats = net.stats[net.nic][direction]
 			if stats["redraw"] or cls.resized:
 				if cls.redraw: stats["redraw"] = True
-				Graphs.net[direction] = Graph(w - bw - 3, cls.graph_height[direction], THEME.gradient[direction], stats["speed"], max_value=stats["graph_top"], invert=False if direction == "download" else True)
+				Graphs.net[direction] = Graph(w - bw - 3, cls.graph_height[direction], THEME.gradient[direction], stats["speed"], max_value=stats["graph_top"], invert=False if direction == "download" else True, color_max_value=stats["top"])
 			out += f'{Mv.to(y if direction == "download" else y + cls.graph_height["download"], x)}{Graphs.net[direction](None if stats["redraw"] else stats["speed"][-1])}'
 
 			out += f'{Mv.to(by+cy, bx)}{THEME.main_fg}{cls.symbols[direction]} {strings["byte_ps"]:<10.10}{Mv.to(by+cy, bx+bw - 12)}{"(" + strings["bit_ps"] + ")":>12.12}'
