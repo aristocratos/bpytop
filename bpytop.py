@@ -1517,18 +1517,18 @@ class CpuBox(Box, SubBox):
 		cls.height = round(Term.height * height_p / 100)
 		if cls.height < 8: cls.height = 8
 		Box._b_cpu_h = cls.height
-		#THREADS = 10
+		#THREADS = 64
 		cls.box_columns = ceil((THREADS + 1) / (cls.height - 5))
-		if cls.box_columns * (20 + 13 if cpu.got_sensors else 21) < cls.width - (cls.width // 4):
+		if cls.box_columns * (20 + 13 if cpu.got_sensors else 21) < cls.width - (cls.width // 3):
 			cls.column_size = 2
 			cls.box_width = (20 + 13 if cpu.got_sensors else 21) * cls.box_columns - ((cls.box_columns - 1) * 1)
-		elif cls.box_columns * (15 + 6 if cpu.got_sensors else 15) < cls.width - (cls.width // 4):
+		elif cls.box_columns * (15 + 6 if cpu.got_sensors else 15) < cls.width - (cls.width // 3):
 			cls.column_size = 1
 			cls.box_width = (15 + 6 if cpu.got_sensors else 15) * cls.box_columns - ((cls.box_columns - 1) * 1)
-		elif cls.box_columns * (8 + 6 if cpu.got_sensors else 8) < cls.width - (cls.width // 4):
+		elif cls.box_columns * (8 + 6 if cpu.got_sensors else 8) < cls.width - (cls.width // 3):
 			cls.column_size = 0
 		else:
-			cls.box_columns = (cls.width - cls.width // 4) // (8 + 6 if cpu.got_sensors else 8); cls.column_size = 0
+			cls.box_columns = (cls.width - cls.width // 3) // (8 + 6 if cpu.got_sensors else 8); cls.column_size = 0
 
 		if cls.column_size == 0: cls.box_width = (8 + 6 if cpu.got_sensors else 8) * cls.box_columns + 1
 
@@ -2058,7 +2058,7 @@ class ProcBox(Box):
 			s_len += len(CONFIG.proc_sorting)
 			if cls.resized or s_len != cls.s_len or proc.detailed:
 				cls.s_len = s_len
-				for k in ["e", "r", "c", "t", "k", "i", "enter", "left"]:
+				for k in ["e", "r", "c", "t", "k", "i", "enter", "left", " "]:
 					if k in Key.mouse: del Key.mouse[k]
 			if proc.detailed:
 				killed = proc.details["killed"]
@@ -2136,14 +2136,6 @@ class ProcBox(Box):
 				if not "c" in Key.mouse: Key.mouse["c"] = [[sort_pos - 24 + i, y-1] for i in range(8)]
 				out_misc += (f'{Mv.to(y-1, sort_pos - 25)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_per_core else ""}'
 					f'{THEME.title("per-")}{THEME.hi_fg("c")}{THEME.title("ore")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
-			# if w > 57 + s_len:
-			# 	if not "G" in Key.mouse: Key.mouse["G"] = [[sort_pos - 34 + i, y-1] for i in range(8)]
-			# 	out_misc += (f'{Mv.to(y-1, sort_pos - 35)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_gradient else ""}{THEME.hi_fg("G")}'
-			# 		f'{THEME.title("radient")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
-			# if w > 65 + s_len:
-			# 	if not "C" in Key.mouse: Key.mouse["C"] = [[sort_pos - 42 + i, y-1] for i in range(6)]
-			# 	out_misc += (f'{Mv.to(y-1, sort_pos - 43)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_colors else ""}'
-			# 		f'{THEME.hi_fg("C")}{THEME.title("olors")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
 
 			if not "f" in Key.mouse or cls.resized: Key.mouse["f"] = [[x+9 + i, y-1] for i in range(6 if not proc.search_filter else 2 + len(proc.search_filter[-10:]))]
 			if proc.search_filter:
@@ -2153,7 +2145,6 @@ class ProcBox(Box):
 			out_misc += (f'{Mv.to(y-1, x + 8)}{THEME.proc_box(Symbol.title_left)}{Fx.b if cls.filtering or proc.search_filter else ""}{THEME.hi_fg("f")}{THEME.title}' +
 				("ilter" if not proc.search_filter and not cls.filtering else f' {proc.search_filter[-(10 if w < 83 else w - 74):]}{(Fx.bl + "█" + Fx.ubl) if cls.filtering else THEME.hi_fg(" del")}') +
 				f'{THEME.proc_box(Symbol.title_right)}')
-
 
 			main = THEME.inactive_fg if cls.selected == 0 else THEME.main_fg
 			hi = THEME.inactive_fg if cls.selected == 0 else THEME.hi_fg
@@ -2172,6 +2163,9 @@ class ProcBox(Box):
 			if w - len(loc_string) > 51:
 				if not "i" in Key.mouse: Key.mouse["i"] = [[x + 39 + i, y+h] for i in range(9)]
 				out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}i{title}nterrupt{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
+			if CONFIG.proc_tree and w - len(loc_string) > 65:
+				if not " " in Key.mouse: Key.mouse[" "] = [[x + 50 + i, y+h] for i in range(12)]
+				out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}spc {title}collapse{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
 
 			#* Processes labels
 			selected: str = CONFIG.proc_sorting
@@ -2181,7 +2175,7 @@ class ProcBox(Box):
 			if CONFIG.proc_tree:
 				label = (f'{THEME.title}{Fx.b}{Mv.to(y, x)}{" Tree:":<{tree_len-2}}' "Threads: " f'{"User:":<9}Mem%{"Cpu%":>11}{Fx.ub}{THEME.main_fg} ' +
 						(" " if proc.num_procs > cls.select_max else ""))
-				if selected in ["program", "arguments"]: selected = "tree"
+				if selected in ["pid", "program", "arguments"]: selected = "tree"
 			else:
 				label = (f'{THEME.title}{Fx.b}{Mv.to(y, x)}{"Pid:":>7} {"Program:" if prog_len > 8 else "Prg:":<{prog_len}}' + (f'{"Arguments:":<{arg_len-4}}' if arg_len else "") +
 					f'{"Threads:" if arg_len else " Tr:"} {"User:":<9}Mem%{"Cpu%":>11}{Fx.ub}{THEME.main_fg} ' +
@@ -2247,9 +2241,16 @@ class ProcBox(Box):
 			indent, name, cmd, threads, username, mem, mem_b, cpu = [items.get(v, d) for v, d in [("indent", ""), ("name", ""), ("cmd", ""), ("threads", 0), ("username", "?"), ("mem", 0.0), ("mem_b", 0), ("cpu", 0.0)]]
 
 			if CONFIG.proc_tree:
+				arg_len = 0
 				offset = tree_len - len(f'{indent}{pid}')
 				if offset < 1: offset = 0
 				indent = f'{indent:.{tree_len - len(str(pid))}}'
+				if offset - len(name) > 12:
+					cmd = cmd.split(" ")[0].split("/")[-1]
+					if not cmd.startswith(name):
+						offset = len(name)
+						arg_len = tree_len - len(f'{indent}{pid} {name} ') + 2
+						cmd = f'({cmd[:(arg_len-4)]})'
 			else:
 				offset = prog_len - 1
 			if cpu > 1.0 or pid in Graphs.pid_cpu:
@@ -2949,7 +2950,8 @@ class ProcCollector(Collector):
 	details_cpu: List[int] = []
 	details_mem: List[int] = []
 	expand: int = 0
-	proc_dict: Dict = {}
+	collapsed: Dict = {}
+	tree_counter: int = 0
 	p_values: List[str] = ["pid", "name", "cmdline", "num_threads", "username", "memory_percent", "cpu_percent", "cpu_times", "create_time"]
 	sort_expr: Dict = {}
 	sort_expr["pid"] = compile("p.info['pid']", "str", "eval")
@@ -3003,7 +3005,7 @@ class ProcCollector(Collector):
 						break
 					else: continue
 
-				cpu = p.info["cpu_percent"] if proc_per_cpu else (p.info["cpu_percent"] / psutil.cpu_count())
+				cpu = p.info["cpu_percent"] if proc_per_cpu else round(p.info["cpu_percent"] / THREADS, 2)
 				mem = p.info["memory_percent"]
 				if CONFIG.proc_mem_bytes and hasattr(p.info["memory_info"], "rss"):
 					mem_b = p.info["memory_info"].rss
@@ -3115,6 +3117,7 @@ class ProcCollector(Collector):
 		err: float = 0.0
 		det_cpu: float = 0.0
 		infolist: Dict = {}
+		cls.tree_counter += 1
 		tree = defaultdict(list)
 		n: int = 0
 		for p in sorted(psutil.process_iter(cls.p_values + (["memory_info"] if CONFIG.proc_mem_bytes else []), err), key=lambda p: eval(sort_cmd), reverse=reverse):
@@ -3129,9 +3132,9 @@ class ProcCollector(Collector):
 		if 0 in tree and 0 in tree[0]:
 			tree[0].remove(0)
 
-		def create_tree(pid: int, tree: defaultdict, indent: str = "", inindent: str = " ", found: bool = False):
+		def create_tree(pid: int, tree: defaultdict, indent: str = "", inindent: str = " ", found: bool = False, depth: int = 0, collapse_to: Union[None, int] = None):
 			nonlocal infolist, proc_per_cpu, search, out, det_cpu
-			name: str; threads: int; username: str; mem: float; cpu: float
+			name: str; threads: int; username: str; mem: float; cpu: float; collapse: bool = False
 			cont: bool = True
 			getinfo: Dict = {}
 			if cls.collect_interrupt: return
@@ -3164,7 +3167,7 @@ class ProcCollector(Collector):
 					else: threads = getinfo["num_threads"]
 					if getinfo["username"] == err: username = ""
 					else: username = getinfo["username"]
-					cpu = getinfo["cpu_percent"] if proc_per_cpu else (getinfo["cpu_percent"] / psutil.cpu_count())
+					cpu = getinfo["cpu_percent"] if proc_per_cpu else round(getinfo["cpu_percent"] / THREADS, 2)
 					mem = getinfo["memory_percent"]
 					if getinfo["cmdline"] == err: cmd = ""
 					else: cmd = " ".join(getinfo["cmdline"]) or "[" + getinfo["name"] + "]"
@@ -3177,28 +3180,56 @@ class ProcCollector(Collector):
 					username = ""
 					mem = cpu = 0.0
 
-				out[pid] = {
-					"indent" : inindent,
-					"name": name,
-					"cmd" : cmd,
-					"threads" : threads,
-					"username" : username,
-					"mem" : mem,
-					"mem_b" : mem_b,
-					"cpu" : cpu }
+				if pid in cls.collapsed:
+					collapse = cls.collapsed[pid]
+				else:
+					collapse = True if depth > 3 else False
+					cls.collapsed[pid] = collapse
+
+				if collapse_to and not search:
+					out[collapse_to]["threads"] += threads
+					out[collapse_to]["mem"] += mem
+					out[collapse_to]["mem_b"] += mem_b
+					out[collapse_to]["cpu"] += cpu
+				else:
+					if pid in tree and len(tree[pid]) > 0:
+						if collapse:
+							inindent = inindent.replace(" ├─ ", "[+]─").replace(" └─ ", "[+]─")
+						else:
+							inindent = inindent.replace(" ├─ ", "[-]─").replace(" └─ ", "[-]─")
+					out[pid] = {
+						"indent" : inindent,
+						"name": name,
+						"cmd" : cmd,
+						"threads" : threads,
+						"username" : username,
+						"mem" : mem,
+						"mem_b" : mem_b,
+						"cpu" : cpu,
+						"depth" : depth,
+						}
+
+			if search: collapse = False
+			elif collapse and not collapse_to:
+				collapse_to = pid
 
 			if pid not in tree:
 				return
 			children = tree[pid][:-1]
+
 			for child in children:
-				create_tree(child, tree, indent + " │ ", indent + " ├─ ", found=found)
-			child = tree[pid][-1]
-			create_tree(child, tree, indent + "  ", indent + " └─ ")
+				create_tree(child, tree, indent + " │ ", indent + " ├─ ", found=found, depth=depth+1, collapse_to=collapse_to)
+			create_tree(tree[pid][-1], tree, indent + "  ", indent + " └─ ", depth=depth+1, collapse_to=collapse_to)
 
 		create_tree(min(tree), tree)
 		cls.det_cpu = det_cpu
 
 		if cls.collect_interrupt: return
+		if cls.tree_counter >= 100:
+			cls.tree_counter = 0
+			for pid in list(cls.collapsed):
+				if not psutil.pid_exists(pid):
+					del cls.collapsed[pid]
 		cls.num_procs = len(out)
 		cls.processes = out.copy()
 
@@ -3360,11 +3391,13 @@ class Menu:
 			"(+) / (-)" : "Add/Subtract 100ms to/from update timer.",
 			"(Up) (Down)" : "Select in process list.",
 			"(Enter)" : "Show detailed information for selected process.",
+			"(Spacebar)" : "Expand/collapse the selected process in tree view.",
 			"(Pg Up) (Pg Down)" : "Jump 1 page in process list.",
 			"(Home) (End)" : "Jump to first or last page in process list.",
 			"(Left) (Right)" : "Select previous/next sorting column.",
 			"(b) (n)" : "Select previous/next network device.",
 			"(z)" : "Toggle totals reset for current network device",
+			"(a)" : "Toggle auto scaling for the network graphs.",
 			"(f)" : "Input a string to filter processes with.",
 			"(c)" : "Toggle per-core cpu usage of processes.",
 			"(r)" : "Reverse sorting order in processes box.",
@@ -4194,6 +4227,10 @@ def process_keys():
 			Collector.collect(NetCollector, redraw=True)
 		elif key in ["left", "right"]:
 			ProcCollector.sorting(key)
+		elif key == " " and CONFIG.proc_tree and ProcBox.selected > 0:
+			if ProcBox.selected_pid in ProcCollector.collapsed:
+				ProcCollector.collapsed[ProcBox.selected_pid] = not ProcCollector.collapsed[ProcBox.selected_pid]
+			Collector.collect(ProcCollector, interrupt=True, redraw=True)
 		elif key == "e":
 			CONFIG.proc_tree = not CONFIG.proc_tree
 			Collector.collect(ProcCollector, interrupt=True, redraw=True)
