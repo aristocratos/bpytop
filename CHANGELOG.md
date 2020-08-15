@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.15
+
+* Added: Network graph color gradient bandwidth option by @drazil100
+* Added: cpu_thermal sensor detection for raspberri pi cpu temp
+* Fixed: Single color graphs crash
+
 ## v1.0.14
 
 * Added: New theme values "graph_text", "meter_bg", "process_start", "process_mid" and "process_end", see default_black.theme for reference.

@@ -56,7 +56,7 @@ if errors:
 		print("\nInstall required modules!\n")
 	raise SystemExit(1)
 
-VERSION: str = "1.0.14"
+VERSION: str = "1.0.15"
 
 #? Argument parser ------------------------------------------------------------------------------->
 if len(sys.argv) > 1:
@@ -2913,15 +2913,15 @@ class NetCollector(Collector):
 				if speed > stat["graph_top"]:
 					stat["graph_raise"] += 1
 					if stat["graph_lower"] > 0: stat["graph_lower"] -= 1
-				elif stat["graph_top"] > cls.net_min[direction] and speed < stat["graph_top"] // 10:
+				elif speed < stat["graph_top"] // 10:
 					stat["graph_lower"] += 1
 					if stat["graph_raise"] > 0: stat["graph_raise"] -= 1
 
 				if stat["graph_raise"] >= 5 or stat["graph_lower"] >= 5:
 					if stat["graph_raise"] >= 5:
-						stat["graph_top"] = round(max(stat["speed"][-10:]) / 0.8)
+						stat["graph_top"] = round(max(stat["speed"][-5:]) / 0.8)
 					elif stat["graph_lower"] >= 5:
-						stat["graph_top"] = max(10 << 10, max(stat["speed"][-10:]) * 3)
+						stat["graph_top"] = max(10 << 10, max(stat["speed"][-5:]) * 3)
 					stat["graph_raise"] = 0
 					stat["graph_lower"] = 0
 					stat["redraw"] = True
@@ -3626,7 +3626,7 @@ class Menu:
 				'Start in network graphs auto rescaling mode.',
 				'',
 				'Ignores any values set above at start and',
-				'rescales down to 10KibiBytes at he lowest.',
+				'rescales down to 10KibiBytes at the lowest.',
 				'',
 				'True or False.'],
 			"net_color_fixed" : [
@@ -3812,6 +3812,7 @@ class Menu:
 							CpuCollector.sensor_method = ""
 							CpuCollector.got_sensors = False
 					if selected in ["net_auto", "net_color_fixed"]:
+						if selected == "net_auto": NetCollector.auto_min = CONFIG.net_auto
 						NetBox.redraw = True
 					Term.refresh(force=True)
 					cls.resized = False
@@ -4312,11 +4313,11 @@ if __name__ == "__main__":
 
 			if start: return
 
-			cls.draw_bg(10)
+			cls.draw_bg(5)
 			Draw.buffer("+init!", f'{Mv.restore}{Symbol.ok}\n{Mv.r(Term.width // 2 - 22)}{Mv.save}')
 
 		@classmethod
-		def draw_bg(cls, times: int = 10):
+		def draw_bg(cls, times: int = 5):
 			for _ in range(times):
 				sleep(0.05)
 				x = randint(0, 100)
@@ -4330,7 +4331,7 @@ if __name__ == "__main__":
 			if cls.resized:
 				Draw.now(Term.clear)
 			else:
-				cls.draw_bg(20)
+				cls.draw_bg(10)
 			Draw.clear("initbg", "banner", "init", saved=True)
 			if cls.resized: return
 			del cls.initbg_up, cls.initbg_down, cls.initbg_data, cls.initbg_colors
