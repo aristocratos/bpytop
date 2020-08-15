@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.16
+
+* Fixed: net_upload variable not working
+* Added: Ability to expand/collapse processes in the tree view
+
 ## v1.0.15
 
 * Added: Network graph color gradient bandwidth option by @drazil100
