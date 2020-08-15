@@ -1119,7 +1119,7 @@ class Theme:
 
 			else:
 				c = Color.fg(*rgb["start"])
-				for _ in range(100):
+				for _ in range(101):
 					self.gradient[name] += [c]
 		#* Set terminal colors
 		Term.fg, Term.bg = self.main_fg, self.main_bg
