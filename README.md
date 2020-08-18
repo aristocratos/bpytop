@@ -191,7 +191,7 @@ make install PYTHON_INTERPRETER=$(which python)
 >to uninstall it
 
 ``` bash
-sudo make uninstall
+make uninstall
 ```
 
 ## Configurability
