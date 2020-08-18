@@ -132,7 +132,7 @@ If you want to help speed this up, help with setting up proper testing is welcom
 
 >Install python3 and git with a package manager of you choice
 
->Install psutil python module (sudo might be required)
+>Install psutil python module for your python3 interpreter. If your system interpreter is version 3.6 or later, you can use it.
 
 ``` bash
 python3 -m pip install psutil
@@ -140,11 +140,8 @@ python3 -m pip install psutil
 
 #### Dependencies installation OSX
 
->Install homebrew if not already installed
-
-``` bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
-```
+>If you haven't installed git and python 3.6 or later,
+>you can install them via [homebrew](https://brew.sh/). 
 
 >Install python3 if not already installed
 
@@ -152,7 +149,7 @@ python3 -m pip install psutil
 brew install python3 git
 ```
 
->Install psutil python module
+>Install psutil python module for your python3 interpreter. If your system interpreter is version 3.6 or later, you can use it.
 
 ``` bash
 python3 -m pip install psutil
@@ -178,11 +175,18 @@ sudo python3 -m pip install psutil
 
 >Clone and install
 
+
+
 ``` bash
 git clone https://github.com/aristocratos/bpytop.git
 cd bpytop
-sudo make install
+make install
 ```
+>The default interpreter will be `/usr/bin/python3`. If you want to use a different one, you can run `make install PYTHON_INTERPRETER=$YOUR_INTERPRETER`. For example
+```bash
+make install PYTHON_INTERPRETER=$(which python)
+```
+>Just make sure that you've installed `psutil` for the selected interpreter.
 
 >to uninstall it
 
