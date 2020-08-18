@@ -483,6 +483,11 @@ except Exception as e:
 	errlog.exception(f'{e}')
 	raise SystemExit(1)
 
+if psutil.version_info[0] < 5 or (psutil.version_info[0] == 5 and psutil.version_info[1] < 7):
+	warn = f'psutil version {".".join(str(x) for x in psutil.version_info)} detected, version 5.7.0 or later required for full functionality!'
+	print("WARNING!", warn)
+	errlog.warning(warn)
+
 
 #? Classes --------------------------------------------------------------------------------------->
 
