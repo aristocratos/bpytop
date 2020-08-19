@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # pylint: disable=not-callable, no-member
 # indent = tab
 # tab-size = 4
