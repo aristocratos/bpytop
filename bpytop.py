@@ -449,6 +449,9 @@ class Config:
 		if isinstance(new_config["update_ms"], int) and new_config["update_ms"] < 100:
 			new_config["update_ms"] = 100
 			self.warnings.append(f'Config key "update_ms" can\'t be lower than 100!')
+		for net_name in ["net_download", "net_upload"]:
+			if net_name in new_config and not new_config[net_name][0].isdigit(): # type: ignore
+				new_config[net_name] = "_error_"
 		return new_config
 
 	def save_config(self):
