@@ -1,6 +1,6 @@
 PREFIX ?= /usr/local
 DOCDIR ?= $(PREFIX)/share/bpytop/doc
-PYTHON_INTERPRETER ?= $$(which python)
+PYTHON_INTERPRETER ?= $$(which python3)
 
 all:
 	@echo Run \'make install\' to install bpytop.
