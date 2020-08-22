@@ -17,7 +17,7 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-import os, sys, threading, signal, re, subprocess, logging, logging.handlers
+import os, sys, threading, signal, re, subprocess, logging, logging.handlers, site
 import urllib.request
 from time import time, sleep, strftime, localtime
 from datetime import timedelta
@@ -186,10 +186,15 @@ if not os.path.isdir(CONFIG_DIR):
 		raise SystemExit(1)
 CONFIG_FILE: str = f'{CONFIG_DIR}/bpytop.conf'
 THEME_DIR: str = ""
-for td in ["local/", ""]:
-	if os.path.isdir(f'/usr/{td}share/bpytop/themes'):
-		THEME_DIR = f'/usr/{td}share/bpytop/themes'
+for td in site.getsitepackages() + [site.getusersitepackages()]:
+	if os.path.isdir(f'{td}/bpytop-themes'):
+		THEME_DIR = f'{td}/bpytop-themes'
 		break
+else:
+	for td in ["local/", ""]:
+		if os.path.isdir(f'/usr/{td}share/bpytop/themes'):
+			THEME_DIR = f'/usr/{td}share/bpytop/themes'
+			break
 USER_THEME_DIR: str = f'{CONFIG_DIR}/themes'
 
 CORES: int = psutil.cpu_count(logical=False) or 1
@@ -3819,6 +3824,9 @@ class Menu:
 								setattr(CONFIG, selected, input_val)
 								if selected.startswith("net_"):
 									NetCollector.net_min = {"download" : -1, "upload" : -1}
+								elif selected == "draw_clock":
+									Box.clock_on = True if len(CONFIG.draw_clock) > 0 else False
+									if not Box.clock_on: Draw.clear("clock", saved=True)
 							Term.refresh(force=True)
 							cls.resized = False
 					elif key == "backspace" and len(input_val) > 0:
@@ -3973,6 +3981,68 @@ class UpdateChecker:
 						"-i", "update-notifier", "-t", "10000"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 				except Exception as e:
 					errlog.exception(f'{e}')
+
+class Init:
+	running: bool = True
+	initbg_colors: List[str] = []
+	initbg_data: List[int]
+	initbg_up: Graph
+	initbg_down: Graph
+	resized = False
+
+	@classmethod
+	def start(cls):
+		Draw.buffer("init", z=1)
+		Draw.buffer("initbg", z=10)
+		for i in range(51):
+			for _ in range(2): cls.initbg_colors.append(Color.fg(i, i, i))
+		Draw.buffer("banner", (f'{Banner.draw(Term.height // 2 - 10, center=True)}{Mv.d(1)}{Mv.l(11)}{Colors.black_bg}{Colors.default}'
+				f'{Fx.b}{Fx.i}Version: {VERSION}{Fx.ui}{Fx.ub}{Term.bg}{Term.fg}{Color.fg("#50")}'), z=2)
+		for _i in range(7):
+			perc = f'{str(round((_i + 1) * 14 + 2)) + "%":>5}'
+			Draw.buffer("+banner", f'{Mv.to(Term.height // 2 - 2 + _i, Term.width // 2 - 28)}{Fx.trans(perc)}{Symbol.v_line}')
+
+		Draw.out("banner")
+		Draw.buffer("+init!", f'{Color.fg("#cc")}{Fx.b}{Mv.to(Term.height // 2 - 2, Term.width // 2 - 21)}{Mv.save}')
+
+		cls.initbg_data = [randint(0, 100) for _ in range(Term.width * 2)]
+		cls.initbg_up = Graph(Term.width, Term.height // 2, cls.initbg_colors, cls.initbg_data, invert=True)
+		cls.initbg_down = Graph(Term.width, Term.height // 2, cls.initbg_colors, cls.initbg_data, invert=False)
+
+	@classmethod
+	def success(cls):
+		if not CONFIG.show_init or cls.resized: return
+		cls.draw_bg(5)
+		Draw.buffer("+init!", f'{Mv.restore}{Symbol.ok}\n{Mv.r(Term.width // 2 - 22)}{Mv.save}')
+
+	@staticmethod
+	def fail(err):
+		if CONFIG.show_init:
+			Draw.buffer("+init!", f'{Mv.restore}{Symbol.fail}')
+			sleep(2)
+		errlog.exception(f'{err}')
+		clean_quit(1, errmsg=f'Error during init! See {CONFIG_DIR}/error.log for more information.')
+
+	@classmethod
+	def draw_bg(cls, times: int = 5):
+		for _ in range(times):
+			sleep(0.05)
+			x = randint(0, 100)
+			Draw.buffer("initbg", f'{Fx.ub}{Mv.to(0, 0)}{cls.initbg_up(x)}{Mv.to(Term.height // 2, 0)}{cls.initbg_down(x)}')
+			Draw.out("initbg", "banner", "init")
+
+	@classmethod
+	def done(cls):
+		cls.running = False
+		if not CONFIG.show_init: return
+		if cls.resized:
+			Draw.now(Term.clear)
+		else:
+			cls.draw_bg(10)
+		Draw.clear("initbg", "banner", "init", saved=True)
+		if cls.resized: return
+		del cls.initbg_up, cls.initbg_down, cls.initbg_data, cls.initbg_colors
+
 
 #? Functions ------------------------------------------------------------------------------------->
 
@@ -4313,90 +4383,31 @@ def process_keys():
 
 CPU_NAME: str = get_cpu_name()
 
+THEME: Theme
 
-if __name__ == "__main__":
+def main():
+	global THEME
 
 	#? Init -------------------------------------------------------------------------------------->
 	if DEBUG: TimeIt.start("Init")
-
-	class Init:
-		running: bool = True
-		initbg_colors: List[str] = []
-		initbg_data: List[int]
-		initbg_up: Graph
-		initbg_down: Graph
-		resized = False
-
-		@staticmethod
-		def fail(err):
-			if CONFIG.show_init:
-				Draw.buffer("+init!", f'{Mv.restore}{Symbol.fail}')
-				sleep(2)
-			errlog.exception(f'{err}')
-			clean_quit(1, errmsg=f'Error during init! See {CONFIG_DIR}/error.log for more information.')
-
-		@classmethod
-		def success(cls, start: bool = False):
-			if not CONFIG.show_init or cls.resized: return
-			if start:
-				Draw.buffer("init", z=1)
-				Draw.buffer("initbg", z=10)
-				for i in range(51):
-					for _ in range(2): cls.initbg_colors.append(Color.fg(i, i, i))
-				Draw.buffer("banner", (f'{Banner.draw(Term.height // 2 - 10, center=True)}{Mv.d(1)}{Mv.l(11)}{Colors.black_bg}{Colors.default}'
-						f'{Fx.b}{Fx.i}Version: {VERSION}{Fx.ui}{Fx.ub}{Term.bg}{Term.fg}{Color.fg("#50")}'), z=2)
-				for _i in range(7):
-					perc = f'{str(round((_i + 1) * 14 + 2)) + "%":>5}'
-					Draw.buffer("+banner", f'{Mv.to(Term.height // 2 - 2 + _i, Term.width // 2 - 28)}{Fx.trans(perc)}{Symbol.v_line}')
-
-				Draw.out("banner")
-				Draw.buffer("+init!", f'{Color.fg("#cc")}{Fx.b}{Mv.to(Term.height // 2 - 2, Term.width // 2 - 21)}{Mv.save}')
-
-				cls.initbg_data = [randint(0, 100) for _ in range(Term.width * 2)]
-				cls.initbg_up = Graph(Term.width, Term.height // 2, cls.initbg_colors, cls.initbg_data, invert=True)
-				cls.initbg_down = Graph(Term.width, Term.height // 2, cls.initbg_colors, cls.initbg_data, invert=False)
-
-			if start: return
-
-			cls.draw_bg(5)
-			Draw.buffer("+init!", f'{Mv.restore}{Symbol.ok}\n{Mv.r(Term.width // 2 - 22)}{Mv.save}')
-
-		@classmethod
-		def draw_bg(cls, times: int = 5):
-			for _ in range(times):
-				sleep(0.05)
-				x = randint(0, 100)
-				Draw.buffer("initbg", f'{Fx.ub}{Mv.to(0, 0)}{cls.initbg_up(x)}{Mv.to(Term.height // 2, 0)}{cls.initbg_down(x)}')
-				Draw.out("initbg", "banner", "init")
-
-		@classmethod
-		def done(cls):
-			cls.running = False
-			if not CONFIG.show_init: return
-			if cls.resized:
-				Draw.now(Term.clear)
-			else:
-				cls.draw_bg(10)
-			Draw.clear("initbg", "banner", "init", saved=True)
-			if cls.resized: return
-			del cls.initbg_up, cls.initbg_down, cls.initbg_data, cls.initbg_colors
-
 
 	#? Switch to alternate screen, clear screen, hide cursor, enable mouse reporting and disable input echo
 	Draw.now(Term.alt_screen, Term.clear, Term.hide_cursor, Term.mouse_on, Term.title("BpyTOP"))
 	Term.echo(False)
 	Term.refresh(force=True)
+
+	#? Start a thread checking for updates while running init
 	if CONFIG.update_check: UpdateChecker.run()
 
 	#? Draw banner and init status
-	if CONFIG.show_init:
-		Init.success(start=True)
+	if CONFIG.show_init and not Init.resized:
+		Init.start()
 
 	#? Load theme
 	if CONFIG.show_init:
 		Draw.buffer("+init!", f'{Mv.restore}{Fx.trans("Loading theme and creating colors... ")}{Mv.save}')
 	try:
-		THEME: Theme = Theme(CONFIG.color_theme)
+		THEME = Theme(CONFIG.color_theme)
 	except Exception as e:
 		Init.fail(e)
 	else:
@@ -4468,7 +4479,6 @@ if __name__ == "__main__":
 	else:
 		Init.success()
 
-
 	Init.done()
 	Term.refresh()
 	Draw.out(clear=True)
@@ -4478,7 +4488,7 @@ if __name__ == "__main__":
 
 	#? Main loop ------------------------------------------------------------------------------------->
 
-	def main():
+	def run():
 		while not False:
 			Term.refresh()
 			Timer.stamp()
@@ -4491,10 +4501,14 @@ if __name__ == "__main__":
 
 	#? Start main loop
 	try:
-		main()
+		run()
 	except Exception as e:
 		errlog.exception(f'{e}')
 		clean_quit(1)
 	else:
 		#? Quit cleanly even if false starts being true...
 		clean_quit()
+
+
+if __name__ == "__main__":
+	main()
