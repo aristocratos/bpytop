@@ -132,11 +132,31 @@ Options menu.
 python3 -m pip install bpytop
 ```
 
-## Arch Linux
+### Arch Linux
 
 Available in the AUR as `bpytop.git`
 
 https://aur.archlinux.org/packages/bpytop/
+
+### FreeBSD package
+
+Available in [FreeBSD ports](https://www.freshports.org/sysutils/bpytop/)
+
+>Install pre-built package
+
+``` bash
+sudo pkg install bpytop
+```
+
+### Fedora/CentOS 8 package
+
+[Available](https://src.fedoraproject.org/rpms/bpytop) in the Fedora and [EPEL-8 repository](https://fedoraproject.org/wiki/EPEL).
+
+>Installation
+
+``` bash
+sudo dnf install bpytop
+```
 
 ### Snap package
 
@@ -215,16 +235,6 @@ sudo make install
 
 ``` bash
 sudo make uninstall
-```
-
-#### FreeBSD package
-
-Available in [FreeBSD ports](https://www.freshports.org/sysutils/bpytop/)
-
-Install pre-built pacakge
-
-``` bash
-sudo pkg install bpytop
 ```
 
 ## Configurability
