@@ -3,9 +3,10 @@
 ![Linux](https://img.shields.io/badge/-Linux-grey?logo=linux)
 ![OSX](https://img.shields.io/badge/-OSX-black?logo=apple)
 ![FreeBSD](https://img.shields.io/badge/-FreeBSD-red?logo=freebsd)
-![Usage](https://img.shields.io/badge/Usage-System%20resource%20monitor-blue)
-![Python](https://img.shields.io/badge/Python-v3.6%5E-orange?logo=python)
+![Usage](https://img.shields.io/badge/Usage-System%20resource%20monitor-yellow)
+![Python](https://img.shields.io/badge/Python-v3.6%5E-green?logo=python)
 ![bpytop_version](https://img.shields.io/github/v/tag/aristocratos/bpytop?label=version)
+[![pypi_version](https://img.shields.io/pypi/v/bpytop?label=pypi)](https://pypi.org/project/bpytop)
 [![Donate](https://img.shields.io/badge/-Donate-yellow?logo=paypal)](https://paypal.me/aristocratos)
 [![Sponsor](https://img.shields.io/badge/-Sponsor-red?logo=github)](https://github.com/sponsors/aristocratos)
 [![Coffee](https://img.shields.io/badge/-Buy%20me%20a%20Coffee-grey?logo=Ko-fi)](https://ko-fi.com/aristocratos)
@@ -124,9 +125,37 @@ Options menu.
 
 ## Installation
 
-PyPi packaging for installation with `pip` will be setup later.
+### PyPi (will always have latest version)
 
-If you want to help speed this up, help with setting up proper testing is welcome!
+> Install python3 and pip
+``` bash
+python3 -m pip install bpytop
+```
+
+## Arch Linux
+
+Available in the AUR as `bpytop.git`
+
+https://aur.archlinux.org/packages/bpytop/
+
+### Snap package
+
+>Install the package
+``` bash
+sudo snap install bpytop
+```
+
+>Give permissions
+``` bash
+sudo snap connect bpytop:mount-observe
+sudo snap connect bpytop:network-control
+sudo snap connect bpytop:hardware-observe
+sudo snap connect bpytop:system-observe
+sudo snap connect bpytop:process-control
+sudo snap connect bpytop:physical-memory-observe
+```
+
+## Manual installation
 
 #### Dependencies installation Linux
 
