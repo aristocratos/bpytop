@@ -4470,7 +4470,7 @@ if __name__ == "__main__":
 
 	#? Main loop ------------------------------------------------------------------------------------->
 
-	def main():
+	def run():
 		while not False:
 			Term.refresh()
 			Timer.stamp()
@@ -4483,7 +4483,7 @@ if __name__ == "__main__":
 
 	#? Start main loop
 	try:
-		main()
+		run()
 	except Exception as e:
 		errlog.exception(f'{e}')
 		clean_quit(1)
