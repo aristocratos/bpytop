@@ -4368,8 +4368,10 @@ def process_keys():
 
 CPU_NAME: str = get_cpu_name()
 
+THEME: Theme
 
 def main():
+	global THEME
 
 	#? Init -------------------------------------------------------------------------------------->
 	if DEBUG: TimeIt.start("Init")
@@ -4388,7 +4390,7 @@ def main():
 	if CONFIG.show_init:
 		Draw.buffer("+init!", f'{Mv.restore}{Fx.trans("Loading theme and creating colors... ")}{Mv.save}')
 	try:
-		THEME: Theme = Theme(CONFIG.color_theme)
+		THEME = Theme(CONFIG.color_theme)
 	except Exception as e:
 		Init.fail(e)
 	else:
