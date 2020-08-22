@@ -2,7 +2,7 @@
 name = "bpytop"
 version = "1.0.16"
 description = "Resource monitor that shows usage and stats for processor, memory, disks, network and processes."
-authors = ["Aristocratos <admin@qvantnet.com>"]
+authors = ["Aristocratos <jakob@qvantnet.com>"]
 license = "Apache-2.0"
 
 [tool.poetry.dependencies]
