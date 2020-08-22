@@ -4306,7 +4306,7 @@ def process_keys():
 CPU_NAME: str = get_cpu_name()
 
 
-if __name__ == "__main__":
+def main():
 
 	#? Init -------------------------------------------------------------------------------------->
 	if DEBUG: TimeIt.start("Init")
@@ -4490,3 +4490,7 @@ if __name__ == "__main__":
 	else:
 		#? Quit cleanly even if false starts being true...
 		clean_quit()
+
+
+if __name__ == "__main__":
+	main()
