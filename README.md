@@ -28,11 +28,11 @@
 
 ## Documents
 
-#### [CHANGELOG.md](CHANGELOG.md)
+#### [CHANGELOG.md](https://github.com/aristocratos/bpytop/blob/master/CHANGELOG.md)
 
-#### [CONTRIBUTING.md](CONTRIBUTING.md)
+#### [CONTRIBUTING.md](https://github.com/aristocratos/bpytop/blob/master/CONTRIBUTING.md)
 
-#### [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+#### [CODE_OF_CONDUCT.md](https://github.com/aristocratos/bpytop/blob/master/CODE_OF_CONDUCT.md)
 
 ## Description
 
@@ -58,7 +58,7 @@ Python port of [bashtop](https://github.com/aristocratos/bashtop).
 
 Bpytop uses the same theme files as bashtop so any theme made for bashtop will work.
 
-See [themes](themes) folder for available themes.
+See [themes](https://github.com/aristocratos/bpytop/tree/master/themes) folder for available themes.
 
 The `make install` command places the default themes in `/usr/local/share/bpytop/themes`.
 User created themes should be placed in `$HOME/.config/bpytop/themes`.
@@ -112,16 +112,16 @@ Dropbear seems to not be able to set correct locale. So if accessing bpytop over
 ## Screenshots
 
 Main UI showing details for a selected process.
-![Screenshot 1](Imgs/main.png)
+![Screenshot 1](https://github.com/aristocratos/bpytop/raw/master/Imgs/main.png)
 
 Main UI in mini mode.
-![Screenshot 2](Imgs/mini.png)
+![Screenshot 2](https://github.com/aristocratos/bpytop/raw/master/Imgs/mini.png)
 
 Main menu.
-![Screenshot 3](Imgs/menu.png)
+![Screenshot 3](https://github.com/aristocratos/bpytop/raw/master/Imgs/menu.png)
 
 Options menu.
-![Screenshot 4](Imgs/options.png)
+![Screenshot 4](https://github.com/aristocratos/bpytop/raw/master/Imgs/options.png)
 
 ## Installation
 
@@ -360,4 +360,4 @@ Arguments:
 
 ## LICENSE
 
-[Apache License 2.0](LICENSE)
+[Apache License 2.0](https://github.com/aristocratos/bpytop/blob/master/LICENSE)
