@@ -474,9 +474,7 @@ class Config:
 
 try:
 	CONFIG: Config = Config(CONFIG_FILE)
-	if not __name__ == "__main__":
-		errlog.setLevel(logging.ERROR)
-	elif DEBUG:
+	if DEBUG:
 		errlog.setLevel(logging.DEBUG)
 	else:
 		errlog.setLevel(getattr(logging, CONFIG.log_level))
@@ -509,9 +507,6 @@ class Term:
 	"""Terminal info and commands"""
 	width: int = 0
 	height: int = 0
-	if __name__ == "__main__":
-		width = os.get_terminal_size().columns
-		height = os.get_terminal_size().lines
 	resized: bool = False
 	_w : int = 0
 	_h : int = 0
@@ -4407,6 +4402,9 @@ THEME: Theme
 
 def main():
 	global THEME
+
+	Term.width = os.get_terminal_size().columns
+	Term.height = os.get_terminal_size().lines
 
 	#? Init -------------------------------------------------------------------------------------->
 	if DEBUG: TimeIt.start("Init")
