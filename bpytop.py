@@ -470,8 +470,10 @@ class Config:
 
 try:
 	CONFIG: Config = Config(CONFIG_FILE)
-	if DEBUG:
-		errlog.setLevel(DEBUG)
+	if not __name__ == "__main__":
+		errlog.setLevel(logging.ERROR)
+	elif DEBUG:
+		errlog.setLevel(logging.DEBUG)
 	else:
 		errlog.setLevel(getattr(logging, CONFIG.log_level))
 		if CONFIG.log_level == "DEBUG": DEBUG = True
@@ -501,8 +503,11 @@ if psutil.version_info[0] < 5 or (psutil.version_info[0] == 5 and psutil.version
 
 class Term:
 	"""Terminal info and commands"""
-	width: int = os.get_terminal_size().columns	#* Current terminal width in columns
-	height: int = os.get_terminal_size().lines	#* Current terminal height in lines
+	width: int = 0
+	height: int = 0
+	if __name__ == "__main__":
+		width = os.get_terminal_size().columns
+		height = os.get_terminal_size().lines
 	resized: bool = False
 	_w : int = 0
 	_h : int = 0
