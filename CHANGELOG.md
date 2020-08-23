@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.19
+
+* Changed: net_auto variable now default to True
+* Fixed: Sorting out negative cpu temperature values from bad sensors
+
 ## v1.0.18
 
 * Fixed: Init screen and error log level when starting from pip installation
