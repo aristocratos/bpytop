@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.0.17
+
+* Added: Option to toggle theme background color
+* Added: Dracula theme by @AethanFoot
+* Added: PyPi theme install and path detection
+* Added: PyPi packaging with poetry by @cjolowicz
+* Added: Error checking for net_download and net_upload config values
+* Added: psutil outdated warning message
+* Changed: Expanded cpu name detection
+
 ## v1.0.16
 
 * Fixed: net_upload variable not working
