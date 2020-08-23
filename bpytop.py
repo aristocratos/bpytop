@@ -127,7 +127,7 @@ proc_per_core=$proc_per_core
 #* Show process memory as bytes instead of percent
 proc_mem_bytes=$proc_mem_bytes
 
-#* Check cpu temperature, needs "vcgencmd" on Raspberry Pi and "osx-cpu-temp" on MacOS X.
+#* Check cpu temperature, needs "osx-cpu-temp" on MacOS X.
 check_temp=$check_temp
 
 #* Draw a clock at top of screen, formatting according to strftime, empty string to disable.
@@ -2531,7 +2531,7 @@ class CpuCollector(Collector):
 			try:
 				for name, entries in psutil.sensors_temperatures().items():
 					for entry in entries:
-						if entry.label.startswith(("Package", "Tdie")) and hasattr(entry, "current"):
+						if entry.label.startswith(("Package", "Tdie")) and hasattr(entry, "current") and round(entry.current) > 0:
 							cpu_type = "intel" if entry.label.startswith("Package") else "ryzen"
 							if not cls.cpu_temp_high:
 								if hasattr(entry, "high") and entry.high: cls.cpu_temp_high = round(entry.high)
@@ -2539,7 +2539,7 @@ class CpuCollector(Collector):
 								if hasattr(entry, "critical") and entry.critical: cls.cpu_temp_crit = round(entry.critical)
 								else: cls.cpu_temp_crit = 95
 							temp = round(entry.current)
-						elif (entry.label.startswith(("Core", "Tccd", "CPU")) or (name.lower().startswith("cpu") and not entry.label)) and hasattr(entry, "current"):
+						elif (entry.label.startswith(("Core", "Tccd", "CPU")) or (name.lower().startswith("cpu") and not entry.label)) and hasattr(entry, "current") and round(entry.current) > 0:
 							if not cpu_type:
 								cpu_type = "other"
 								if not cls.cpu_temp_high:
