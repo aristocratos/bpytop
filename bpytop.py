@@ -373,7 +373,7 @@ class Config:
 	net_download: str = "10M"
 	net_upload: str = "10M"
 	net_color_fixed: bool = False
-	net_auto: bool = False
+	net_auto: bool = True
 	show_init: bool = True
 	mini_mode: bool = False
 	log_level: str = "WARNING"
