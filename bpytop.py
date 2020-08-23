@@ -99,6 +99,9 @@ DEFAULT_CONF: Template = Template(f'#? Config file for bpytop v. {VERSION}' + ''
 #* Prefix name by a plus sign (+) for a theme located in user themes folder, i.e. color_theme="+monokai"
 color_theme="$color_theme"
 
+#* If the theme set background should be shown, set to False if you want terminal background transparency
+theme_background=$theme_background
+
 #* Update time in milliseconds, increases automatically if set below internal loops processing time, recommended 2000 ms or above for better sample times for graphs.
 update_ms=$update_ms
 
@@ -345,9 +348,10 @@ def timeit_decorator(func):
 class Config:
 	'''Holds all config variables and functions for loading from and saving to disk'''
 	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name", "proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes",
-						"disks_filter", "update_check", "log_level", "mem_graphs", "show_swap", "swap_disk", "show_disks", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "mini_mode"]
+						"disks_filter", "update_check", "log_level", "mem_graphs", "show_swap", "swap_disk", "show_disks", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "mini_mode", "theme_background"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
+	theme_background: bool = True
 	update_ms: int = 2000
 	proc_sorting: str = "cpu lazy"
 	proc_reversed: bool = False
@@ -1144,7 +1148,8 @@ class Theme:
 				for _ in range(101):
 					self.gradient[name] += [c]
 		#* Set terminal colors
-		Term.fg, Term.bg = self.main_fg, self.main_bg
+		Term.fg = self.main_fg
+		Term.bg = self.main_bg if CONFIG.theme_background else "\033[49m"
 		Draw.now(self.main_fg, self.main_bg)
 
 	@classmethod
@@ -3541,6 +3546,11 @@ class Menu:
 				'',
 				'For theme updates see:',
 				'https://github.com/aristocratos/bpytop'],
+			"theme_background" : [
+				'If the theme set background should be shown.',
+				'',
+				'Set to False if you want terminal background',
+				'transparency.'],
 			"mini_mode" : [
 				'Enable bpytop mini mode at start.',
 				'',
@@ -3868,6 +3878,9 @@ class Menu:
 					if selected in ["net_auto", "net_color_fixed"]:
 						if selected == "net_auto": NetCollector.auto_min = CONFIG.net_auto
 						NetBox.redraw = True
+					if selected == "theme_background":
+						Term.bg = THEME.main_bg if CONFIG.theme_background else "\033[49m"
+						Draw.now(Term.bg)
 					Term.refresh(force=True)
 					cls.resized = False
 				elif key in ["left", "right"] and selected == "color_theme" and len(Theme.themes) > 1:
