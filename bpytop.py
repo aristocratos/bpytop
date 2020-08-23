@@ -4095,10 +4095,12 @@ def get_cpu_name() -> str:
 		name = nlist[nlist.index("CPU")+1]
 	elif "Ryzen" in name:
 		name = " ".join(nlist[nlist.index("Ryzen"):nlist.index("Ryzen")+3])
+	elif "Duo" in name and "@" in name:
+		name = " ".join(nlist[:nlist.index("@")])
 	elif "CPU" in name and not nlist[0] == "CPU":
 		name = nlist[nlist.index("CPU")-1]
 
-	return name
+	return name.replace("Processor ", "").replace("CPU ", "").replace("(R)", "").replace("(TM)", "").replace("Intel ", "")
 
 def create_box(x: int = 0, y: int = 0, width: int = 0, height: int = 0, title: str = "", title2: str = "", line_color: Color = None, title_color: Color = None, fill: bool = True, box = None) -> str:
 	'''Create a box from a box object or by given arguments'''
