@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.20
+
+* Release bump to fix pypi and source version missmatch
+
 ## v1.0.19
 
 * Changed: net_auto variable now default to True

@@ -1,8 +1,10 @@
 [tool.poetry]
 name = "bpytop"
-version = "1.0.19"
+version = "1.0.20"
 description = "Resource monitor that shows usage and stats for processor, memory, disks, network and processes."
+readme = "README.md"
 authors = ["Aristocratos <jakob@qvantnet.com>"]
+homepage = "https://github.com/aristocratos/bpytop"
 license = "Apache-2.0"
 include = ["bpytop-themes/*.theme"]
 
