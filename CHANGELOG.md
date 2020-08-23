@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.18
+
+* Fixed: Init screen and error log level when starting from pip installation
+
 ## v1.0.17
 
 * Added: Option to toggle theme background color
