@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.21
+
+* Fixed: Clean excess whitespace from CPU model name, by @RedBearAK
+* Changed: README.md absolute paths to work on PyPi
+
 ## v1.0.20
 
 * Release bump to fix pypi and source version missmatch
