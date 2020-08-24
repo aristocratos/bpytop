@@ -4095,6 +4095,8 @@ def get_cpu_name() -> str:
 	elif "CPU" in name and not nlist[0] == "CPU":
 		name = nlist[nlist.index("CPU")-1]
 
+	name = " ".join(name.split())
+
 	return name.replace("Processor ", "").replace("CPU ", "").replace("(R)", "").replace("(TM)", "").replace("Intel ", "")
 
 def create_box(x: int = 0, y: int = 0, width: int = 0, height: int = 0, title: str = "", title2: str = "", line_color: Color = None, title_color: Color = None, fill: bool = True, box = None) -> str:
