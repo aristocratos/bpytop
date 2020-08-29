@@ -705,6 +705,7 @@ class Key:
 		cls.reader = threading.Thread(target=cls._get_key)
 		cls.reader.start()
 		cls.started = True
+
 	@classmethod
 	def stop(cls):
 		if cls.started and cls.reader.is_alive():
@@ -978,7 +979,7 @@ class Color:
 				elif len(self.hexa) == 7:
 					self.dec = (int(self.hexa[1:3], base=16), int(self.hexa[3:5], base=16), int(self.hexa[5:7], base=16))
 				else:
-					raise ValueError(f'Incorrectly formatted hexadeciaml rgb string: {self.hexa}')
+					raise ValueError(f'Incorrectly formatted hexadecimal rgb string: {self.hexa}')
 
 			else:
 				c_t = tuple(map(int, color.split(" ")))
@@ -2741,10 +2742,7 @@ class MemCollector(Collector):
 				pass
 
 			u_percent = round(disk_u.percent)
-			cls.disks[disk.device] = {}
-			cls.disks[disk.device]["name"] = disk_name
-			cls.disks[disk.device]["used_percent"] = u_percent
-			cls.disks[disk.device]["free_percent"] = 100 - u_percent
+			cls.disks[disk.device] = { "name" : disk_name, "used_percent" : u_percent, "free_percent" : 100 - u_percent }
 			for name in ["total", "used", "free"]:
 				cls.disks[disk.device][name] = floating_humanizer(getattr(disk_u, name, 0))
 
@@ -2783,13 +2781,9 @@ class MemCollector(Collector):
 			cls.disks[disk.device]["io"] = io_string
 
 		if CONFIG.swap_disk and MemBox.swap_on:
-			cls.disks["__swap"] = {}
-			cls.disks["__swap"]["name"] = "swap"
-			cls.disks["__swap"]["used_percent"] = cls.swap_percent["used"]
-			cls.disks["__swap"]["free_percent"] = cls.swap_percent["free"]
+			cls.disks["__swap"] = { "name" : "swap", "used_percent" : cls.swap_percent["used"], "free_percent" : cls.swap_percent["free"], "io" : "" }
 			for name in ["total", "used", "free"]:
 				cls.disks["__swap"][name] = cls.swap_string[name]
-			cls.disks["__swap"]["io"] = ""
 			if len(cls.disks) > 2:
 				try:
 					new = { list(cls.disks)[0] : cls.disks.pop(list(cls.disks)[0])}
@@ -3211,10 +3205,8 @@ class ProcCollector(Collector):
 					out[collapse_to]["cpu"] += cpu
 				else:
 					if pid in tree and len(tree[pid]) > 0:
-						if collapse:
-							inindent = inindent.replace(" ├─ ", "[+]─").replace(" └─ ", "[+]─")
-						else:
-							inindent = inindent.replace(" ├─ ", "[-]─").replace(" └─ ", "[-]─")
+						sign: str = "+" if collapse else "-"
+						inindent = inindent.replace(" ├─ ", "[" + sign + "]─").replace(" └─ ", "[" + sign + "]─")
 					out[pid] = {
 						"indent" : inindent,
 						"name": name,
@@ -4156,8 +4148,6 @@ def now_awake(signum, frame):
 	Box.draw_bg()
 	Collector.start()
 
-	#Draw.out()
-
 def quit_sigint(signum, frame):
 	"""SIGINT redirection to clean_quit()"""
 	clean_quit()
@@ -4332,12 +4322,6 @@ def process_keys():
 		elif key == "r":
 			CONFIG.proc_reversed = not CONFIG.proc_reversed
 			Collector.collect(ProcCollector, interrupt=True, redraw=True)
-		# elif key == "C":
-		# 	CONFIG.proc_colors = not CONFIG.proc_colors
-		# 	Collector.collect(ProcCollector, redraw=True, only_draw=True)
-		# elif key == "G":
-		# 	CONFIG.proc_gradient = not CONFIG.proc_gradient
-		# 	Collector.collect(ProcCollector, redraw=True, only_draw=True)
 		elif key == "c":
 			CONFIG.proc_per_core = not CONFIG.proc_per_core
 			Collector.collect(ProcCollector, interrupt=True, redraw=True)
