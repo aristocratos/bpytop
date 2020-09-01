@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.22
+
+* Some refactoring and cleanup
+* README: Info for debian package
+* Added: Theme search path for snap install
+* README: Updated snap install info
+
+
 ## v1.0.21
 
 * Fixed: Clean excess whitespace from CPU model name, by @RedBearAK
