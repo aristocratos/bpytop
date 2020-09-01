@@ -194,9 +194,9 @@ for td in site.getsitepackages() + [site.getusersitepackages()]:
 		THEME_DIR = f'{td}/bpytop-themes'
 		break
 else:
-	for td in ["local/", ""]:
-		if os.path.isdir(f'/usr/{td}share/bpytop/themes'):
-			THEME_DIR = f'/usr/{td}share/bpytop/themes'
+	for td in ["/usr/local/", "/usr/", "/snap/bpytop/current/usr/"]:
+		if os.path.isdir(f'{td}share/bpytop/themes'):
+			THEME_DIR = f'{td}share/bpytop/themes'
 			break
 USER_THEME_DIR: str = f'{CONFIG_DIR}/themes'
 
