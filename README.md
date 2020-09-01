@@ -138,6 +138,10 @@ Available in the AUR as `bpytop.git`
 
 https://aur.archlinux.org/packages/bpytop/
 
+#### Debian based
+
+Available for debian/ubuntu from [Azlux's repository](http://packages.azlux.fr/)
+
 ### FreeBSD package
 
 Available in [FreeBSD ports](https://www.freshports.org/sysutils/bpytop/)
