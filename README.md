@@ -164,6 +164,10 @@ sudo dnf install bpytop
 
 ### Snap package
 
+by @kz6fittycent
+
+https://github.com/kz6fittycent/bpytop-snap
+
 >Install the package
 ``` bash
 sudo snap install bpytop
@@ -178,6 +182,8 @@ sudo snap connect bpytop:system-observe
 sudo snap connect bpytop:process-control
 sudo snap connect bpytop:physical-memory-observe
 ```
+
+The config folder will be located in `~/snap/bpytop/current/.config/bpytop`
 
 ## Manual installation
 
