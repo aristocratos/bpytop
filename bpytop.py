@@ -2085,6 +2085,8 @@ class ProcBox(Box):
 		killed: bool = True
 		indent: str = ""
 		offset: int = 0
+		tr_show: bool = True
+		usr_show: bool = True
 		vals: List[str]
 		g_color: str = ""
 		s_len: int = 0
@@ -2107,6 +2109,13 @@ class ProcBox(Box):
 		else:
 			arg_len = 0
 			prog_len = w - 38 - (1 if proc.num_procs > cls.select_max else 0)
+			if prog_len < 15:
+				tr_show = False
+				prog_len += 5
+			if prog_len < 12:
+				usr_show = False
+				prog_len += 9
+
 		if CONFIG.proc_tree:
 			tree_len = arg_len + prog_len + 6
 			arg_len = 0
@@ -2231,12 +2240,12 @@ class ProcBox(Box):
 			if selected == "memory": selected = "mem"
 			if selected == "threads" and not CONFIG.proc_tree and not arg_len: selected = "tr"
 			if CONFIG.proc_tree:
-				label = (f'{THEME.title}{Fx.b}{Mv.to(y, x)}{" Tree:":<{tree_len-2}}' "Threads: " f'{"User:":<9}Mem%{"Cpu%":>11}{Fx.ub}{THEME.main_fg} ' +
+				label = (f'{THEME.title}{Fx.b}{Mv.to(y, x)}{" Tree:":<{tree_len-2}}' + (f'{"Threads: ":<9}' if tr_show else " "*4) + (f'{"User:":<9}' if usr_show else "") + f'Mem%{"Cpu%":>11}{Fx.ub}{THEME.main_fg} ' +
 						(" " if proc.num_procs > cls.select_max else ""))
 				if selected in ["pid", "program", "arguments"]: selected = "tree"
 			else:
 				label = (f'{THEME.title}{Fx.b}{Mv.to(y, x)}{"Pid:":>7} {"Program:" if prog_len > 8 else "Prg:":<{prog_len}}' + (f'{"Arguments:":<{arg_len-4}}' if arg_len else "") +
-					f'{"Threads:" if arg_len else " Tr:"} {"User:":<9}Mem%{"Cpu%":>11}{Fx.ub}{THEME.main_fg} ' +
+					((f'{"Threads:":<9}' if arg_len else f'{"Tr:":^5}') if tr_show else "") + (f'{"User:":<9}' if usr_show else "") + f'Mem%{"Cpu%":>11}{Fx.ub}{THEME.main_fg} ' +
 					(" " if proc.num_procs > cls.select_max else ""))
 				if selected == "program" and prog_len <= 8: selected = "prg"
 			selected = selected.split(" ")[0].capitalize()
@@ -2347,8 +2356,8 @@ class ProcBox(Box):
 			out += (f'{Mv.to(y+cy, x)}{g_color}{indent}{pid:>{(1 if CONFIG.proc_tree else 7)}} ' +
 				f'{c_color}{name:<{offset}.{offset}} {end}' +
 				(f'{g_color}{cmd:<{arg_len}.{arg_len-1}}' if arg_len else "") +
-				t_color + (f'{threads:>4} ' if threads < 1000 else "999> ") + end +
-				g_color + (f'{username:<9.9}' if len(username) < 10 else f'{username[:8]:<8}+') +
+				(t_color + (f'{threads:>4} ' if threads < 1000 else "999> ") + end if tr_show else "") +
+				(g_color + (f'{username:<9.9}' if len(username) < 10 else f'{username[:8]:<8}+') if usr_show else "") +
 				m_color + ((f'{mem:>4.1f}' if mem < 100 else f'{mem:>4.0f} ') if not CONFIG.proc_mem_bytes else f'{floating_humanizer(mem_b, short=True):>4.4}') + end +
 				f' {THEME.inactive_fg}{"⡀"*5}{THEME.main_fg}{g_color}{c_color}' + (f' {cpu:>4.1f} ' if cpu < 100 else f'{cpu:>5.0f} ') + end +
 				(" " if proc.num_procs > cls.select_max else ""))
