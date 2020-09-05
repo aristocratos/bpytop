@@ -329,6 +329,9 @@ net_upload="100Mbit"
 #* Start in network graphs auto rescaling mode, ignores any values set above and rescales down to 10 Kibibytes at the lowest.
 net_auto=True
 
+#* Sync the scaling for download and upload to whichever currently has the highest scale
+net_sync=False
+
 #* If the network graphs color gradient should scale to bandwith usage or auto scale, bandwith usage is based on "net_download" and "net_upload" values
 net_color_fixed=False
 
