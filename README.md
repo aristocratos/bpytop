@@ -61,6 +61,7 @@ Bpytop uses the same theme files as bashtop so any theme made for bashtop will w
 See [themes](https://github.com/aristocratos/bpytop/tree/master/themes) folder for available themes.
 
 The `make install` command places the default themes in `/usr/local/share/bpytop/themes`.
+If installed with `pip3` the themes will be located in a folder called `bpytop-themes` in the python3 site-packages folder.
 User created themes should be placed in `$HOME/.config/bpytop/themes`.
 
 Let me know if you want to contribute with new themes.
