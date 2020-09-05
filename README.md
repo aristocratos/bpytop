@@ -138,7 +138,7 @@ Available in the AUR as `bpytop.git`
 
 https://aur.archlinux.org/packages/bpytop/
 
-#### Debian based
+### Debian based
 
 Available for debian/ubuntu from [Azlux's repository](http://packages.azlux.fr/)
 
@@ -257,14 +257,17 @@ Config files stored in "$HOME/.config/bpytop" folder
 "/etc/bpytop.conf" will be used as default seed for config file creation if it exists.
 
 ```bash
-#? Config file for bpytop v. 1.0.18
+#? Config file for bpytop v. 1.0.22
 
 #* Color theme, looks for a .theme file in "/usr/[local/]share/bpytop/themes" and "~/.config/bpytop/themes", "Default" for builtin default theme.
 #* Prefix name by a plus sign (+) for a theme located in user themes folder, i.e. color_theme="+monokai"
 color_theme="Default"
 
 #* If the theme set background should be shown, set to False if you want terminal background transparency
-theme_background=True
+theme_background=False
+
+#* Set bpytop view mode, "full" for everything shown, "proc" for cpu stats and processes, "stat" for cpu, mem, disks and net stats shown.
+view_mode=full
 
 #* Update time in milliseconds, increases automatically if set below internal loops processing time, recommended 2000 ms or above for better sample times for graphs.
 update_ms=2000
@@ -330,18 +333,14 @@ net_auto=True
 net_color_fixed=False
 
 #* Show init screen at startup, the init screen is purely cosmetical
-show_init=True
+show_init=False
 
 #* Enable check for new version from github.com/aristocratos/bpytop at start.
 update_check=True
 
-#* Enable start in mini mode, can be toggled with shift+m at any time.
-mini_mode=False
-
 #* Set loglevel for "~/.config/bpytop/error.log" levels are: "ERROR" "WARNING" "INFO" "DEBUG".
 #* The level set includes all lower levels, i.e. "DEBUG" will show all logging info.
 log_level=WARNING
-
 
 ```
 
@@ -351,7 +350,9 @@ log_level=WARNING
 USAGE: bpytop [argument]
 
 Arguments:
-    -m, --mini            Start in minimal mode without memory and net boxes
+    -f, --full            Start in full mode showing all boxes [default]
+    -p, --proc            Start in minimal mode without memory and net boxes
+    -s, --stat            Start in minimal mode without process box
     -v, --version         Show version info and exit
     -h, --help            Show this help message and exit
     --debug               Start with loglevel set to DEBUG overriding value set in config
