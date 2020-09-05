@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.24
+
+* Fixed: "view_mode" option entry format
+* Fixed: Help menu entries
+
 ## v1.0.23
 
 * Added: View mode toggle with 3 presets, "full", "proc" and "stat"
