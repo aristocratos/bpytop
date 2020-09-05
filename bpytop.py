@@ -175,6 +175,9 @@ net_upload="$net_upload"
 #* Start in network graphs auto rescaling mode, ignores any values set above and rescales down to 10 Kibibytes at the lowest.
 net_auto=$net_auto
 
+#* Sync the scaling for download and upload to whichever currently has the highest scale
+net_sync=$net_sync
+
 #* If the network graphs color gradient should scale to bandwith usage or auto scale, bandwith usage is based on "net_download" and "net_upload" values
 net_color_fixed=$net_color_fixed
 
@@ -357,8 +360,9 @@ def timeit_decorator(func):
 
 class Config:
 	'''Holds all config variables and functions for loading from and saving to disk'''
-	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name", "proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes",
-						"disks_filter", "update_check", "log_level", "mem_graphs", "show_swap", "swap_disk", "show_disks", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "view_mode", "theme_background"]
+	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name",
+						"proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes", "disks_filter", "update_check", "log_level", "mem_graphs", "show_swap",
+						"swap_disk", "show_disks", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "view_mode", "theme_background", "net_sync"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	theme_background: bool = True
@@ -384,6 +388,7 @@ class Config:
 	net_upload: str = "10M"
 	net_color_fixed: bool = False
 	net_auto: bool = True
+	net_sync: bool = False
 	show_init: bool = True
 	view_mode: str = "full"
 	log_level: str = "WARNING"
@@ -1914,15 +1919,19 @@ class NetBox(Box, SubBox):
 				if not "a" in Key.mouse: Key.mouse["a"] = [[x+w - 20 - len(net.nic[:10]) + i, y-1] for i in range(4)]
 				out_misc += (f'{Mv.to(y-1, x+w - 21 - len(net.nic[:10]))}{THEME.net_box(Symbol.title_left)}{Fx.b if net.auto_min else ""}{THEME.hi_fg("a")}{THEME.title("uto")}'
 				f'{Fx.ub}{THEME.net_box(Symbol.title_right)}{Term.fg}')
+			if w - len(net.nic[:10]) - 20 > 13:
+				if not "y" in Key.mouse: Key.mouse["y"] = [[x+w - 26 - len(net.nic[:10]) + i, y-1] for i in range(4)]
+				out_misc += (f'{Mv.to(y-1, x+w - 27 - len(net.nic[:10]))}{THEME.net_box(Symbol.title_left)}{Fx.b if CONFIG.net_sync else ""}{THEME.title("s")}{THEME.hi_fg("y")}{THEME.title("nc")}'
+				f'{Fx.ub}{THEME.net_box(Symbol.title_right)}{Term.fg}')
 			Draw.buffer("net_misc", out_misc, only_save=True)
 
 		cy = 0
 		for direction in ["download", "upload"]:
 			strings = net.strings[net.nic][direction]
 			stats = net.stats[net.nic][direction]
+			if cls.redraw: stats["redraw"] = True
 			if stats["redraw"] or cls.resized:
-				if cls.redraw: stats["redraw"] = True
-				Graphs.net[direction] = Graph(w - bw - 3, cls.graph_height[direction], THEME.gradient[direction], stats["speed"], max_value=stats["graph_top"],
+				Graphs.net[direction] = Graph(w - bw - 3, cls.graph_height[direction], THEME.gradient[direction], stats["speed"], max_value=net.sync_top if CONFIG.net_sync else stats["graph_top"],
 					invert=False if direction == "download" else True, color_max_value=net.net_min.get(direction) if CONFIG.net_color_fixed else None)
 			out += f'{Mv.to(y if direction == "download" else y + cls.graph_height["download"], x)}{Graphs.net[direction](None if stats["redraw"] else stats["speed"][-1])}'
 
@@ -1938,7 +1947,8 @@ class NetBox(Box, SubBox):
 				else: cy += 1
 			stats["redraw"] = False
 
-		out += f'{Mv.to(y, x)}{THEME.graph_text(net.strings[net.nic]["download"]["graph_top"])}{Mv.to(y+h-1, x)}{THEME.graph_text(net.strings[net.nic]["upload"]["graph_top"])}'
+		out += (f'{Mv.to(y, x)}{THEME.graph_text(net.sync_string if CONFIG.net_sync else net.strings[net.nic]["download"]["graph_top"])}'
+				f'{Mv.to(y+h-1, x)}{THEME.graph_text(net.sync_string if CONFIG.net_sync else net.strings[net.nic]["upload"]["graph_top"])}')
 
 		Draw.buffer(cls.buffer, f'{out_misc}{out}{Term.fg}', only_save=Menu.active)
 		cls.redraw = cls.resized = False
@@ -2106,7 +2116,7 @@ class ProcBox(Box):
 			s_len += len(CONFIG.proc_sorting)
 			if cls.resized or s_len != cls.s_len or proc.detailed:
 				cls.s_len = s_len
-				for k in ["e", "r", "c", "t", "k", "i", "enter", "left", " "]:
+				for k in ["e", "r", "c", "t", "k", "i", "enter", "left", " ", "f", "delete"]:
 					if k in Key.mouse: del Key.mouse[k]
 			if proc.detailed:
 				killed = proc.details["killed"]
@@ -2185,9 +2195,9 @@ class ProcBox(Box):
 				out_misc += (f'{Mv.to(y-1, sort_pos - 25)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_per_core else ""}'
 					f'{THEME.title("per-")}{THEME.hi_fg("c")}{THEME.title("ore")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
 
-			if not "f" in Key.mouse or cls.resized: Key.mouse["f"] = [[x+9 + i, y-1] for i in range(6 if not proc.search_filter else 2 + len(proc.search_filter[-10:]))]
+			if not "f" in Key.mouse or cls.resized: Key.mouse["f"] = [[x+5 + i, y-1] for i in range(6 if not proc.search_filter else 2 + len(proc.search_filter[-10:]))]
 			if proc.search_filter:
-				if not "delete" in Key.mouse: Key.mouse["delete"] = [[x+12 + len(proc.search_filter[-10:]) + i, y-1] for i in range(3)]
+				if not "delete" in Key.mouse: Key.mouse["delete"] = [[x+11 + len(proc.search_filter[-10:]) + i, y-1] for i in range(3)]
 			elif "delete" in Key.mouse:
 				del Key.mouse["delete"]
 			out_misc += (f'{Mv.to(y-1, x + 7)}{THEME.proc_box(Symbol.title_left)}{Fx.b if cls.filtering or proc.search_filter else ""}{THEME.hi_fg("f")}{THEME.title}' +
@@ -2852,6 +2862,8 @@ class NetCollector(Collector):
 	timestamp: float = time()
 	net_min: Dict[str, int] = {"download" : -1, "upload" : -1}
 	auto_min: bool = CONFIG.net_auto
+	sync_top: int = 0
+	sync_string: str = ""
 
 	@classmethod
 	def _get_nics(cls):
@@ -2971,7 +2983,12 @@ class NetCollector(Collector):
 
 		cls.timestamp = time()
 
-
+		if CONFIG.net_sync:
+			c_max: int = max(cls.stats[cls.nic]["download"]["graph_top"], cls.stats[cls.nic]["upload"]["graph_top"])
+			if c_max != cls.sync_top:
+				cls.sync_top = c_max
+				cls.sync_string = floating_humanizer(cls.sync_top, short=True)
+				NetBox.redraw = True
 
 	@classmethod
 	def _draw(cls):
@@ -3709,6 +3726,13 @@ class Menu:
 				'rescales down to 10KibiBytes at the lowest.',
 				'',
 				'True or False.'],
+			"net_sync" : [
+				'Network scale sync.',
+				'',
+				'Syncs the scaling for download and upload to',
+				'whichever currently has the highest scale.',
+				'',
+				'True or False.'],
 			"net_color_fixed" : [
 				'Set network graphs color gradient to fixed.',
 				'',
@@ -3897,7 +3921,7 @@ class Menu:
 						else:
 							CpuCollector.sensor_method = ""
 							CpuCollector.got_sensors = False
-					if selected in ["net_auto", "net_color_fixed"]:
+					if selected in ["net_auto", "net_color_fixed", "net_sync"]:
 						if selected == "net_auto": NetCollector.auto_min = CONFIG.net_auto
 						NetBox.redraw = True
 					if selected == "theme_background":
@@ -4356,6 +4380,9 @@ def process_keys():
 			Menu.help()
 		elif key == "z":
 			NetCollector.reset = not NetCollector.reset
+			Collector.collect(NetCollector, redraw=True)
+		elif key == "y":
+			CONFIG.net_sync = not CONFIG.net_sync
 			Collector.collect(NetCollector, redraw=True)
 		elif key == "a":
 			NetCollector.auto_min = not NetCollector.auto_min
