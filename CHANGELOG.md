@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.0.23
+
+* Added: View mode toggle with 3 presets, "full", "proc" and "stat"
+* Added: Rescaling of net stat box width on smaller terminal sizes
+* Changed: Net box height slight increase, mem/disks box height slight decrease
+* Fixed: Some element placement fixes by @RedBearAK
+* Fixed: "delete" and "filter" mouse click area misaligned
+* Added: Option to sync network scaling between download and upload
+
 ## v1.0.22
 
 * Some refactoring and cleanup
