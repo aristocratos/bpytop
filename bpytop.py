@@ -1495,7 +1495,7 @@ class Box:
 	@classmethod
 	def draw_update_ms(cls, now: bool = True):
 		update_string: str = f'{CONFIG.update_ms}ms'
-		xpos: int = CpuBox.x + CpuBox.width - len(update_string) - 14
+		xpos: int = CpuBox.x + CpuBox.width - len(update_string) - 15
 		if not "+" in Key.mouse:
 			Key.mouse["+"] = [[xpos + 7 + i, CpuBox.y] for i in range(3)]
 			Key.mouse["-"] = [[CpuBox.x + CpuBox.width - 4 + i, CpuBox.y] for i in range(3)]
@@ -2190,7 +2190,7 @@ class ProcBox(Box):
 				if not "delete" in Key.mouse: Key.mouse["delete"] = [[x+12 + len(proc.search_filter[-10:]) + i, y-1] for i in range(3)]
 			elif "delete" in Key.mouse:
 				del Key.mouse["delete"]
-			out_misc += (f'{Mv.to(y-1, x + 8)}{THEME.proc_box(Symbol.title_left)}{Fx.b if cls.filtering or proc.search_filter else ""}{THEME.hi_fg("f")}{THEME.title}' +
+			out_misc += (f'{Mv.to(y-1, x + 7)}{THEME.proc_box(Symbol.title_left)}{Fx.b if cls.filtering or proc.search_filter else ""}{THEME.hi_fg("f")}{THEME.title}' +
 				("ilter" if not proc.search_filter and not cls.filtering else f' {proc.search_filter[-(10 if w < 83 else w - 74):]}{(Fx.bl + "█" + Fx.ubl) if cls.filtering else THEME.hi_fg(" del")}') +
 				f'{THEME.proc_box(Symbol.title_right)}')
 
@@ -2369,7 +2369,7 @@ class ProcBox(Box):
 			del Key.mouse["scroll_up"], Key.mouse["scroll_down"]
 
 		#* Draw current selection and number of processes
-		out += (f'{Mv.to(y+h, x + w - 3 - len(loc_string))}{THEME.proc_box}{Symbol.h_line*1}{Symbol.title_left}{THEME.title}'
+		out += (f'{Mv.to(y+h, x + w - 3 - len(loc_string))}{THEME.proc_box}{Symbol.title_left}{THEME.title}'
 					f'{Fx.b}{loc_string}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
 
 		#* Clean up dead processes graphs and counters
