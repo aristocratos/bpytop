@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.25
+
+* Added: More sizing adaptation for processes
+* Fixed: Clock centering
+
 ## v1.0.24
 
 * Fixed: "view_mode" option entry format
