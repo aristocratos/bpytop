@@ -1516,7 +1516,7 @@ class Box:
 		cls.clock = strftime(CONFIG.draw_clock)
 		clock_len = len(cls.clock[:(CpuBox.width-58)])
 		now: bool = False if Menu.active else not force
-		Draw.buffer("clock", (f'{Mv.to(CpuBox.y, ((CpuBox.width-2)//2)-(clock_len//2)-5)}{Fx.ub}{THEME.cpu_box}{Symbol.h_line * 4}'
+		Draw.buffer("clock", (f'{Mv.to(CpuBox.y, ((CpuBox.width-2)//2)-(clock_len//2)-3)}{Fx.ub}{THEME.cpu_box}{Symbol.h_line * 4}'
 			f'{Symbol.title_left}{Fx.b}{THEME.title(cls.clock[:clock_len])}{Fx.ub}{THEME.cpu_box}{Symbol.title_right}{Symbol.h_line * 4}{Term.fg}'),
 		z=1, now=now, once=not force, only_save=Menu.active)
 
