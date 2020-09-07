@@ -17,7 +17,7 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-import os, sys, threading, signal, re, subprocess, logging, logging.handlers, site
+import os, sys, threading, signal, re, subprocess, logging, logging.handlers
 import urllib.request
 from time import time, sleep, strftime, localtime
 from datetime import timedelta
@@ -202,10 +202,9 @@ if not os.path.isdir(CONFIG_DIR):
 		raise SystemExit(1)
 CONFIG_FILE: str = f'{CONFIG_DIR}/bpytop.conf'
 THEME_DIR: str = ""
-for td in site.getsitepackages() + [site.getusersitepackages()]:
-	if os.path.isdir(f'{td}/bpytop-themes'):
-		THEME_DIR = f'{td}/bpytop-themes'
-		break
+
+if os.path.isdir(f'{os.path.dirname(__file__)}/bpytop-themes'):
+	THEME_DIR = f'{os.path.dirname(__file__)}/bpytop-themes'
 else:
 	for td in ["/usr/local/", "/usr/", "/snap/bpytop/current/usr/"]:
 		if os.path.isdir(f'{td}share/bpytop/themes'):
@@ -1623,7 +1622,7 @@ class CpuBox(Box, SubBox):
 				f'{THEME.main_fg}{Mv.to(by + cy, bx + cx)}{Fx.b}{"CPU "}{Fx.ub}{Meters.cpu(cpu.cpu_usage[0][-1])}'
 				f'{THEME.gradient["cpu"][cpu.cpu_usage[0][-1]]}{cpu.cpu_usage[0][-1]:>4}{THEME.main_fg}%')
 		if cpu.got_sensors:
-				out += (f'{THEME.inactive_fg} ⡀⡀⡀⡀⡀{Mv.l(5)}{THEME.gradient["temp"][100 if cpu.cpu_temp[0][-1] >= cpu.cpu_temp_crit else (cpu.cpu_temp[0][-1] * 100 // cpu.cpu_temp_crit)]}{Graphs.temps[0](None if cls.resized else cpu.cpu_temp[0][-1])}'
+				out += (f'{THEME.inactive_fg} ⡀⡀⡀⡀⡀{Mv.l(5)}{THEME.gradient["temp"][min_max(cpu.cpu_temp[0][-1], 0, cpu.cpu_temp_crit) * 100 // cpu.cpu_temp_crit]}{Graphs.temps[0](None if cls.resized else cpu.cpu_temp[0][-1])}'
 						f'{cpu.cpu_temp[0][-1]:>4}{THEME.main_fg}°C')
 
 		cy += 1
@@ -2638,12 +2637,12 @@ class CpuCollector(Collector):
 		else:
 			try:
 				if cls.sensor_method == "osx-cpu-temp":
-					temp = round(float(subprocess.check_output("osx-cpu-temp", text=True).strip()[:-2]))
+					temp = max(0, round(float(subprocess.check_output("osx-cpu-temp", text=True).strip()[:-2])))
 					if not cls.cpu_temp_high:
 						cls.cpu_temp_high = 85
 						cls.cpu_temp_crit = 100
 				elif cls.sensor_method == "vcgencmd":
-					temp = round(float(subprocess.check_output(["vcgencmd", "measure_temp"], text=True).strip()[5:-2]))
+					temp = max(0, round(float(subprocess.check_output(["vcgencmd", "measure_temp"], text=True).strip()[5:-2])))
 					if not cls.cpu_temp_high:
 						cls.cpu_temp_high = 60
 						cls.cpu_temp_crit = 80
@@ -4265,10 +4264,9 @@ def floating_humanizer(value: Union[float, int], bit: bool = False, per_second: 
 	* short=True always returns 0 decimals and shortens unit to 1 character
 	'''
 	out: str = ""
-	unit: Tuple[str, ...] = UNITS["bit"] if bit else UNITS["byte"]
-	selector: int = start if start else 0
 	mult: int = 8 if bit else 1
-	if value <= 0: value = 0
+	selector: int = start
+	unit: Tuple[str, ...] = UNITS["bit"] if bit else UNITS["byte"]
 
 	if isinstance(value, float): value = round(value * 100 * mult)
 	elif value > 0: value *= 100 * mult
@@ -4334,6 +4332,9 @@ def units_to_bytes(value: str) -> int:
 	except ValueError:
 		out = 0
 	return out
+
+def min_max(value: int, min_value: int=0, max_value: int=100) -> int:
+	return max(min_value, min(value, max_value))
 
 def process_keys():
 	mouse_pos: Tuple[int, int] = (0, 0)
