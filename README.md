@@ -163,6 +163,16 @@ sudo pkg install bpytop
 sudo dnf install bpytop
 ```
 
+### Gentoo / Calculate Linux
+
+Available for debian/ubuntu from [adrien-overlay](https://github.com/aaaaadrien/adrien-overlay)
+
+>Installation
+
+``` bash
+sudo emerge -av sys-process/bpytop
+```
+
 ### Snap package
 
 by @kz6fittycent
