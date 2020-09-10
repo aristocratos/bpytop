@@ -20,7 +20,7 @@ theme[selected_fg]="#f8f8f2"
 theme[inactive_fg]="#497e7a"
 
 # Color of text appearing on top of graphs, i.e uptime and current network graph scaling
-theme[graph_text]="21d6c9"
+theme[graph_text]="#21d6c9"
 
 # Background color of the percentage meters
 theme[meter_bg]="#80638e"
