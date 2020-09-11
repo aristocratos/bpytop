@@ -135,7 +135,7 @@ pip3 install bpytop --upgrade
 
 ### Arch Linux
 
-Available in the AUR as `bpytop.git`
+Available in the AUR as `bpytop`
 
 https://aur.archlinux.org/packages/bpytop/
 
