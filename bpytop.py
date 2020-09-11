@@ -56,7 +56,7 @@ if errors:
 		print("\nInstall required modules!\n")
 	raise SystemExit(1)
 
-VERSION: str = "1.0.26"
+VERSION: str = "1.0.27"
 
 #? Argument parser ------------------------------------------------------------------------------->
 if len(sys.argv) > 1:
@@ -128,6 +128,9 @@ proc_reversed=$proc_reversed
 #* Show processes as a tree
 proc_tree=$proc_tree
 
+#* Which depth the tree view should auto collapse processes at
+tree_depth=$tree_depth
+
 #* Use the cpu graph colors in the process list.
 proc_colors=$proc_colors
 
@@ -180,6 +183,9 @@ net_sync=$net_sync
 
 #* If the network graphs color gradient should scale to bandwith usage or auto scale, bandwith usage is based on "net_download" and "net_upload" values
 net_color_fixed=$net_color_fixed
+
+#* Show battery stats in top right if battery is present
+show_battery=$show_battery
 
 #* Show init screen at startup, the init screen is purely cosmetical
 show_init=$show_init
@@ -361,7 +367,8 @@ class Config:
 	'''Holds all config variables and functions for loading from and saving to disk'''
 	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name",
 						"proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes", "disks_filter", "update_check", "log_level", "mem_graphs", "show_swap",
-						"swap_disk", "show_disks", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "view_mode", "theme_background", "net_sync"]
+						"swap_disk", "show_disks", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "view_mode", "theme_background",
+						"net_sync", "show_battery", "tree_depth"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	theme_background: bool = True
@@ -369,6 +376,7 @@ class Config:
 	proc_sorting: str = "cpu lazy"
 	proc_reversed: bool = False
 	proc_tree: bool = False
+	tree_depth: int = 3
 	proc_colors: bool = True
 	proc_gradient: bool = True
 	proc_per_core: bool = False
@@ -388,6 +396,7 @@ class Config:
 	net_color_fixed: bool = False
 	net_auto: bool = True
 	net_sync: bool = False
+	show_battery: bool = True
 	show_init: bool = True
 	view_mode: str = "full"
 	log_level: str = "WARNING"
@@ -1419,14 +1428,16 @@ class Meter:
 	color_inactive: Color
 	gradient_name: str
 	width: int
+	invert: bool
 	saved: Dict[int, str]
 
-	def __init__(self, value: int, width: int, gradient_name: str):
+	def __init__(self, value: int, width: int, gradient_name: str, invert: bool = False):
 		self.gradient_name = gradient_name
 		self.color_gradient = THEME.gradient[gradient_name]
 		self.color_inactive = THEME.meter_bg
 		self.width = width
 		self.saved = {}
+		self.invert = invert
 		self.out = self._create(value)
 
 	def __call__(self, value: Union[int, None]) -> str:
@@ -1451,7 +1462,7 @@ class Meter:
 		out: str = ""
 		for i in range(1, self.width + 1):
 			if value >= round(i * 100 / self.width):
-				out += f'{self.color_gradient[round(i * 100 / self.width)]}{Symbol.meter}'
+				out += f'{self.color_gradient[round(i * 100 / self.width) if not self.invert else round(100 - (i * 100 / self.width))]}{Symbol.meter}'
 			else:
 				out += self.color_inactive(Symbol.meter * (self.width + 1 - i))
 				break
@@ -1463,6 +1474,7 @@ class Meter:
 
 class Meters:
 	cpu: Meter
+	battery: Meter
 	mem: Dict[str, Union[Meter, Graph]] = {}
 	swap: Dict[str, Union[Meter, Graph]] = {}
 	disks_used: Dict[str, Meter] = {}
@@ -1506,7 +1518,12 @@ class Box:
 		Draw.buffer("update_ms!" if now and not Menu.active else "update_ms",
 			f'{Mv.to(CpuBox.y, xpos)}{THEME.cpu_box(Symbol.h_line * 7, Symbol.title_left)}{Fx.b}{THEME.hi_fg("+")} ',
 			f'{THEME.title(update_string)} {THEME.hi_fg("-")}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}', only_save=Menu.active, once=True)
-		if now and not Menu.active: Draw.clear("update_ms")
+		if now and not Menu.active:
+			Draw.clear("update_ms")
+			if CONFIG.show_battery and CpuBox.battery_present:
+				CpuBox.redraw = True
+				CpuBox._draw_fg()
+				Draw.out("cpu")
 
 	@classmethod
 	def draw_clock(cls, force: bool = False):
@@ -1543,6 +1560,9 @@ class CpuBox(Box, SubBox):
 	resized: bool = True
 	redraw: bool = False
 	buffer: str = "cpu"
+	battery_percent: int = 1000
+	old_battery_pos = 0
+	battery_present: bool = True if hasattr(psutil, "sensors_battery") and psutil.sensors_battery() else False
 	clock_block: bool = True
 	Box.buffers.append(buffer)
 
@@ -1612,6 +1632,24 @@ class CpuBox(Box, SubBox):
 					for n in range(1, THREADS + 1):
 						Graphs.temps[n] = Graph(5, 1, None, cpu.cpu_temp[n], max_value=cpu.cpu_temp_crit, offset=-23)
 			Draw.buffer("cpu_misc", out_misc, only_save=True)
+
+		if CONFIG.show_battery and cls.battery_present and psutil.sensors_battery().percent != cls.battery_percent:
+			if isinstance(psutil.sensors_battery().secsleft, int):
+				battery_secs: int = psutil.sensors_battery().secsleft
+			else:
+				battery_secs = 0
+			cls.battery_percent = psutil.sensors_battery().percent
+			if not hasattr(Meters, "battery") or cls.resized:
+				Meters.battery = Meter(cls.battery_percent, 10, "cpu", invert=True)
+			battery_symbol: str = "▼" if not psutil.sensors_battery().power_plugged else "▲"
+			battery_pos = cls.width - len(f'{CONFIG.update_ms}') - 17 - (11 if cls.width >= 100 else 0) - (6 if battery_secs else 0) - len(f'{cls.battery_percent}')
+			if battery_pos != cls.old_battery_pos and cls.old_battery_pos > 0 and not cls.resized:
+				out += f'{Mv.to(y-1, cls.old_battery_pos)}{THEME.cpu_box(Symbol.h_line*(15 if cls.width >= 100 else 5))}'
+			cls.old_battery_pos = battery_pos
+			out += (f'{Mv.to(y-1, battery_pos)}{THEME.cpu_box(Symbol.title_left)}{Fx.b}{THEME.title}BAT{battery_symbol} {cls.battery_percent}%'+
+				("" if cls.width < 100 else f' {Fx.ub}{Meters.battery(cls.battery_percent)}{Fx.b}') +
+				("" if not battery_secs else f' {THEME.title}{battery_secs // 3600:02}:{(battery_secs % 3600) // 60:02}') +
+				f'{Fx.ub}{THEME.cpu_box(Symbol.title_right)}')
 
 		cx = cy = cc = 0
 		ccw = (bw + 1) // cls.box_columns
@@ -3250,7 +3288,7 @@ class ProcCollector(Collector):
 				if pid in cls.collapsed:
 					collapse = cls.collapsed[pid]
 				else:
-					collapse = True if depth > 3 else False
+					collapse = True if depth > CONFIG.tree_depth else False
 					cls.collapsed[pid] = collapse
 
 				if collapse_to and not search:
@@ -3628,6 +3666,11 @@ class Menu:
 				'Set true to show processes grouped by parents,',
 				'with lines drawn between parent and child',
 				'process.'],
+			"tree_depth" : [
+				'Process tree auto collapse depth.',
+				'',
+				'Sets the depth were the tree view will auto',
+				'collapse processes at.'],
 			"proc_colors" : [
 				'Enable colors in process view.',
 				'',
@@ -3752,6 +3795,11 @@ class Menu:
 				'The bandwidth usage is based on the',
 				'"net_download" and "net_upload" values set',
 				'above.'],
+			"show_battery" : [
+				'Show battery stats.',
+				'',
+				'Show battery stats in the top right corner',
+				'if a battery is present.'],
 			"show_init" : [
 				'Show init screen at startup.',
 				'',
@@ -3890,6 +3938,12 @@ class Menu:
 									CONFIG.update_ms = 86399900
 								else:
 									CONFIG.update_ms = int(input_val)
+							elif selected == "tree_depth":
+								if not input_val or int(input_val) < 0:
+									CONFIG.tree_depth = 0
+								else:
+									CONFIG.tree_depth = int(input_val)
+								ProcCollector.collapsed = {}
 							elif isinstance(getattr(CONFIG, selected), str):
 								setattr(CONFIG, selected, input_val)
 								if selected.startswith("net_"):
@@ -3913,7 +3967,7 @@ class Menu:
 				elif key in ["escape", "o", "M", "f2"]:
 					cls.close = True
 					break
-				elif key == "enter" and selected in ["update_ms", "disks_filter", "custom_cpu_name", "net_download", "net_upload", "draw_clock"]:
+				elif key == "enter" and selected in ["update_ms", "disks_filter", "custom_cpu_name", "net_download", "net_upload", "draw_clock", "tree_depth"]:
 					inputting = True
 					input_val = str(getattr(CONFIG, selected))
 				elif key == "left" and selected == "update_ms" and CONFIG.update_ms - 100 >= 100:
@@ -3922,6 +3976,12 @@ class Menu:
 				elif key == "right" and selected == "update_ms" and CONFIG.update_ms + 100 <= 86399900:
 					CONFIG.update_ms += 100
 					Box.draw_update_ms()
+				elif key == "left" and selected == "tree_depth" and CONFIG.tree_depth > 0:
+					CONFIG.tree_depth -= 1
+					ProcCollector.collapsed = {}
+				elif key == "right" and selected == "tree_depth":
+					CONFIG.tree_depth += 1
+					ProcCollector.collapsed = {}
 				elif key in ["left", "right"] and isinstance(getattr(CONFIG, selected), bool):
 					setattr(CONFIG, selected, not getattr(CONFIG, selected))
 					if selected == "check_temp":

@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.27
+
+* Added: kyli0x theme by @kyli0x
+* Added: Battery meter and stats
+* Added: Option to change the tree view auto collapse depth
+
 ## v1.0.26
 
 * Fixed: Cpu temp color index crash
