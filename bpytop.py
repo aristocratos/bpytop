@@ -128,6 +128,9 @@ proc_reversed=$proc_reversed
 #* Show processes as a tree
 proc_tree=$proc_tree
 
+#* Which depth the tree view should auto collapse processes at
+tree_depth=$tree_depth
+
 #* Use the cpu graph colors in the process list.
 proc_colors=$proc_colors
 
@@ -365,7 +368,7 @@ class Config:
 	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name",
 						"proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes", "disks_filter", "update_check", "log_level", "mem_graphs", "show_swap",
 						"swap_disk", "show_disks", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "view_mode", "theme_background",
-						"net_sync", "show_battery"]
+						"net_sync", "show_battery", "tree_depth"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	theme_background: bool = True
@@ -373,6 +376,7 @@ class Config:
 	proc_sorting: str = "cpu lazy"
 	proc_reversed: bool = False
 	proc_tree: bool = False
+	tree_depth: int = 3
 	proc_colors: bool = True
 	proc_gradient: bool = True
 	proc_per_core: bool = False
@@ -3284,7 +3288,7 @@ class ProcCollector(Collector):
 				if pid in cls.collapsed:
 					collapse = cls.collapsed[pid]
 				else:
-					collapse = True if depth > 3 else False
+					collapse = True if depth > CONFIG.tree_depth else False
 					cls.collapsed[pid] = collapse
 
 				if collapse_to and not search:
@@ -3662,6 +3666,11 @@ class Menu:
 				'Set true to show processes grouped by parents,',
 				'with lines drawn between parent and child',
 				'process.'],
+			"tree_depth" : [
+				'Process tree auto collapse depth.',
+				'',
+				'Sets the depth were the tree view will auto',
+				'collapse processes at.'],
 			"proc_colors" : [
 				'Enable colors in process view.',
 				'',
@@ -3929,6 +3938,12 @@ class Menu:
 									CONFIG.update_ms = 86399900
 								else:
 									CONFIG.update_ms = int(input_val)
+							elif selected == "tree_depth":
+								if not input_val or int(input_val) < 0:
+									CONFIG.tree_depth = 0
+								else:
+									CONFIG.tree_depth = int(input_val)
+								ProcCollector.collapsed = {}
 							elif isinstance(getattr(CONFIG, selected), str):
 								setattr(CONFIG, selected, input_val)
 								if selected.startswith("net_"):
@@ -3952,7 +3967,7 @@ class Menu:
 				elif key in ["escape", "o", "M", "f2"]:
 					cls.close = True
 					break
-				elif key == "enter" and selected in ["update_ms", "disks_filter", "custom_cpu_name", "net_download", "net_upload", "draw_clock"]:
+				elif key == "enter" and selected in ["update_ms", "disks_filter", "custom_cpu_name", "net_download", "net_upload", "draw_clock", "tree_depth"]:
 					inputting = True
 					input_val = str(getattr(CONFIG, selected))
 				elif key == "left" and selected == "update_ms" and CONFIG.update_ms - 100 >= 100:
@@ -3961,6 +3976,12 @@ class Menu:
 				elif key == "right" and selected == "update_ms" and CONFIG.update_ms + 100 <= 86399900:
 					CONFIG.update_ms += 100
 					Box.draw_update_ms()
+				elif key == "left" and selected == "tree_depth" and CONFIG.tree_depth > 0:
+					CONFIG.tree_depth -= 1
+					ProcCollector.collapsed = {}
+				elif key == "right" and selected == "tree_depth":
+					CONFIG.tree_depth += 1
+					ProcCollector.collapsed = {}
 				elif key in ["left", "right"] and isinstance(getattr(CONFIG, selected), bool):
 					setattr(CONFIG, selected, not getattr(CONFIG, selected))
 					if selected == "check_temp":
