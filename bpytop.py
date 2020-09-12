@@ -1551,6 +1551,7 @@ class CpuBox(Box, SubBox):
 	redraw: bool = False
 	buffer: str = "cpu"
 	battery_percent: int = 1000
+	battery_secs: int = 0
 	old_battery_pos = 0
 	clock_block: bool = True
 	Box.buffers.append(buffer)
@@ -1622,13 +1623,13 @@ class CpuBox(Box, SubBox):
 						Graphs.temps[n] = Graph(5, 1, None, cpu.cpu_temp[n], max_value=cpu.cpu_temp_crit, offset=-23)
 			Draw.buffer("cpu_misc", out_misc, only_save=True)
 
-		if CONFIG.show_battery and hasattr(psutil, "sensors_battery") and psutil.sensors_battery() and (round(psutil.sensors_battery().percent) != cls.battery_percent or cls.resized):
-			cls.battery_percent = round(psutil.sensors_battery().percent)
-			if isinstance(psutil.sensors_battery().secsleft, int) and psutil.sensors_battery().secsleft > 0:
-				battery_secs: int = psutil.sensors_battery().secsleft
-				battery_time = f' {THEME.title}{battery_secs // 3600:02}:{(battery_secs % 3600) // 60:02}'
+		if CONFIG.show_battery and hasattr(psutil, "sensors_battery") and psutil.sensors_battery() and (ceil(psutil.sensors_battery().percent) != cls.battery_percent or psutil.sensors_battery().secsleft != cls.battery_secs or cls.resized or cls.redraw):
+			cls.battery_percent = ceil(psutil.sensors_battery().percent)
+			if psutil.sensors_battery().secsleft > 0:
+				cls.battery_secs = psutil.sensors_battery().secsleft
+				battery_time = f' {THEME.title}{cls.battery_secs // 3600:02}:{(cls.battery_secs % 3600) // 60:02}'
 			else:
-				battery_secs = 0
+				cls.battery_secs = 0
 				battery_time = ""
 			if not hasattr(Meters, "battery") or cls.resized:
 				Meters.battery = Meter(cls.battery_percent, 10, "cpu", invert=True)
