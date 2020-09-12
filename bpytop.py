@@ -1624,7 +1624,7 @@ class CpuBox(Box, SubBox):
 
 		if CONFIG.show_battery and hasattr(psutil, "sensors_battery") and psutil.sensors_battery() and round(psutil.sensors_battery().percent) != cls.battery_percent:
 			cls.battery_percent = round(psutil.sensors_battery().percent)
-			if cls.battery_percent != 100 and isinstance(psutil.sensors_battery().secsleft, int):
+			if isinstance(psutil.sensors_battery().secsleft, int) and psutil.sensors_battery().secsleft > 0:
 				battery_secs: int = psutil.sensors_battery().secsleft
 				battery_time = f' {THEME.title}{battery_secs // 3600:02}:{(battery_secs % 3600) // 60:02}'
 			else:
