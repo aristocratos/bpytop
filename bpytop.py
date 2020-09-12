@@ -19,6 +19,7 @@
 
 import os, sys, threading, signal, re, subprocess, logging, logging.handlers
 import urllib.request
+import argparse 
 from time import time, sleep, strftime, localtime
 from datetime import timedelta
 from _thread import interrupt_main
@@ -59,38 +60,28 @@ if errors:
 VERSION: str = "1.0.26"
 
 #? Argument parser ------------------------------------------------------------------------------->
-if len(sys.argv) > 1:
-	for arg in sys.argv[1:]:
-		if not arg in ["-m", "--mini", "-v", "--version", "-h", "--help", "--debug", "-f", "-p", "-s", "--full", "--proc", "--stat"]:
-			print(f'Unrecognized argument: {arg}\n'
-				f'Use argument -h or --help for help')
-			raise SystemExit(1)
+args=  argparse.ArgumentParser()   
+args.add_argument("-f" , "--full"    ,action="store_true" ,help ="Start in full mode showing all boxes [default]")
+args.add_argument("-p" , "--proc"    ,action="store_true" ,help ="Start in minimal mode without memory and net boxes")
+args.add_argument("-s" , "--stat"    ,action="store_true" ,help ="Start in minimal mode without process box")
+args.add_argument("-v" , "--version" ,action="store_true" ,help ="Show version info and exit")
+args.add_argument("-D" , "--debug"   ,action="store_true" ,help ="Start with loglevel set to DEBUG overriding value set in config")
+stdargs  = args.parse_args()  
 
-if "-h" in sys.argv or "--help" in sys.argv:
-	print(f'USAGE: {sys.argv[0]} [argument]\n\n'
-		f'Arguments:\n'
-		f'    -f, --full            Start in full mode showing all boxes [default]\n'
-		f'    -p, --proc            Start in minimal mode without memory and net boxes\n'
-		f'    -s, --stat            Start in minimal mode without process box\n'
-		f'    -v, --version         Show version info and exit\n'
-		f'    -h, --help            Show this help message and exit\n'
-		f'    --debug               Start with loglevel set to DEBUG overriding value set in config\n'
-	)
-	raise SystemExit(0)
-elif "-v" in sys.argv or "--version" in sys.argv:
+if   stdargs.version  : 
 	print(f'bpytop version: {VERSION}\n'
 		f'psutil version: {".".join(str(x) for x in psutil.version_info)}')
 	raise SystemExit(0)
 
 ARG_MODE: str = ""
-if "-f" in sys.argv or "--full" in sys.argv:
+
+if  stdargs.full: 
 	ARG_MODE = "full"
-elif "-p" in sys.argv or "--proc" in sys.argv:
+elif stdargs.proc:
 	ARG_MODE = "proc"
-elif "-s" in sys.argv or "--stat" in sys.argv:
+elif stdargs.stat: 
 	ARG_MODE = "stat"
-
-
+ 
 #? Variables ------------------------------------------------------------------------------------->
 
 BANNER_SRC: List[Tuple[str, str, str]] = [
@@ -217,7 +208,7 @@ THREADS: int = psutil.cpu_count(logical=True) or 1
 
 THREAD_ERROR: int = 0
 
-if "--debug" in sys.argv:
+if stdargs.debug : 
 	DEBUG = True
 else:
 	DEBUG = False
