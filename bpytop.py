@@ -17,9 +17,8 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-import os, sys, threading, signal, re, subprocess, logging, logging.handlers
+import os, sys, threading, signal, re, subprocess, logging, logging.handlers, argparse
 import urllib.request
-import argparse 
 from time import time, sleep, strftime, localtime
 from datetime import timedelta
 from _thread import interrupt_main
@@ -60,28 +59,33 @@ if errors:
 VERSION: str = "1.0.29"
 
 #? Argument parser ------------------------------------------------------------------------------->
-args=  argparse.ArgumentParser()   
-args.add_argument("-f" , "--full"    ,action="store_true" ,help ="Start in full mode showing all boxes [default]")
-args.add_argument("-p" , "--proc"    ,action="store_true" ,help ="Start in minimal mode without memory and net boxes")
-args.add_argument("-s" , "--stat"    ,action="store_true" ,help ="Start in minimal mode without process box")
-args.add_argument("-v" , "--version" ,action="store_true" ,help ="Show version info and exit")
-args.add_argument("-D" , "--debug"   ,action="store_true" ,help ="Start with loglevel set to DEBUG overriding value set in config")
-stdargs  = args.parse_args()  
+args = argparse.ArgumentParser()
+args.add_argument("-f" , "--full"		,action="store_true" ,help ="Start in full mode showing all boxes [default]")
+args.add_argument("-p" , "--proc"		,action="store_true" ,help ="Start in minimal mode without memory and net boxes")
+args.add_argument("-s" , "--stat"		,action="store_true" ,help ="Start in minimal mode without process box")
+args.add_argument("-v" , "--version"	,action="store_true" ,help ="Show version info and exit")
+args.add_argument("--debug"				,action="store_true" ,help ="Start with loglevel set to DEBUG overriding value set in config")
+stdargs = args.parse_args()
 
-if   stdargs.version  : 
+if stdargs.version:
 	print(f'bpytop version: {VERSION}\n'
 		f'psutil version: {".".join(str(x) for x in psutil.version_info)}')
 	raise SystemExit(0)
 
 ARG_MODE: str = ""
 
-if  stdargs.full: 
+if stdargs.full:
 	ARG_MODE = "full"
 elif stdargs.proc:
 	ARG_MODE = "proc"
-elif stdargs.stat: 
+elif stdargs.stat:
 	ARG_MODE = "stat"
- 
+
+if stdargs.debug:
+	DEBUG = True
+else:
+	DEBUG = False
+
 #? Variables ------------------------------------------------------------------------------------->
 
 BANNER_SRC: List[Tuple[str, str, str]] = [
@@ -213,11 +217,6 @@ CORES: int = psutil.cpu_count(logical=False) or 1
 THREADS: int = psutil.cpu_count(logical=True) or 1
 
 THREAD_ERROR: int = 0
-
-if stdargs.debug : 
-	DEBUG = True
-else:
-	DEBUG = False
 
 DEFAULT_THEME: Dict[str, str] = {
 	"main_bg" : "",
