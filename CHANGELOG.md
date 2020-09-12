@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.28
+
+* Fixed: Battery meter causing crash when connecting/disconnecting battery
+* README: Added more repositories
+
 ## v1.0.27
 
 * Added: kyli0x theme by @kyli0x
