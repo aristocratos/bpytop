@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.30
+
+* Changed: Argument parsing using argparse
+* Fixed: Hide battery time when not known
+
 ## v1.0.29
 
 * Fixed: Battery percent converted to integer and battery time hidden at 100% level
