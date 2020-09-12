@@ -1520,7 +1520,7 @@ class Box:
 			f'{THEME.title(update_string)} {THEME.hi_fg("-")}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}', only_save=Menu.active, once=True)
 		if now and not Menu.active:
 			Draw.clear("update_ms")
-			if CONFIG.show_battery and CpuBox.battery_present:
+			if CONFIG.show_battery and hasattr(psutil, "sensors_battery") and psutil.sensors_battery():
 				CpuBox.redraw = True
 				CpuBox._draw_fg()
 				Draw.out("cpu")
@@ -1562,7 +1562,6 @@ class CpuBox(Box, SubBox):
 	buffer: str = "cpu"
 	battery_percent: int = 1000
 	old_battery_pos = 0
-	battery_present: bool = True if hasattr(psutil, "sensors_battery") and psutil.sensors_battery() else False
 	clock_block: bool = True
 	Box.buffers.append(buffer)
 
@@ -1633,7 +1632,7 @@ class CpuBox(Box, SubBox):
 						Graphs.temps[n] = Graph(5, 1, None, cpu.cpu_temp[n], max_value=cpu.cpu_temp_crit, offset=-23)
 			Draw.buffer("cpu_misc", out_misc, only_save=True)
 
-		if CONFIG.show_battery and cls.battery_present and psutil.sensors_battery().percent != cls.battery_percent:
+		if CONFIG.show_battery and hasattr(psutil, "sensors_battery") and psutil.sensors_battery() and psutil.sensors_battery().percent != cls.battery_percent:
 			if isinstance(psutil.sensors_battery().secsleft, int):
 				battery_secs: int = psutil.sensors_battery().secsleft
 			else:
