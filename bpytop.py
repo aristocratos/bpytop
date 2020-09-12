@@ -282,6 +282,7 @@ DEFAULT_THEME: Dict[str, str] = {
 	"cpu_box" : "#3d7b46",
 	"mem_box" : "#8a882e",
 	"net_box" : "#423ba5",
+	"gpu_box" : "#ff33dd",
 	"proc_box" : "#923535",
 	"div_line" : "#30",
 	"temp_start" : "#4897d4",
@@ -2416,7 +2417,7 @@ class NetBox(Box, SubBox):
 class ProcBox(Box):
 	name = "proc"
 	num = 4
-	height_p = 68
+	height_p = 38
 	width_p = 55
 	min_w: int = 44
 	min_h: int = 16
@@ -2467,6 +2468,7 @@ class ProcBox(Box):
 		cls.y = Box._b_cpu_h + 1
 		cls.current_y = cls.y
 		cls.current_h = cls.height
+		Box._b_proc_h = cls.current_h
 		cls.select_max = cls.height - 3
 		cls.redraw = True
 		cls.resized = True
@@ -2873,6 +2875,91 @@ class ProcBox(Box):
 
 		Draw.buffer(cls.buffer, f'{out_misc}{out}{Term.fg}', only_save=Menu.active)
 		cls.redraw = cls.resized = cls.moved = False
+
+class GpuBox(Box):
+	name = "gpu"
+	height_p = 30
+	width_p = 55
+	x = 1
+	y = 1
+	resized: bool = True
+	redraw: bool = True
+	graph_height: Dict[str, int] = {}
+	symbols: Dict[str, str] = {"download" : "▼", "upload" : "▲"}
+	buffer: str = "gpu"
+
+	Box.buffers.append(buffer)
+
+	@classmethod
+	def _calc_size(cls):
+		width_p: int
+		if cls.stat_mode:
+			width_p = 100
+		else:
+			width_p = cls.width_p
+
+		cls.width = round(Term.width * width_p / 100)
+		cls.height = Term.height - Box._b_proc_h - Box._b_cpu_h
+		cls.y = Box._b_cpu_h + 1
+		cls.x = Term.width - cls.width + 1
+		cls.box_width = 27 if cls.width > 45 else 19
+		cls.box_height = 9 if cls.height > 10 else cls.height - 2
+		cls.graph_height["download"] = round((cls.height - 2) / 2)
+		cls.graph_height["upload"] = cls.height - 2 - cls.graph_height["download"]
+		cls.redraw = True
+
+	@classmethod
+	def _draw_bg(cls) -> str:
+		if cls.proc_mode: return ""
+		return f'{create_box(box=cls, line_color=THEME.gpu_box)}'
+
+	@classmethod
+	def _draw_fg(cls):
+		if cls.proc_mode: return
+		gpu = GpuCollector
+		if gpu.redraw: cls.redraw = True
+		if not gpu.gpu: return
+		out: str = ""
+		out_misc: str = ""
+		x, y, w, h = cls.x + 1, cls.y + 1, cls.width - 2, cls.height - 2
+		reset: bool = bool(True)
+
+		if cls.resized or cls.redraw:
+			out_misc += cls._draw_bg()
+			out_misc += (f'{Mv.to(y-1, x+w - 25)}{THEME.gpu_box}{Symbol.h_line * (18 - len(gpu.gpu[:10]))}'
+				f'{Symbol.title_left}{Fx.b}{THEME.title(gpu.gpu[:10])}{Fx.ub}{THEME.gpu_box(Symbol.title_right)}{Term.fg}')
+
+
+			Draw.buffer("net_misc", out_misc, only_save=True)
+
+		cy = 0
+		# for direction in ["download", "upload"]:
+		# 	strings = gpu.strings[gpu.gpu][direction]
+		# 	stats = gpu.stats[gpu.gpu][direction]
+		# 	if cls.redraw: stats["redraw"] = True
+		# 	if stats["redraw"] or cls.resized:
+		# 		Graphs.net[direction] = Graph(w - bw - 3, cls.graph_height[direction], THEME.gradient[direction], stats["speed"], max_value=gpu.sync_top if CONFIG.net_sync else stats["graph_top"],
+		# 			invert=False if direction == "download" else True, color_max_value=gpu.net_min.get(direction) if CONFIG.net_color_fixed else None)
+		# 	out += f'{Mv.to(y if direction == "download" else y + cls.graph_height["download"], x)}{Graphs.net[direction](None if stats["redraw"] else stats["speed"][-1])}'
+
+		# 	out += (f'{Mv.to(by+cy, bx)}{THEME.main_fg}{cls.symbols[direction]} {strings["byte_ps"]:<10.10}' +
+		# 			("" if bw < 20 else f'{Mv.to(by+cy, bx+bw - 12)}{"(" + strings["bit_ps"] + ")":>12.12}'))
+		# 	cy += 1 if bh != 3 else 2
+		# 	if bh >= 6:
+		# 		out += f'{Mv.to(by+cy, bx)}{cls.symbols[direction]} {"Top:"}{Mv.to(by+cy, bx+bw - 12)}{"(" + strings["top"] + ")":>12.12}'
+		# 		cy += 1
+		# 	if bh >= 4:
+		# 		out += f'{Mv.to(by+cy, bx)}{cls.symbols[direction]} {"Total:"}{Mv.to(by+cy, bx+bw - 10)}{strings["total"]:>10.10}'
+		# 		if bh > 2 and bh % 2: cy += 2
+		# 		else: cy += 1
+		# 	stats["redraw"] = False
+
+
+		# out += (f'{Mv.to(y, x)}{THEME.graph_text("amdgpu")}')
+
+		Draw.buffer(cls.buffer, f'{out_misc}{out}{Term.fg}', only_save=Menu.active)
+		cls.redraw = cls.resized = False
+
 
 class Collector:
 	'''Data collector master class
@@ -3969,6 +4056,73 @@ class ProcCollector(Collector):
 	@classmethod
 	def _draw(cls):
 		ProcBox._draw_fg()
+
+class GpuCollector(Collector):
+	'''Collects GPU stats'''
+	buffer: str = GpuBox.buffer
+
+	dir: str = "/sys/class/drm/"
+	hwmon: str = "/device/hwmon/hwmon0/"
+
+	gpus: List[str] = []
+	gpu_i: int = 0
+	gpu: str = ""
+	new_gpu: str = ""
+	gpu_error: bool = False
+	reset: bool = False
+	# graph_raise: Dict[str, int] = {"download" : 5, "upload" : 5}
+	# graph_lower: Dict[str, int] = {"download" : 5, "upload" : 5}
+	#min_top: int = 10<<10
+	#* Stats structure = stats[gpu device]
+	#[fans, clocks, mems, temps, power]
+	#[fanX_rpm, fanX_max, sclk, mclk, vddgfx, power, temp][total, last, top, graph_top, offset, speed, redraw, graph_raise, graph_low] = int, List[int], bool
+	stats: Dict[str, Dict[str, Dict[str, Any]]] = {}
+	#* Strings structure strings[network device][download, upload][total, byte_ps, bit_ps, top, graph_top] = str
+	strings: Dict[str, Dict[str, Dict[str, str]]] = {}
+	switched: bool = False
+	timestamp: float = time()
+	net_min: Dict[str, int] = {"download" : -1, "upload" : -1}
+	auto_min: bool = CONFIG.net_auto
+	sync_top: int = 0
+	sync_string: str = ""
+
+	@classmethod
+	def _get_dir(cls, name):
+		return cls.dir + name + cls.hwmon
+
+	@classmethod
+	def _get_gpus(cls):
+		'''Get a list of all network devices sorted by highest throughput'''
+		cls.gpu_i = 0
+		cls.gpu = ""
+
+		valid_gpu = re.compile('card\d$')
+
+		with os.scandir(cls.dir) as cards:
+			for card in cards:
+				if valid_gpu.match(card.name):
+					with open(cls._get_dir(card.name) + "name") as file:
+						cls.gpus.append(file.readline().strip())
+						file.close()
+
+
+		if not cls.gpus: cls.gpus = [""]
+		cls.gpu = cls.gpus[cls.gpu_i]
+
+
+	@classmethod
+	def _collect(cls):
+		speed: int
+		stat: Dict
+
+		if not cls.gpus: cls._get_gpus()
+		if not cls.gpu: return
+
+		cls.timestamp = time()
+
+	@classmethod
+	def _draw(cls):
+		GpuBox._draw_fg()
 
 class Menu:
 	'''Holds all menus'''
