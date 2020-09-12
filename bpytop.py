@@ -1622,7 +1622,7 @@ class CpuBox(Box, SubBox):
 						Graphs.temps[n] = Graph(5, 1, None, cpu.cpu_temp[n], max_value=cpu.cpu_temp_crit, offset=-23)
 			Draw.buffer("cpu_misc", out_misc, only_save=True)
 
-		if CONFIG.show_battery and hasattr(psutil, "sensors_battery") and psutil.sensors_battery() and round(psutil.sensors_battery().percent) != cls.battery_percent:
+		if CONFIG.show_battery and hasattr(psutil, "sensors_battery") and psutil.sensors_battery() and (round(psutil.sensors_battery().percent) != cls.battery_percent or cls.resized):
 			cls.battery_percent = round(psutil.sensors_battery().percent)
 			if isinstance(psutil.sensors_battery().secsleft, int) and psutil.sensors_battery().secsleft > 0:
 				battery_secs: int = psutil.sensors_battery().secsleft
