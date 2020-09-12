@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.29
+
+* Fixed: Battery percent converted to integer and battery time hidden at 100% level
+
 ## v1.0.28
 
 * Fixed: Battery meter causing crash when connecting/disconnecting battery
