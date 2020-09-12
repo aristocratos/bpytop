@@ -1632,23 +1632,24 @@ class CpuBox(Box, SubBox):
 						Graphs.temps[n] = Graph(5, 1, None, cpu.cpu_temp[n], max_value=cpu.cpu_temp_crit, offset=-23)
 			Draw.buffer("cpu_misc", out_misc, only_save=True)
 
-		if CONFIG.show_battery and hasattr(psutil, "sensors_battery") and psutil.sensors_battery() and psutil.sensors_battery().percent != cls.battery_percent:
-			if isinstance(psutil.sensors_battery().secsleft, int):
+		if CONFIG.show_battery and hasattr(psutil, "sensors_battery") and psutil.sensors_battery() and round(psutil.sensors_battery().percent) != cls.battery_percent:
+			cls.battery_percent = round(psutil.sensors_battery().percent)
+			if cls.battery_percent != 100 and isinstance(psutil.sensors_battery().secsleft, int):
 				battery_secs: int = psutil.sensors_battery().secsleft
+				battery_time = f' {THEME.title}{battery_secs // 3600:02}:{(battery_secs % 3600) // 60:02}'
 			else:
 				battery_secs = 0
-			cls.battery_percent = psutil.sensors_battery().percent
+				battery_time = ""
 			if not hasattr(Meters, "battery") or cls.resized:
 				Meters.battery = Meter(cls.battery_percent, 10, "cpu", invert=True)
 			battery_symbol: str = "▼" if not psutil.sensors_battery().power_plugged else "▲"
-			battery_pos = cls.width - len(f'{CONFIG.update_ms}') - 17 - (11 if cls.width >= 100 else 0) - (6 if battery_secs else 0) - len(f'{cls.battery_percent}')
+			battery_pos = cls.width - len(f'{CONFIG.update_ms}') - 17 - (11 if cls.width >= 100 else 0) - len(battery_time) - len(f'{cls.battery_percent}')
 			if battery_pos != cls.old_battery_pos and cls.old_battery_pos > 0 and not cls.resized:
 				out += f'{Mv.to(y-1, cls.old_battery_pos)}{THEME.cpu_box(Symbol.h_line*(15 if cls.width >= 100 else 5))}'
 			cls.old_battery_pos = battery_pos
 			out += (f'{Mv.to(y-1, battery_pos)}{THEME.cpu_box(Symbol.title_left)}{Fx.b}{THEME.title}BAT{battery_symbol} {cls.battery_percent}%'+
 				("" if cls.width < 100 else f' {Fx.ub}{Meters.battery(cls.battery_percent)}{Fx.b}') +
-				("" if not battery_secs else f' {THEME.title}{battery_secs // 3600:02}:{(battery_secs % 3600) // 60:02}') +
-				f'{Fx.ub}{THEME.cpu_box(Symbol.title_right)}')
+				f'{battery_time}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}')
 
 		cx = cy = cc = 0
 		ccw = (bw + 1) // cls.box_columns
