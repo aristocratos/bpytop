@@ -2919,6 +2919,7 @@ class GpuBox(Box):
 		gpu = GpuCollector
 		if gpu.redraw: cls.redraw = True
 		if not gpu.gpu: return
+		name = gpu.gpu[1][:30]
 		out: str = ""
 		out_misc: str = ""
 		x, y, w, h = cls.x + 1, cls.y + 1, cls.width - 2, cls.height - 2
@@ -2926,8 +2927,8 @@ class GpuBox(Box):
 
 		if cls.resized or cls.redraw:
 			out_misc += cls._draw_bg()
-			out_misc += (f'{Mv.to(y-1, x+w - 25)}{THEME.gpu_box}{Symbol.h_line * (18 - len(gpu.gpu[:10]))}'
-				f'{Symbol.title_left}{Fx.b}{THEME.title(gpu.gpu[:10])}{Fx.ub}{THEME.gpu_box(Symbol.title_right)}{Term.fg}')
+			out_misc += (f'{Mv.to(y-1, x+w - 35)}{THEME.gpu_box}{Symbol.h_line * (18 - len(name))}'
+				f'{Symbol.title_left}{Fx.b}{THEME.title(name)}{Fx.ub}{THEME.gpu_box(Symbol.title_right)}{Term.fg}')
 
 
 			Draw.buffer("net_misc", out_misc, only_save=True)
@@ -4063,23 +4064,23 @@ class GpuCollector(Collector):
 
 	dir: str = "/sys/class/drm/"
 	hwmon: str = "/device/hwmon/hwmon0/"
+	pci_id_locations = ["/usr/share/hwdata/", "/usr/share/misc/"]
 
-	gpus: List[str] = []
+	gpus: List[Tuple[str, str]] = []
 	gpu_i: int = 0
 	gpu: str = ""
 	new_gpu: str = ""
 	gpu_error: bool = False
 	reset: bool = False
-	# graph_raise: Dict[str, int] = {"download" : 5, "upload" : 5}
-	# graph_lower: Dict[str, int] = {"download" : 5, "upload" : 5}
-	#min_top: int = 10<<10
+
 	#* Stats structure = stats[gpu device]
 	#[fans, clocks, mems, temps, power]
-	#[fanX_rpm, fanX_max, sclk, mclk, vddgfx, power, temp][total, last, top, graph_top, offset, speed, redraw, graph_raise, graph_low] = int, List[int], bool
+	#[fanX_rpm, fanX_max, sclk, mclk, vddgfx, power, temp]
+	# [total, last, top, graph_top, offset, speed, redraw, graph_raise, graph_low] = int, List[int], bool
 	stats: Dict[str, Dict[str, Dict[str, Any]]] = {}
 	#* Strings structure strings[network device][download, upload][total, byte_ps, bit_ps, top, graph_top] = str
-	strings: Dict[str, Dict[str, Dict[str, str]]] = {}
-	switched: bool = False
+	# strings: Dict[str, Dict[str, Dict[str, str]]] = {}
+	populated: bool = False
 	timestamp: float = time()
 	net_min: Dict[str, int] = {"download" : -1, "upload" : -1}
 	auto_min: bool = CONFIG.net_auto
@@ -4087,35 +4088,72 @@ class GpuCollector(Collector):
 	sync_string: str = ""
 
 	@classmethod
-	def _get_dir(cls, name):
-		return cls.dir + name + cls.hwmon
+	def _get_hwmon(cls, name): return cls.dir + name + cls.hwmon
+
+	@classmethod
+	def _get_device(cls, name): return cls.dir + name + "/device/"
+
+	@classmethod
+	def _get_gpu_names(cls, gpus: List[Tuple[str, Tuple[str]]]):
+		# gpus is a list of tuples: ('cardN', (vendor, device, subvendor subdevice))
+		names: List[Tuple[str, str]] = [] # names is a list of tuples: ('cardN', Device Name)
+		location, g_i = "", 0
+		gpus.sort()
+
+		for loc in cls.pci_id_locations:
+			if (os.access(loc+"pci.ids", os.R_OK)):
+				location = loc
+				break
+
+		if (location == ""): return
+		with open(location+"pci.ids", 'r', encoding='utf8') as pci_ids:
+			level = 0
+			for line in pci_ids:
+				if g_i == len(gpus) + 1: break
+				if line[0] == "#": continue
+				if line[:level] != level * "\t": continue
+
+				match = (level * "\t") + gpus[g_i][1][level]
+				if re.match(match, line, flags=re.IGNORECASE):
+					entry = (gpus[g_i][0], line[len(match) + 2:].strip())
+					if level == len(gpus[g_i][1]):
+						names[g_i] = entry
+						level, g_i = 0, g_i + 1
+					else:
+						if g_i < len(names): names[g_i] = entry
+						else: names.append(entry)
+						level += 1
+					continue
+		return names
 
 	@classmethod
 	def _get_gpus(cls):
-		'''Get a list of all network devices sorted by highest throughput'''
+		'''Get a list of all GPUs with names'''
 		cls.gpu_i = 0
 		cls.gpu = ""
-
-		valid_gpu = re.compile('card\d$')
-
+		id, keys = ["", "", "", ""], ["vendor", "device", "subsystem_vendor", "subsystem_device"]
 		with os.scandir(cls.dir) as cards:
 			for card in cards:
-				if valid_gpu.match(card.name):
-					with open(cls._get_dir(card.name) + "name") as file:
-						cls.gpus.append(file.readline().strip())
-						file.close()
+				if re.match('card\d$', card.name):
+					for i in range(len(keys)):
+						with open(cls._get_device(card.name) + keys[i]) as file:
+							id[i] = file.readline().strip().replace("0x", "")
+							file.close()
+					id[2] = f"{id[2]} {id[3]}"
+					cls.gpus.append((card.name, tuple(id[:3])))
 
-
+		cls.gpus = cls._get_gpu_names(cls.gpus);
 		if not cls.gpus: cls.gpus = [""]
 		cls.gpu = cls.gpus[cls.gpu_i]
+		cls.populated = True
 
 
 	@classmethod
 	def _collect(cls):
 		speed: int
 		stat: Dict
-
-		if not cls.gpus: cls._get_gpus()
+		
+		if not cls.populated: cls._get_gpus()
 		if not cls.gpu: return
 
 		cls.timestamp = time()
