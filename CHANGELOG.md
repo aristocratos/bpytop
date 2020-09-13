@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.31
+
+* Fixed: Battery meter redraw after terminal resize
+* Fixed: Battery meter additional fixes
+* Fixed: Cpu temp color wrong on small sizes
+
 ## v1.0.30
 
 * Changed: Argument parsing using argparse
