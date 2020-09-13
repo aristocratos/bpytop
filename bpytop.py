@@ -1633,7 +1633,10 @@ class CpuBox(Box, SubBox):
 				battery_time = ""
 			if not hasattr(Meters, "battery") or cls.resized:
 				Meters.battery = Meter(cls.battery_percent, 10, "cpu", invert=True)
-			battery_symbol: str = "▼" if not psutil.sensors_battery().power_plugged else "▲"
+			if psutil.sensors_battery().power_plugged:
+				battery_symbol: str = "▲" if cls.battery_percent < 100 else "■"
+			else:
+				battery_symbol = "▼"
 			battery_pos = cls.width - len(f'{CONFIG.update_ms}') - 17 - (11 if cls.width >= 100 else 0) - len(battery_time) - len(f'{cls.battery_percent}')
 			if battery_pos != cls.old_battery_pos and cls.old_battery_pos > 0 and not cls.resized:
 				out += f'{Mv.to(y-1, cls.old_battery_pos)}{THEME.cpu_box(Symbol.h_line*(15 if cls.width >= 100 else 5))}'
