@@ -98,6 +98,14 @@ Also needs a UTF8 locale and a font that covers:
 
 #### Notice
 
+If you are having problems with the characters in the graphs not looking like they do in the screenshots,
+it's likely a problem with your systems configured fallback font not having support for braille characters.
+
+Se comments by @sgleizes [link](https://github.com/aristocratos/bpytop/issues/100#issuecomment-684036827) and @XenHat [link](https://github.com/aristocratos/bpytop/issues/100#issuecomment-691585587) in issue #100 for possible solutions.
+
+
+#### Notice
+
 Dropbear seems to not be able to set correct locale. So if accessing bpytop over ssh, OpenSSH is recommended.
 
 ## Dependencies
