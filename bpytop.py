@@ -4215,14 +4215,17 @@ def get_cpu_name() -> str:
 	else:
 		name = cmd_out
 	nlist = name.split(" ")
-	if "Xeon" in name and "CPU" in name:
-		name = nlist[nlist.index("CPU")+1]
-	elif "Ryzen" in name:
-		name = " ".join(nlist[nlist.index("Ryzen"):nlist.index("Ryzen")+3])
-	elif "Duo" in name and "@" in name:
-		name = " ".join(nlist[:nlist.index("@")])
-	elif "CPU" in name and not nlist[0] == "CPU":
-		name = nlist[nlist.index("CPU")-1]
+	try:
+		if "Xeon" in name and "CPU" in name:
+			name = nlist[nlist.index("CPU")+(-1 if name.endswith("CPU") else 1)]
+		elif "Ryzen" in name:
+			name = " ".join(nlist[nlist.index("Ryzen"):nlist.index("Ryzen")+3])
+		elif "Duo" in name and "@" in name:
+			name = " ".join(nlist[:nlist.index("@")])
+		elif "CPU" in name and not nlist[0] == "CPU":
+			name = nlist[nlist.index("CPU")-1]
+	except:
+		pass
 
 	name = " ".join(name.split())
 
