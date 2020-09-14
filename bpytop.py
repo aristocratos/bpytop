@@ -2557,6 +2557,8 @@ class CpuCollector(Collector):
 			try:
 				if which("osx-cpu-temp") and subprocess.check_output("osx-cpu-temp", text=True).rstrip().endswith("°C"):
 					cls.sensor_method = "osx-cpu-temp"
+				if which("coretemp") and subprocess.check_output("coretemp", text=True).split()[0].strip().replace("-", "").isdigit():
+					cls.sensor_method += "+coretemp"
 			except: pass
 		elif hasattr(psutil, "sensors_temperatures"):
 			try:
@@ -2668,8 +2670,28 @@ class CpuCollector(Collector):
 
 		else:
 			try:
-				if cls.sensor_method == "osx-cpu-temp":
-					temp = max(0, round(float(subprocess.check_output("osx-cpu-temp", text=True).strip()[:-2])))
+				if cls.sensor_method.startswith("osx-cpu-temp") or cls.sensor_method.startswith("+coretemp"):
+					if cls.sensor_method.startswith("+coretemp"):
+						temp = max(0, round(float(subprocess.check_output(["coretemp", "-c 0", "-r 3"], text=True).split()[0].strip())))
+					else:
+						temp = max(0, round(float(subprocess.check_output("osx-cpu-temp", text=True).strip()[:-2])))
+					if cls.sensor_method.endswith("+coretemp"):
+						cores = [max(0, round(float(x))) for x in subprocess.check_output(["coretemp", "-r 3"], text=True).split()]
+						if len(cores) < THREADS:
+							cls.cpu_temp[0].append(temp)
+							for n, t in enumerate(cores, start=1):
+								try:
+									cls.cpu_temp[n].append(t)
+									cls.cpu_temp[THREADS // 2 + n].append(t)
+								except IndexError:
+									break
+						else:
+							cores.insert(0, temp)
+							for n, t in enumerate(cores):
+								try:
+									cls.cpu_temp[n].append(t)
+								except IndexError:
+									break
 					if not cls.cpu_temp_high:
 						cls.cpu_temp_high = 85
 						cls.cpu_temp_crit = 100
@@ -2684,8 +2706,9 @@ class CpuCollector(Collector):
 					#CONFIG.check_temp = False
 					CpuBox._calc_size()
 			else:
-				for n in range(THREADS + 1):
-					cls.cpu_temp[n].append(temp)
+				if not cores:
+					for n in range(THREADS + 1):
+						cls.cpu_temp[n].append(temp)
 
 		if len(cls.cpu_temp[0]) > 5:
 			for n in range(len(cls.cpu_temp)):
