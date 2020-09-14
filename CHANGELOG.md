@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.32
+
+* Added: Symbol for battery inactive
+* Fixed: Cpu model name exception for certain xeon cpus
+* Fixed: Exception when sending signal using uppercase T, K, I
+* Fixed: Battery meter placement calculation correction
+* Added: Support for OSX cpu core temperatures via coretemp program
+
 ## v1.0.31
 
 * Fixed: Battery meter redraw after terminal resize
