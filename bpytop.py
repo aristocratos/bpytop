@@ -4495,9 +4495,9 @@ def process_keys():
 		elif key.lower() in ["t", "k", "i"] and (ProcBox.selected > 0 or ProcCollector.detailed):
 			pid: int = ProcBox.selected_pid if ProcBox.selected > 0 else ProcCollector.detailed_pid # type: ignore
 			if psutil.pid_exists(pid):
-				if key == "t": sig = signal.SIGTERM
-				elif key == "k": sig = signal.SIGKILL
-				elif key == "i": sig = signal.SIGINT
+				if key.lower() == "t": sig = signal.SIGTERM
+				elif key.lower() == "k": sig = signal.SIGKILL
+				elif key.lower() == "i": sig = signal.SIGINT
 				try:
 					os.kill(pid, sig)
 				except Exception as e:
