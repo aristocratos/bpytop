@@ -1627,7 +1627,7 @@ class CpuBox(Box, SubBox):
 			cls.battery_percent = ceil(psutil.sensors_battery().percent)
 			if psutil.sensors_battery().secsleft > 0:
 				cls.battery_secs = psutil.sensors_battery().secsleft
-				battery_time = f' {THEME.title}{cls.battery_secs // 3600:02}:{(cls.battery_secs % 3600) // 60:02}'
+				battery_time = f' {cls.battery_secs // 3600:02}:{(cls.battery_secs % 3600) // 60:02}'
 			else:
 				cls.battery_secs = 0
 				battery_time = ""
@@ -1643,7 +1643,7 @@ class CpuBox(Box, SubBox):
 			cls.old_battery_pos = battery_pos
 			out += (f'{Mv.to(y-1, battery_pos)}{THEME.cpu_box(Symbol.title_left)}{Fx.b}{THEME.title}BAT{battery_symbol} {cls.battery_percent}%'+
 				("" if cls.width < 100 else f' {Fx.ub}{Meters.battery(cls.battery_percent)}{Fx.b}') +
-				f'{battery_time}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}')
+				f'{THEME.title}{battery_time}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}')
 
 		cx = cy = cc = 0
 		ccw = (bw + 1) // cls.box_columns
