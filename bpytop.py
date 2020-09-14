@@ -2919,7 +2919,9 @@ class GpuBox(Box):
 		gpu = GpuCollector
 		if gpu.redraw: cls.redraw = True
 		if not gpu.gpu: return
-		name = gpu.gpu[1][:30]
+		card, name = gpu.gpu[0], gpu.gpu[1][:20]
+		stat = gpu.stats[card]
+		stat_nums = gpu.stat_nums[card]
 		out: str = ""
 		out_misc: str = ""
 		x, y, w, h = cls.x + 1, cls.y + 1, cls.width - 2, cls.height - 2
@@ -2927,36 +2929,23 @@ class GpuBox(Box):
 
 		if cls.resized or cls.redraw:
 			out_misc += cls._draw_bg()
-			out_misc += (f'{Mv.to(y-1, x+w - 35)}{THEME.gpu_box}{Symbol.h_line * (18 - len(name))}'
+			out_misc += (f'{Mv.to(y-1, x+w - 23)}{THEME.gpu_box}{Symbol.h_line * (18 - len(name))}'
 				f'{Symbol.title_left}{Fx.b}{THEME.title(name)}{Fx.ub}{THEME.gpu_box(Symbol.title_right)}{Term.fg}')
 
+			
+			Draw.buffer("gpu_misc", out_misc, only_save=True)
 
-			Draw.buffer("net_misc", out_misc, only_save=True)
-
-		cy = 0
-		# for direction in ["download", "upload"]:
-		# 	strings = gpu.strings[gpu.gpu][direction]
-		# 	stats = gpu.stats[gpu.gpu][direction]
-		# 	if cls.redraw: stats["redraw"] = True
-		# 	if stats["redraw"] or cls.resized:
-		# 		Graphs.net[direction] = Graph(w - bw - 3, cls.graph_height[direction], THEME.gradient[direction], stats["speed"], max_value=gpu.sync_top if CONFIG.net_sync else stats["graph_top"],
-		# 			invert=False if direction == "download" else True, color_max_value=gpu.net_min.get(direction) if CONFIG.net_color_fixed else None)
-		# 	out += f'{Mv.to(y if direction == "download" else y + cls.graph_height["download"], x)}{Graphs.net[direction](None if stats["redraw"] else stats["speed"][-1])}'
-
-		# 	out += (f'{Mv.to(by+cy, bx)}{THEME.main_fg}{cls.symbols[direction]} {strings["byte_ps"]:<10.10}' +
-		# 			("" if bw < 20 else f'{Mv.to(by+cy, bx+bw - 12)}{"(" + strings["bit_ps"] + ")":>12.12}'))
-		# 	cy += 1 if bh != 3 else 2
-		# 	if bh >= 6:
-		# 		out += f'{Mv.to(by+cy, bx)}{cls.symbols[direction]} {"Top:"}{Mv.to(by+cy, bx+bw - 12)}{"(" + strings["top"] + ")":>12.12}'
-		# 		cy += 1
-		# 	if bh >= 4:
-		# 		out += f'{Mv.to(by+cy, bx)}{cls.symbols[direction]} {"Total:"}{Mv.to(by+cy, bx+bw - 10)}{strings["total"]:>10.10}'
-		# 		if bh > 2 and bh % 2: cy += 2
-		# 		else: cy += 1
-		# 	stats["redraw"] = False
+		load_p = lambda s, i=0 : f'{s}{(3-len(s)) * " "}{Mv.to(y+i, Term.width-2)}%'
+		clock = lambda s : f'{s}{(4-len(s)) * " "}{Mv.r(4-len(s))}Mhz'
 
 
-		# out += (f'{Mv.to(y, x)}{THEME.graph_text("amdgpu")}')
+		for f_i in range(len(stat_nums["freqs"])):
+			(f, name) = stat_nums["freqs"][f_i]
+			out += f'{Mv.to(y+f_i, x)}{THEME.graph_text(name+": ")}{clock(stat["freqs"][f"freq{f}"][0])}'
+
+		out += f'{Mv.to(y, Term.width - 9)}{THEME.graph_text("GPU:")}{load_p(stat["load"]["gpu"])}'
+		out += f'{Mv.to(y+1, Term.width - 9)}{THEME.graph_text("Mem:")}{load_p(stat["load"]["mem"], 1)}'
+		out += f'{Mv.to(y+2, Term.width - 10)}{THEME.graph_text("Temp:")}{stat["vitals"]["temp1"][0]}'
 
 		Draw.buffer(cls.buffer, f'{out_misc}{out}{Term.fg}', only_save=Menu.active)
 		cls.redraw = cls.resized = False
@@ -4069,23 +4058,27 @@ class GpuCollector(Collector):
 	gpus: List[Tuple[str, str]] = []
 	gpu_i: int = 0
 	gpu: str = ""
-	new_gpu: str = ""
 	gpu_error: bool = False
 	reset: bool = False
-
-	#* Stats structure = stats[gpu device]
-	#[fans, clocks, mems, temps, power]
-	#[fanX_rpm, fanX_max, sclk, mclk, vddgfx, power, temp]
-	# [total, last, top, graph_top, offset, speed, redraw, graph_raise, graph_low] = int, List[int], bool
+	
+	#* stats structure = stats[cardN]
+	#[fans, freqs, vitals, power, load]
+	#[fanN_rpm, fanN_max, sclk, mclk, tempN, vram_used, vram_total, vddgfx, avg_draw,  gpu_load_p, mem_load_p]
 	stats: Dict[str, Dict[str, Dict[str, Any]]] = {}
-	#* Strings structure strings[network device][download, upload][total, byte_ps, bit_ps, top, graph_top] = str
-	# strings: Dict[str, Dict[str, Dict[str, str]]] = {}
+	#* stat_nums structure = stats[cardN][fans, freqs, temps, power, volts][n, ..., m]
+	stat_nums: Dict[str, Dict[str, List[Tuple[str, str]]]] = {}
+
 	populated: bool = False
 	timestamp: float = time()
-	net_min: Dict[str, int] = {"download" : -1, "upload" : -1}
-	auto_min: bool = CONFIG.net_auto
-	sync_top: int = 0
-	sync_string: str = ""
+
+	@classmethod
+	def _read(cls, path):
+		# reads exactly one line from the path
+		val = ""
+		with open(path) as file:
+			val = file.readline().strip()
+			file.close()
+		return val
 
 	@classmethod
 	def _get_hwmon(cls, name): return cls.dir + name + cls.hwmon
@@ -4127,6 +4120,43 @@ class GpuCollector(Collector):
 		return names
 
 	@classmethod
+	def _get_stat_nums(cls, card):
+		stat_keys = ["fans", "freqs", "temps", "power", "volts"]
+		sys_keys = ["fan", "freq", "temp", "power", "in"]
+		cls.stat_nums[card] = {
+			"fans": [],
+			"freqs": [],
+			"temps": [],
+			"power": [],
+			"volts": [],
+		}
+		get_num = lambda s, f: re.match(f"{s}\d", f)
+		with os.scandir(cls._get_hwmon(card)) as files:
+			for file in files:
+				matches = [get_num(k, file.name) for k in sys_keys]
+				for i in range (0,5):
+					if matches[i]:
+						num = file.name[matches[i].end() - 1]
+						arr = cls.stat_nums[card][stat_keys[i]]
+						if len(arr) == 0 or num not in arr:
+							arr.append(num)
+						break
+		# label the properties which have labels
+		for key_i in range(len(cls.stat_nums[card])):
+			key = cls.stat_nums[card][stat_keys[key_i]]
+			for j in range(len(key)):
+				num = key[j]
+				try:
+					label = cls._read(cls._get_hwmon(card) + sys_keys[key_i] + num + "_label")
+					key[j] = (key[j], label)
+				except: pass
+		# prepopulate fans' max RPM
+		for f in range(len(cls.stat_nums[card]["fans"])):
+			fan = cls.stat_nums[card]["fans"][f]
+			f_max = cls._read(cls._get_hwmon(card) + f"fan{fan}_max")
+			cls.stat_nums[card]["fans"][f] = (fan, f_max)
+
+	@classmethod
 	def _get_gpus(cls):
 		'''Get a list of all GPUs with names'''
 		cls.gpu_i = 0
@@ -4136,27 +4166,77 @@ class GpuCollector(Collector):
 			for card in cards:
 				if re.match('card\d$', card.name):
 					for i in range(len(keys)):
-						with open(cls._get_device(card.name) + keys[i]) as file:
-							id[i] = file.readline().strip().replace("0x", "")
-							file.close()
+						id[i] = cls._read(cls._get_device(card.name) + keys[i]).replace("0x", "")
 					id[2] = f"{id[2]} {id[3]}"
 					cls.gpus.append((card.name, tuple(id[:3])))
 
 		cls.gpus = cls._get_gpu_names(cls.gpus);
+		for gpu in cls.gpus:
+			cls._get_stat_nums(gpu[0])
 		if not cls.gpus: cls.gpus = [""]
 		cls.gpu = cls.gpus[cls.gpu_i]
 		cls.populated = True
 
+	@classmethod
+	def _get_vitals(cls, card):
+		temp = lambda n: str(round(int(cls._read(cls._get_hwmon(card) + f"temp{n}_input")) / 1000)) #°C
+		stat = {
+			"vram_used": cls._read(cls._get_device(card) + "mem_info_vram_used"), #kB
+			"vram_total": cls._read(cls._get_device(card) + "mem_info_vram_total"), #kB
+		}
+		for (i, name) in cls.stat_nums[card]["temps"]:
+			stat[f"temp{i}"] = (temp(i), name)
+		return stat
+
+	@classmethod
+	def _get_power(cls, card):
+		power = lambda n: str(round(int(cls._read(cls._get_hwmon(card) + f"power{n}_average")) / 1000000, 2)) # Watts
+		volt = lambda n: cls._read(cls._get_hwmon(card) + f"in{n}_input") # mV
+
+		stat = {}
+		for i in cls.stat_nums[card]["power"]:
+			stat[f"power{i}"] = power(i)
+		for (i, name) in cls.stat_nums[card]["volts"]:
+			stat[f"volt{i}"] = (volt(i), name)
+		return stat
+
+	@classmethod
+	def _get_freqs(cls, card):
+		freq = lambda n: str(round(int(cls._read(cls._get_hwmon(card) + f"freq{n}_input")) / 1000000)) # MHz
+
+		stat = {}
+		for (i, name) in cls.stat_nums[card]["freqs"]:
+			stat[f"freq{i}"] = (freq(i), name)
+		return stat
+
+	@classmethod
+	def _get_fans(cls, card):
+		fan = lambda n: cls._read(cls._get_hwmon(card) + f"fan{n}_input") # RPM
+
+		stat = {}
+		for (i, f_max) in cls.stat_nums[card]["fans"]:
+			stat[f"fan{i}"] = (fan(i), f_max)
+		return stat
 
 	@classmethod
 	def _collect(cls):
-		speed: int
-		stat: Dict
-		
 		if not cls.populated: cls._get_gpus()
 		if not cls.gpu: return
+		stat: Dict[str, Dict[str, Any]] = {}
+		card = cls.gpu[0]
 
+		stat["fans"] = cls._get_fans(card)
+		stat["freqs"] = cls._get_freqs(card)
+		stat["power"] = cls._get_power(card)
+		stat["vitals"] = cls._get_vitals(card)
+		stat["load"] = {
+			"mem": cls._read(cls._get_device(card) + "mem_busy_percent"),
+			"gpu": cls._read(cls._get_device(card) + "gpu_busy_percent"),
+		}
+
+		cls.stats[card] = stat
 		cls.timestamp = time()
+
 
 	@classmethod
 	def _draw(cls):
