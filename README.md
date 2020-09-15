@@ -181,6 +181,13 @@ Available from [adrien-overlay](https://github.com/aaaaadrien/adrien-overlay)
 sudo emerge -av sys-process/bpytop
 ```
 
+### MX Linux
+
+Available in the MX Test Repo as `bpytop`
+Please use MX Package Installer MX Test Repo tab to install.
+
+http://mxrepo.com/mx/testrepo/pool/test/b/bpytop/
+
 ### Snap package
 
 by @kz6fittycent
