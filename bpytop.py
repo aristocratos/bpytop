@@ -1552,6 +1552,7 @@ class CpuBox(Box, SubBox):
 	buffer: str = "cpu"
 	battery_percent: int = 1000
 	battery_secs: int = 0
+	battery_status: str = "Unknown"
 	old_battery_pos = 0
 	clock_block: bool = True
 	Box.buffers.append(buffer)
@@ -1596,6 +1597,44 @@ class CpuBox(Box, SubBox):
 		f'{create_box(x=cls.box_x, y=cls.box_y, width=cls.box_width, height=cls.box_height, line_color=THEME.div_line, fill=False, title=CPU_NAME[:cls.box_width - 14] if not CONFIG.custom_cpu_name else CONFIG.custom_cpu_name[:cls.box_width - 14])}')
 
 	@classmethod
+	def battery_activity(cls) -> bool:
+		if not hasattr(psutil, "sensors_battery") or psutil.sensors_battery() == None:
+			return False
+
+		return_true: bool = False
+		percent: int = ceil(getattr(psutil.sensors_battery(), "percent", 0))
+		if percent != cls.battery_percent:
+			cls.battery_percent = percent
+			return_true = True
+
+		seconds: int = getattr(psutil.sensors_battery(), "secsleft", 0)
+		if seconds != cls.battery_secs:
+			cls.battery_secs = seconds
+			return_true = True
+
+		status: str = "not_set"
+		if os.path.isfile("/sys/class/power_supply/BAT0/status"):
+			try:
+				with open("/sys/class/power_supply/BAT0/status", "r") as file:
+					status = file.read().strip()
+			except:
+				pass
+		if status == "not_set" and getattr(psutil.sensors_battery(), "power_plugged", None) == True:
+			status = "Charging" if cls.battery_percent < 100 else "Full"
+		elif status == "not_set" and getattr(psutil.sensors_battery(), "power_plugged", None) == False:
+			status = "Discharging"
+		elif status == "not_set":
+			status = "Unknown"
+		if status != cls.battery_status:
+			cls.battery_status = status
+			return_true = True
+
+		if return_true or cls.resized or cls.redraw:
+			return True
+		else:
+			return False
+
+	@classmethod
 	def _draw_fg(cls):
 		cpu = CpuCollector
 		if cpu.redraw: cls.redraw = True
@@ -1623,20 +1662,21 @@ class CpuBox(Box, SubBox):
 						Graphs.temps[n] = Graph(5, 1, None, cpu.cpu_temp[n], max_value=cpu.cpu_temp_crit, offset=-23)
 			Draw.buffer("cpu_misc", out_misc, only_save=True)
 
-		if CONFIG.show_battery and hasattr(psutil, "sensors_battery") and psutil.sensors_battery() and (ceil(psutil.sensors_battery().percent) != cls.battery_percent or psutil.sensors_battery().secsleft != cls.battery_secs or cls.resized or cls.redraw):
-			cls.battery_percent = ceil(psutil.sensors_battery().percent)
-			if psutil.sensors_battery().secsleft > 0:
-				cls.battery_secs = psutil.sensors_battery().secsleft
-				battery_time = f' {cls.battery_secs // 3600:02}:{(cls.battery_secs % 3600) // 60:02}'
+		if CONFIG.show_battery and cls.battery_activity():
+			if cls.battery_secs > 0:
+				battery_time: str = f' {cls.battery_secs // 3600:02}:{(cls.battery_secs % 3600) // 60:02}'
 			else:
-				cls.battery_secs = 0
 				battery_time = ""
 			if not hasattr(Meters, "battery") or cls.resized:
 				Meters.battery = Meter(cls.battery_percent, 10, "cpu", invert=True)
-			if psutil.sensors_battery().power_plugged:
-				battery_symbol: str = "▲" if cls.battery_percent < 100 else "■"
-			else:
+			if cls.battery_status == "Charging":
+				battery_symbol: str = "▲"
+			elif cls.battery_status == "Discharging":
 				battery_symbol = "▼"
+			elif cls.battery_status in ["Full", "Not charging"]:
+				battery_symbol = "■"
+			else:
+				battery_symbol = "○"
 			battery_pos = cls.width - len(f'{CONFIG.update_ms}') - 17 - (11 if cls.width >= 100 else 0) - len(battery_time) - len(f'{cls.battery_percent}')
 			if battery_pos != cls.old_battery_pos and cls.old_battery_pos > 0 and not cls.resized:
 				out += f'{Mv.to(y-1, cls.old_battery_pos)}{THEME.cpu_box(Symbol.h_line*(15 if cls.width >= 100 else 5))}'
