@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.33
+
+* Changed: Improvement on osx cpu temperature collection with coretemp
+* Fixed: Battery stats crash and better battery status detection
+* README: coretemp install instructions by @hacker1024
+* README: Added notice about font problems and possible solutions
+
 ## v1.0.32
 
 * Added: Symbol for battery inactive

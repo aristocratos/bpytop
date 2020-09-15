@@ -56,7 +56,7 @@ if errors:
 		print("\nInstall required modules!\n")
 	raise SystemExit(1)
 
-VERSION: str = "1.0.32"
+VERSION: str = "1.0.33"
 
 #? Argument parser ------------------------------------------------------------------------------->
 args = argparse.ArgumentParser()
