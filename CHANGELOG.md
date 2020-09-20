@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.34
+
+* Changed: Improvement on cpu name detection
+* Added: Option to choose cpu temperature sensor
+* Fixed: Battery meter adaptation
+
 ## v1.0.33
 
 * Changed: Improvement on osx cpu temperature collection with coretemp
