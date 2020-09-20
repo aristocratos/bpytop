@@ -141,6 +141,9 @@ proc_mem_bytes=$proc_mem_bytes
 #* Check cpu temperature, needs "osx-cpu-temp" on MacOS X.
 check_temp=$check_temp
 
+#* Which sensor to use for cpu temperature, use options menu to select from list of available sensors.
+cpu_sensor=$cpu_sensor
+
 #* Draw a clock at top of screen, formatting according to strftime, empty string to disable.
 draw_clock="$draw_clock"
 
@@ -358,7 +361,7 @@ class Config:
 	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name",
 						"proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes", "disks_filter", "update_check", "log_level", "mem_graphs", "show_swap",
 						"swap_disk", "show_disks", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "view_mode", "theme_background",
-						"net_sync", "show_battery", "tree_depth"]
+						"net_sync", "show_battery", "tree_depth", "cpu_sensor"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	theme_background: bool = True
@@ -372,6 +375,7 @@ class Config:
 	proc_per_core: bool = False
 	proc_mem_bytes: bool = True
 	check_temp: bool = True
+	cpu_sensor: str = "Auto"
 	draw_clock: str = "%X"
 	background_update: bool = True
 	custom_cpu_name: str = ""
@@ -398,6 +402,19 @@ class Config:
 	log_levels: List[str] = ["ERROR", "WARNING", "INFO", "DEBUG"]
 
 	view_modes: List[str] = ["full", "proc", "stat"]
+
+	cpu_sensors: List[str] = [ "Auto" ]
+
+	if hasattr(psutil, "sensors_temperatures"):
+		try:
+			_temps = psutil.sensors_temperatures()
+			if _temps:
+				for _name, _entries in _temps.items():
+					for _num, _entry in enumerate(_entries, 1):
+						if hasattr(_entry, "current"):
+							cpu_sensors.append(f'{_name}:{_num if _entry.label == "" else _entry.label}')
+		except:
+			pass
 
 	changed: bool = False
 	recreate: bool = False
@@ -479,6 +496,9 @@ class Config:
 		for net_name in ["net_download", "net_upload"]:
 			if net_name in new_config and not new_config[net_name][0].isdigit(): # type: ignore
 				new_config[net_name] = "_error_"
+		if "cpu_sensor" in new_config and not new_config["cpu_sensor"] in self.cpu_sensors:
+			new_config["cpu_sensor"] = "_error_"
+			self.warnings.append(f'Config key "cpu_sensor" does not contain an available sensor!')
 		return new_config
 
 	def save_config(self):
@@ -2646,14 +2666,26 @@ class CpuCollector(Collector):
 
 	@classmethod
 	def _collect_temps(cls):
-		temp: int
+		temp: int = 1000
 		cores: List[int] = []
 		cpu_type: str = ""
+		s_name: str = "_-_"
+		s_label: str = "_-_"
 		if cls.sensor_method == "psutil":
 			try:
 				for name, entries in psutil.sensors_temperatures().items():
-					for entry in entries:
-						if entry.label.startswith(("Package", "Tdie")) and hasattr(entry, "current") and round(entry.current) > 0:
+					for num, entry in enumerate(entries, 1):
+						if CONFIG.cpu_sensor != "Auto":
+							s_name, s_label = CONFIG.cpu_sensor.split(":", 1)
+						if temp == 1000 and name == s_name and (entry.label == s_label or str(num) == s_label) and round(entry.current) > 0:
+							cpu_type = "other"
+							if not cls.cpu_temp_high:
+								if hasattr(entry, "high") and entry.high: cls.cpu_temp_high = round(entry.high)
+								else: cls.cpu_temp_high = 80
+								if hasattr(entry, "critical") and entry.critical: cls.cpu_temp_crit = round(entry.critical)
+								else: cls.cpu_temp_crit = 95
+							temp = round(entry.current)
+						elif temp == 1000 and entry.label.startswith(("Package", "Tdie")) and hasattr(entry, "current") and round(entry.current) > 0:
 							cpu_type = "intel" if entry.label.startswith("Package") else "ryzen"
 							if not cls.cpu_temp_high:
 								if hasattr(entry, "high") and entry.high: cls.cpu_temp_high = round(entry.high)
@@ -3753,6 +3785,12 @@ class Menu:
 				'Enable cpu temperature reporting.',
 				'',
 				'True or False.'],
+			"cpu_sensor" : [
+				'Cpu temperature sensor',
+				'',
+				'Select the sensor that corresponds to',
+				'your cpu temperature.',
+				'Set to "Auto" for auto detection.'],
 			"draw_clock" : [
 				'Draw a clock at top of screen.',
 				'',
@@ -3875,6 +3913,7 @@ class Menu:
 		sorting_i: int = CONFIG.sorting_options.index(CONFIG.proc_sorting)
 		loglevel_i: int = CONFIG.log_levels.index(CONFIG.log_level)
 		view_mode_i: int = CONFIG.view_modes.index(CONFIG.view_mode)
+		cpu_sensor_i: int = CONFIG.cpu_sensors.index(CONFIG.cpu_sensor)
 		color_i: int
 		while not cls.close:
 			key = ""
@@ -3921,11 +3960,13 @@ class Menu:
 						counter = f' {loglevel_i + 1}/{len(CONFIG.log_levels)}'
 					elif opt == "view_mode":
 						counter = f' {view_mode_i + 1}/{len(CONFIG.view_modes)}'
+					elif opt == "cpu_sensor":
+						counter = f' {cpu_sensor_i + 1}/{len(CONFIG.cpu_sensors)}'
 					else:
 						counter = ""
 					out += f'{Mv.to(y+1+cy, x+1)}{t_color}{Fx.b}{opt.replace("_", " ").capitalize() + counter:^24.24}{Fx.ub}{Mv.to(y+2+cy, x+1)}{v_color}'
 					if opt == selected:
-						if isinstance(value, bool) or opt in ["color_theme", "proc_sorting", "log_level", "view_mode"]:
+						if isinstance(value, bool) or opt in ["color_theme", "proc_sorting", "log_level", "view_mode", "cpu_sensor"]:
 							out += f'{t_color} {Symbol.left}{v_color}{d_quote + str(value) + d_quote:^20.20}{t_color}{Symbol.right} '
 						elif inputting:
 							out += f'{str(input_val)[-17:] + Fx.bl + "█" + Fx.ubl + "" + Symbol.enter:^33.33}'
@@ -4075,6 +4116,14 @@ class Menu:
 					CONFIG.log_level = CONFIG.log_levels[loglevel_i]
 					errlog.setLevel(getattr(logging, CONFIG.log_level))
 					errlog.info(f'Loglevel set to {CONFIG.log_level}')
+				elif key in ["left", "right"] and selected == "cpu_sensor":
+					if key == "left":
+						cpu_sensor_i -= 1
+						if cpu_sensor_i < 0: cpu_sensor_i = len(CONFIG.cpu_sensors) - 1
+					elif key == "right":
+						cpu_sensor_i += 1
+						if cpu_sensor_i > len(CONFIG.cpu_sensors) - 1: cpu_sensor_i = 0
+					CONFIG.cpu_sensor = CONFIG.cpu_sensors[cpu_sensor_i]
 				elif key in ["left", "right"] and selected == "view_mode":
 					if key == "left":
 						view_mode_i -= 1
