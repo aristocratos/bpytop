@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.35
+
+* Fixed: Decimal placement in floating_humanizer() function
+
 ## v1.0.34
 
 * Changed: Improvement on cpu name detection
