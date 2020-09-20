@@ -4460,7 +4460,8 @@ def floating_humanizer(value: Union[float, int], bit: bool = False, per_second: 
 
 
 	if short:
-		out = out.split(".")[0]
+		if "." in out:
+			out = f'{round(float(out))}'
 		if len(out) > 3:
 			out = f'{int(out[0]) + 1}'
 			selector += 1
