@@ -4449,9 +4449,10 @@ def floating_humanizer(value: Union[float, int], bit: bool = False, per_second: 
 			break
 		selector += 1
 	else:
-		if len(f'{value}') < 5 and len(f'{value}') >= 2 and selector > 0:
-			decimals = 5 - len(f'{value}')
-			out = f'{value}'[:-2] + "." + f'{value}'[-decimals:]
+		if len(f'{value}') == 4 and selector > 0:
+			out = f'{value}'[:-2] + "." + f'{value}'[-2]
+		elif len(f'{value}') == 3 and selector > 0:
+			out = f'{value}'[:-2] + "." + f'{value}'[-2:]
 		elif len(f'{value}') >= 2:
 			out = f'{value}'[:-2]
 		else:
