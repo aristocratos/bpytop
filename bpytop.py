@@ -2622,6 +2622,8 @@ class CpuCollector(Collector):
 				elif which("osx-cpu-temp") and subprocess.check_output("osx-cpu-temp", text=True).rstrip().endswith("°C"):
 					cls.sensor_method = "osx-cpu-temp"
 			except: pass
+		elif CONFIG.cpu_sensor != "Auto" and CONFIG.cpu_sensor in CONFIG.cpu_sensors:
+			cls.sensor_method = "psutil"
 		elif hasattr(psutil, "sensors_temperatures"):
 			try:
 				temps = psutil.sensors_temperatures()
