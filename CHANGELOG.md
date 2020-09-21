@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.36
+
+* Added: Rounding for floating_humanizer() short option
+* Fixed: Cpu temp not showing when manually selected and not auto detected
+* Fixed Crash during theme change
+
 ## v1.0.35
 
 * Fixed: Decimal placement in floating_humanizer() function
