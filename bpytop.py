@@ -26,7 +26,7 @@ from collections import defaultdict
 from select import select
 from distutils.util import strtobool
 from string import Template
-from math import ceil, floor
+from math import ceil, floor, log10
 from random import randint
 from shutil import which
 from typing import List, Dict, Tuple, Union, Any, Iterable
@@ -1639,6 +1639,8 @@ class Meters:
 	swap: Dict[str, Union[Meter, Graph]] = {}
 	disks_used: Dict[str, Meter] = {}
 	disks_free: Dict[str, Meter] = {}
+	# gpu structure: gpu[gpu_key][cardN_property]
+	gpu: Dict[str, Dict[str, Union[Meter, Graph]]] = {}
 
 class Box:
 	'''Box class with all needed attributes for create_box() function'''
@@ -2885,8 +2887,8 @@ class GpuBox(Box):
 	resized: bool = True
 	redraw: bool = True
 	graph_height: Dict[str, int] = {}
-	symbols: Dict[str, str] = {"download" : "▼", "upload" : "▲"}
 	buffer: str = "gpu"
+	gpu_keys = ["freqs", "fans", "load", "vitals", "power"]
 
 	Box.buffers.append(buffer)
 
@@ -2927,25 +2929,60 @@ class GpuBox(Box):
 		x, y, w, h = cls.x + 1, cls.y + 1, cls.width - 2, cls.height - 2
 		reset: bool = bool(True)
 
+
 		if cls.resized or cls.redraw:
+			Meters.gpu = {k:{} for k in cls.gpu_keys}
 			out_misc += cls._draw_bg()
 			out_misc += (f'{Mv.to(y-1, x+w - 23)}{THEME.gpu_box}{Symbol.h_line * (18 - len(name))}'
 				f'{Symbol.title_left}{Fx.b}{THEME.title(name)}{Fx.ub}{THEME.gpu_box(Symbol.title_right)}{Term.fg}')
 
-			
+			Meters.gpu["load"][card+"gpu"] = Meter(int(stat["load"]["gpu"]), (w // 2) - 4, "cpu")
+			Meters.gpu["load"][card+"mem"] = Meter(int(stat["load"]["mem"]), (w // 2) - 4, "cpu")
+			Meters.gpu["vitals"][card+"vram"] = Meter(int(stat["vitals"]["vram"]), (w // 2) - 4, "cpu")
+
 			Draw.buffer("gpu_misc", out_misc, only_save=True)
 
 		load_p = lambda s, i=0 : f'{s}{(3-len(s)) * " "}{Mv.to(y+i, Term.width-2)}%'
 		clock = lambda s : f'{s}{(4-len(s)) * " "}{Mv.r(4-len(s))}Mhz'
 
+		fixedEnding = lambda s, n : f'{s}{(n-(int(log10(s))+1)) * " "}{Mv.r(n-(int(log10(s))+1))}'
+		clock = lambda s: fixedEnding(s, 4) + 'Mhz'
+		voltage = lambda s: fixedEnding(s, 4) + 'mV'
+		watts = lambda s: f'{s}{(6-(len(str(s))+1)) * " "}{Mv.r(6-(len(str(s))+1))}W'
 
+		# load percent
+		out += f'{Mv.to(y, Term.width - round(w / 2) - 1)}{THEME.graph_text("GPU ")}{Meters.gpu["load"][card+"gpu"](None if cls.resized else stat["load"]["gpu"])}'
+		out += f'{Mv.to(y+1, Term.width - round(w / 2) - 1)}{THEME.graph_text("Mem ")}{Meters.gpu["load"][card+"mem"](None if cls.resized else stat["load"]["mem"])}'
+
+		# vram
+		out += f'{Mv.to(y+2, Term.width - round(w / 2) - 2)}{THEME.graph_text("VRAM ")}{Meters.gpu["vitals"][card+"vram"](None if cls.resized else stat["vitals"]["vram"])}'
+
+		# clocks
 		for f_i in range(len(stat_nums["freqs"])):
 			(f, name) = stat_nums["freqs"][f_i]
 			out += f'{Mv.to(y+f_i, x)}{THEME.graph_text(name+": ")}{clock(stat["freqs"][f"freq{f}"][0])}'
 
-		out += f'{Mv.to(y, Term.width - 9)}{THEME.graph_text("GPU:")}{load_p(stat["load"]["gpu"])}'
-		out += f'{Mv.to(y+1, Term.width - 9)}{THEME.graph_text("Mem:")}{load_p(stat["load"]["mem"], 1)}'
-		out += f'{Mv.to(y+2, Term.width - 10)}{THEME.graph_text("Temp:")}{stat["vitals"]["temp1"][0]}'
+		# voltage
+		out += f'{Mv.to(y+len(stat_nums["freqs"])-1, x)}'
+		for f_i in range(len(stat_nums["volts"])):
+			(n, name) = stat_nums["volts"][f_i]
+			out += f'{Mv.d(1)}{THEME.graph_text(name+": ")}{voltage(stat["volts"][f"volt{n}"][0])}'
+
+		# power
+		out += f'{Mv.to(y+len(stat_nums["freqs"])+len(stat_nums["volts"])-1, x)}'
+		for f_i in range(len(stat_nums["power"])):
+			n = stat_nums["power"][f_i]
+			out += f'{Mv.d(1)}{THEME.graph_text("Draw: ")}{watts(stat["power"][f"power{n}"])}'
+
+		# temps
+		out += f'{Mv.to(y+3, Term.width - 5)}{stat["vitals"]["temp1"][0]}°C'
+
+		# fans
+		out += f'{Mv.l(4)}'#len of temps
+		for f_i in range(len(stat_nums["fans"])):
+			(n, rpm) = stat_nums["freqs"][f_i]
+			out += f'{Mv.l(8 * (f_i + 1))}{stat["fans"][f"fan{n}"][0]}RPM'
+
 
 		Draw.buffer(cls.buffer, f'{out_misc}{out}{Term.fg}', only_save=Menu.active)
 		cls.redraw = cls.resized = False
@@ -4063,7 +4100,7 @@ class GpuCollector(Collector):
 	
 	#* stats structure = stats[cardN]
 	#[fans, freqs, vitals, power, load]
-	#[fanN_rpm, fanN_max, sclk, mclk, tempN, vram_used, vram_total, vddgfx, avg_draw,  gpu_load_p, mem_load_p]
+	#[fanN_rpm, fanN_max, freqN, tempN, vram_used, vram_total, vddgfx, avg_draw, gpu_load_p, mem_load_p]
 	stats: Dict[str, Dict[str, Dict[str, Any]]] = {}
 	#* stat_nums structure = stats[cardN][fans, freqs, temps, power, volts][n, ..., m]
 	stat_nums: Dict[str, Dict[str, List[Tuple[str, str]]]] = {}
@@ -4181,9 +4218,10 @@ class GpuCollector(Collector):
 	def _get_vitals(cls, card):
 		temp = lambda n: str(round(int(cls._read(cls._get_hwmon(card) + f"temp{n}_input")) / 1000)) #°C
 		stat = {
-			"vram_used": cls._read(cls._get_device(card) + "mem_info_vram_used"), #kB
-			"vram_total": cls._read(cls._get_device(card) + "mem_info_vram_total"), #kB
+			"vram_used": int(cls._read(cls._get_device(card) + "mem_info_vram_used")), #kB
+			"vram_total": int(cls._read(cls._get_device(card) + "mem_info_vram_total")), #kB
 		}
+		stat["vram"] = (stat["vram_used"] / stat["vram_total"]) * 100 #percent
 		for (i, name) in cls.stat_nums[card]["temps"]:
 			stat[f"temp{i}"] = (temp(i), name)
 		return stat
@@ -4196,6 +4234,13 @@ class GpuCollector(Collector):
 		stat = {}
 		for i in cls.stat_nums[card]["power"]:
 			stat[f"power{i}"] = power(i)
+		return stat
+
+	@classmethod
+	def _get_volts(cls, card):
+		volt = lambda n: int(cls._read(cls._get_hwmon(card) + f"in{n}_input")) # mV
+
+		stat = {}
 		for (i, name) in cls.stat_nums[card]["volts"]:
 			stat[f"volt{i}"] = (volt(i), name)
 		return stat
@@ -4204,6 +4249,8 @@ class GpuCollector(Collector):
 	def _get_freqs(cls, card):
 		freq = lambda n: str(round(int(cls._read(cls._get_hwmon(card) + f"freq{n}_input")) / 1000000)) # MHz
 
+		freq = lambda n: round(int(cls._read(cls._get_hwmon(card) + f"freq{n}_input")) / 1000000) # MHz
+
 		stat = {}
 		for (i, name) in cls.stat_nums[card]["freqs"]:
 			stat[f"freq{i}"] = (freq(i), name)
@@ -4211,8 +4258,8 @@ class GpuCollector(Collector):
 
 	@classmethod
 	def _get_fans(cls, card):
-		fan = lambda n: cls._read(cls._get_hwmon(card) + f"fan{n}_input") # RPM
-
+		fan = lambda n: int(cls._read(cls._get_hwmon(card) + f"fan{n}_input")) # RPM
+		
 		stat = {}
 		for (i, f_max) in cls.stat_nums[card]["fans"]:
 			stat[f"fan{i}"] = (fan(i), f_max)
@@ -4228,10 +4275,11 @@ class GpuCollector(Collector):
 		stat["fans"] = cls._get_fans(card)
 		stat["freqs"] = cls._get_freqs(card)
 		stat["power"] = cls._get_power(card)
+		stat["volts"] = cls._get_volts(card)
 		stat["vitals"] = cls._get_vitals(card)
 		stat["load"] = {
-			"mem": cls._read(cls._get_device(card) + "mem_busy_percent"),
-			"gpu": cls._read(cls._get_device(card) + "gpu_busy_percent"),
+			"mem": int(cls._read(cls._get_device(card) + "mem_busy_percent")),
+			"gpu": int(cls._read(cls._get_device(card) + "gpu_busy_percent")),
 		}
 
 		cls.stats[card] = stat
