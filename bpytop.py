@@ -4104,6 +4104,7 @@ class Menu:
 					elif key == "right":
 						color_i += 1
 						if color_i > len(Theme.themes) - 1: color_i = 0
+					Collector.collect_idle.wait()
 					CONFIG.color_theme = list(Theme.themes)[color_i]
 					THEME(CONFIG.color_theme)
 					Term.refresh(force=True)
