@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.37
+
+* Fixed: Swap toggle rare crash
+* Fixed: Cpu sensor option to trigger temp toggle if check temp is true
+
 ## v1.0.36
 
 * Added: Rounding for floating_humanizer() short option
