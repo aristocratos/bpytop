@@ -4121,7 +4121,7 @@ class Menu:
 					CONFIG.log_level = CONFIG.log_levels[loglevel_i]
 					errlog.setLevel(getattr(logging, CONFIG.log_level))
 					errlog.info(f'Loglevel set to {CONFIG.log_level}')
-				elif key in ["left", "right"] and selected == "cpu_sensor":
+				elif key in ["left", "right"] and selected == "cpu_sensor" and len(CONFIG.cpu_sensors) > 1:
 					if key == "left":
 						cpu_sensor_i -= 1
 						if cpu_sensor_i < 0: cpu_sensor_i = len(CONFIG.cpu_sensors) - 1
@@ -4129,6 +4129,8 @@ class Menu:
 						cpu_sensor_i += 1
 						if cpu_sensor_i > len(CONFIG.cpu_sensors) - 1: cpu_sensor_i = 0
 					CONFIG.cpu_sensor = CONFIG.cpu_sensors[cpu_sensor_i]
+					if CONFIG.check_temp and CpuCollector.sensor_method != "psutil":
+						CpuCollector.get_sensors()
 				elif key in ["left", "right"] and selected == "view_mode":
 					if key == "left":
 						view_mode_i -= 1
