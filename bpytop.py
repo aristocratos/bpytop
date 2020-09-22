@@ -4593,6 +4593,7 @@ def process_keys():
 			CONFIG.mem_graphs = not CONFIG.mem_graphs
 			Collector.collect(MemCollector, interrupt=True, redraw=True)
 		elif key == "s":
+			Collector.collect_idle.wait()
 			CONFIG.swap_disk = not CONFIG.swap_disk
 			Collector.collect(MemCollector, interrupt=True, redraw=True)
 		elif key == "f":
