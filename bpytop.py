@@ -4143,6 +4143,8 @@ class Menu:
 					CONFIG.cpu_sensor = CONFIG.cpu_sensors[cpu_sensor_i]
 					if CONFIG.check_temp and (CpuCollector.sensor_method != "psutil" or CONFIG.cpu_sensor == "Auto"):
 						CpuCollector.get_sensors()
+						Term.refresh(force=True)
+						cls.resized = False
 				elif key in ["left", "right"] and selected == "view_mode":
 					if key == "left":
 						view_mode_i -= 1
