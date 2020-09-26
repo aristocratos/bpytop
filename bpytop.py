@@ -4128,8 +4128,9 @@ class Menu:
 					elif key == "right":
 						cpu_sensor_i += 1
 						if cpu_sensor_i > len(CONFIG.cpu_sensors) - 1: cpu_sensor_i = 0
+					Collector.collect_idle.wait()
 					CONFIG.cpu_sensor = CONFIG.cpu_sensors[cpu_sensor_i]
-					if CONFIG.check_temp and CpuCollector.sensor_method != "psutil":
+					if CONFIG.check_temp and (CpuCollector.sensor_method != "psutil" or CONFIG.cpu_sensor == "Auto"):
 						CpuCollector.get_sensors()
 				elif key in ["left", "right"] and selected == "view_mode":
 					if key == "left":
