@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.38
+
+* Fixed: Cpu sensor check when changing from manual sensor to Auto
+* Fixed: Menu collection timeout and menu background update stall
+* Added: Custom options for clock formatting: hostname and username
+
 ## v1.0.37
 
 * Fixed: Swap toggle rare crash
