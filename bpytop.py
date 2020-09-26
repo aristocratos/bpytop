@@ -32,7 +32,7 @@ from shutil import which
 from typing import List, Set, Dict, Tuple, Optional, Union, Any, Callable, ContextManager, Iterable, Type, NamedTuple
 
 errors: List[str] = []
-try: import fcntl, termios, tty
+try: import fcntl, termios, tty, pwd
 except Exception as e: errors.append(f'{e}')
 
 try: import psutil # type: ignore
@@ -1510,6 +1510,10 @@ class Box:
 	clock_on: bool = False
 	clock: str = ""
 	resized: bool = False
+	clock_custom_format: Dict[str, Any] = {
+		"/host" : os.uname()[1],
+		"/user" : os.environ.get("USER") or pwd.getpwuid(os.getuid())[0],
+		}
 
 	@classmethod
 	def calc_sizes(cls):
@@ -1539,11 +1543,14 @@ class Box:
 	def draw_clock(cls, force: bool = False):
 		if force: pass
 		elif not cls.clock_on or Term.resized or strftime(CONFIG.draw_clock) == cls.clock: return
-		cls.clock = strftime(CONFIG.draw_clock)
-		clock_len = len(cls.clock[:(CpuBox.width-58)])
+		clock_string = cls.clock = strftime(CONFIG.draw_clock)
+		for custom in cls.clock_custom_format:
+			if custom in clock_string:
+				clock_string = clock_string.replace(custom, cls.clock_custom_format[custom])
+		clock_len = len(clock_string[:(CpuBox.width-58)])
 		now: bool = False if Menu.active else not force
 		Draw.buffer("clock", (f'{Mv.to(CpuBox.y, ((CpuBox.width-2)//2)-(clock_len//2)-3)}{Fx.ub}{THEME.cpu_box}{Symbol.h_line * 4}'
-			f'{Symbol.title_left}{Fx.b}{THEME.title(cls.clock[:clock_len])}{Fx.ub}{THEME.cpu_box}{Symbol.title_right}{Symbol.h_line * 4}{Term.fg}'),
+			f'{Symbol.title_left}{Fx.b}{THEME.title(clock_string[:clock_len])}{Fx.ub}{THEME.cpu_box}{Symbol.title_right}{Symbol.h_line * 4}{Term.fg}'),
 		z=1, now=now, once=not force, only_save=Menu.active)
 
 	@classmethod
@@ -3801,11 +3808,15 @@ class Menu:
 				'Formatting according to strftime, empty',
 				'string to disable.',
 				'',
-				'Examples:',
-				'"%X" locale HH:MM:SS',
-				'"%H" 24h hour, "%I" 12h hour',
-				'"%M" minute, "%S" second',
-				'"%d" day, "%m" month, "%y" year'],
+				'Custom formatting options:',
+				'"/host" = hostname',
+				'"/user" = username',
+				'',
+				'Examples of strftime formats:',
+				'"%X" = locale HH:MM:SS',
+				'"%H" = 24h hour, "%I" = 12h hour',
+				'"%M" = minute, "%S" = second',
+				'"%d" = day, "%m" = month, "%y" = year'],
 			"background_update" : [
 				'Update main ui when menus are showing.',
 				'',
