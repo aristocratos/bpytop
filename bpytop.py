@@ -946,7 +946,7 @@ class Draw:
 				if name in cls.strings:
 					out += cls.strings[name]
 					if cls.save[name]:
-						cls.saved[name] = out
+						cls.saved[name] = cls.strings[name]
 					if cls.once[name] and not clear:
 						cls.clear(name)
 			if clear:
@@ -3549,7 +3549,7 @@ class Menu:
 				skip = True
 			else:
 				Collector.collect()
-				Collector.collect_done.wait(1)
+				Collector.collect_done.wait(2)
 				if CONFIG.background_update: cls.background = f'{THEME.inactive_fg}' + Fx.uncolor(f'{Draw.saved_buffer()}') + f'{Term.fg}'
 				Timer.stamp()
 
@@ -3676,7 +3676,7 @@ class Menu:
 				skip = True
 			else:
 				Collector.collect()
-				Collector.collect_done.wait(1)
+				Collector.collect_done.wait(2)
 				if CONFIG.background_update: cls.background = f'{THEME.inactive_fg}' + Fx.uncolor(f'{Draw.saved_buffer()}') + f'{Term.fg}'
 				Timer.stamp()
 
@@ -4172,7 +4172,7 @@ class Menu:
 				skip = True
 			else:
 				Collector.collect()
-				Collector.collect_done.wait(1)
+				Collector.collect_done.wait(2)
 				if CONFIG.background_update: cls.background = f'{THEME.inactive_fg}' + Fx.uncolor(f'{Draw.saved_buffer()}') + f'{Term.fg}'
 				Timer.stamp()
 
