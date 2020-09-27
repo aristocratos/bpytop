@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.39
+
+* Fixed: Manual sensor selection screen refresh
+* Fixed: Rare swap toggle crash
+* Fixed: Clock and battery placement and sizing
+
 ## v1.0.38
 
 * Fixed: Cpu sensor check when changing from manual sensor to Auto
