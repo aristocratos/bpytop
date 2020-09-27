@@ -613,8 +613,10 @@ class Term:
 
 	@staticmethod
 	def title(text: str = "") -> str:
-		if text: text = f' {text}'
-		return f'\033]0;{os.environ.get("TERMINAL_TITLE", "")}{text}\a'
+		out: str = f'{os.environ.get("TERMINAL_TITLE", "")}'
+		if out and text: out += " "
+		if text: out += f'{text}'
+		return f'\033]0;{out}\a'
 
 class Fx:
 	"""Text effects
