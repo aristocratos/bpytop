@@ -1204,7 +1204,7 @@ class Theme:
 		'''Load a bashtop formatted theme file and return a dict'''
 		new_theme: Dict[str, str] = {}
 		try:
-			with open(path) as f:
+			with open(path, "r") as f:
 				for line in f:
 					if not line.startswith("theme["): continue
 					key = line[6:line.find("]")]
@@ -1509,6 +1509,7 @@ class Box:
 	buffers: List[str] = []
 	clock_on: bool = False
 	clock: str = ""
+	clock_len: int = 0
 	resized: bool = False
 	clock_custom_format: Dict[str, Any] = {
 		"/host" : os.uname()[1],
@@ -1535,23 +1536,28 @@ class Box:
 		if now and not Menu.active:
 			Draw.clear("update_ms")
 			if CONFIG.show_battery and hasattr(psutil, "sensors_battery") and psutil.sensors_battery():
-				CpuBox.redraw = True
-				CpuBox._draw_fg()
-				Draw.out("cpu")
+				Draw.out("battery")
 
 	@classmethod
 	def draw_clock(cls, force: bool = False):
+		out: str = ""
 		if force: pass
 		elif not cls.clock_on or Term.resized or strftime(CONFIG.draw_clock) == cls.clock: return
 		clock_string = cls.clock = strftime(CONFIG.draw_clock)
 		for custom in cls.clock_custom_format:
 			if custom in clock_string:
 				clock_string = clock_string.replace(custom, cls.clock_custom_format[custom])
-		clock_len = len(clock_string[:(CpuBox.width-58)])
+		clock_len = len(clock_string[:(CpuBox.width-56)])
+		if cls.clock_len != clock_len and not CpuBox.resized:
+			out = f'{Mv.to(CpuBox.y, ((CpuBox.width)//2)-(cls.clock_len//2))}{Fx.ub}{THEME.cpu_box}{Symbol.h_line * cls.clock_len}'
+		cls.clock_len = clock_len
 		now: bool = False if Menu.active else not force
-		Draw.buffer("clock", (f'{Mv.to(CpuBox.y, ((CpuBox.width-2)//2)-(clock_len//2)-3)}{Fx.ub}{THEME.cpu_box}{Symbol.h_line * 4}'
-			f'{Symbol.title_left}{Fx.b}{THEME.title(clock_string[:clock_len])}{Fx.ub}{THEME.cpu_box}{Symbol.title_right}{Symbol.h_line * 4}{Term.fg}'),
-		z=1, now=now, once=not force, only_save=Menu.active)
+		out += (f'{Mv.to(CpuBox.y, ((CpuBox.width)//2)-(clock_len//2))}{Fx.ub}{THEME.cpu_box}'
+			f'{Symbol.title_left}{Fx.b}{THEME.title(clock_string[:clock_len])}{Fx.ub}{THEME.cpu_box}{Symbol.title_right}{Term.fg}')
+		Draw.buffer("clock", out, z=1, now=now, once=not force, only_save=Menu.active)
+		if now and not Menu.active:
+			if CONFIG.show_battery and hasattr(psutil, "sensors_battery") and psutil.sensors_battery():
+				Draw.out("battery")
 
 	@classmethod
 	def draw_bg(cls, now: bool = True):
@@ -1582,6 +1588,7 @@ class CpuBox(Box, SubBox):
 	battery_status: str = "Unknown"
 	old_battery_pos = 0
 	old_battery_len = 0
+	battery_path: Union[str, None] = ""
 	clock_block: bool = True
 	Box.buffers.append(buffer)
 
@@ -1629,6 +1636,14 @@ class CpuBox(Box, SubBox):
 		if not hasattr(psutil, "sensors_battery") or psutil.sensors_battery() == None:
 			return False
 
+		if cls.battery_path == "":
+			for directory in os.listdir("/sys/class/power_supply"):
+				if directory.startswith('BAT') or 'battery' in directory.lower():
+					cls.battery_path = f'/sys/class/power_supply/{directory}/'
+					break
+				else:
+					cls.battery_path = None
+
 		return_true: bool = False
 		percent: int = ceil(getattr(psutil.sensors_battery(), "percent", 0))
 		if percent != cls.battery_percent:
@@ -1641,12 +1656,8 @@ class CpuBox(Box, SubBox):
 			return_true = True
 
 		status: str = "not_set"
-		if os.path.isfile("/sys/class/power_supply/BAT0/status"):
-			try:
-				with open("/sys/class/power_supply/BAT0/status", "r") as file:
-					status = file.read().strip()
-			except:
-				pass
+		if cls.battery_path:
+			status = readfile(cls.battery_path + "status", default="not_set")
 		if status == "not_set" and getattr(psutil.sensors_battery(), "power_plugged", None) == True:
 			status = "Charging" if cls.battery_percent < 100 else "Full"
 		elif status == "not_set" and getattr(psutil.sensors_battery(), "power_plugged", None) == False:
@@ -1657,7 +1668,7 @@ class CpuBox(Box, SubBox):
 			cls.battery_status = status
 			return_true = True
 
-		if return_true or cls.resized or cls.redraw:
+		if return_true or cls.resized or cls.redraw or Menu.active:
 			return True
 		else:
 			return False
@@ -1691,6 +1702,7 @@ class CpuBox(Box, SubBox):
 			Draw.buffer("cpu_misc", out_misc, only_save=True)
 
 		if CONFIG.show_battery and cls.battery_activity():
+			bat_out: str = ""
 			if cls.battery_secs > 0:
 				battery_time: str = f' {cls.battery_secs // 3600:02}:{(cls.battery_secs % 3600) // 60:02}'
 			else:
@@ -1708,11 +1720,12 @@ class CpuBox(Box, SubBox):
 			battery_len: int = len(f'{CONFIG.update_ms}') + (11 if cls.width >= 100 else 0) + len(battery_time) + len(f'{cls.battery_percent}')
 			battery_pos = cls.width - battery_len - 17
 			if battery_pos != cls.old_battery_pos and cls.old_battery_pos > 0 and not cls.resized:
-				out += f'{Mv.to(y-1, cls.old_battery_pos)}{THEME.cpu_box(Symbol.h_line*cls.old_battery_len)}'
+				bat_out += f'{Mv.to(y-1, cls.old_battery_pos)}{THEME.cpu_box(Symbol.h_line*cls.old_battery_len)}'
 			cls.old_battery_pos, cls.old_battery_len = battery_pos, battery_len
-			out += (f'{Mv.to(y-1, battery_pos)}{THEME.cpu_box(Symbol.title_left)}{Fx.b}{THEME.title}BAT{battery_symbol} {cls.battery_percent}%'+
+			bat_out += (f'{Mv.to(y-1, battery_pos)}{THEME.cpu_box(Symbol.title_left)}{Fx.b}{THEME.title}BAT{battery_symbol} {cls.battery_percent}%'+
 				("" if cls.width < 100 else f' {Fx.ub}{Meters.battery(cls.battery_percent)}{Fx.b}') +
 				f'{THEME.title}{battery_time}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}')
+			Draw.buffer("battery", f'{bat_out}{Term.fg}', only_save=Menu.active)
 
 		cx = cy = cc = 0
 		ccw = (bw + 1) // cls.box_columns
@@ -4073,7 +4086,6 @@ class Menu:
 						input_val += key
 					elif isinstance(getattr(CONFIG, selected), int) and key.isdigit():
 						input_val += key
-
 				elif key == "q":
 					clean_quit()
 				elif key in ["escape", "o", "M", "f2"]:
@@ -4108,6 +4120,8 @@ class Menu:
 					if selected == "theme_background":
 						Term.bg = THEME.main_bg if CONFIG.theme_background else "\033[49m"
 						Draw.now(Term.bg)
+					if selected == "show_battery":
+						Draw.clear("battery", saved=True)
 					Term.refresh(force=True)
 					cls.resized = False
 				elif key in ["left", "right"] and selected == "color_theme" and len(Theme.themes) > 1:
@@ -4528,6 +4542,16 @@ def units_to_bytes(value: str) -> int:
 
 def min_max(value: int, min_value: int=0, max_value: int=100) -> int:
 	return max(min_value, min(value, max_value))
+
+def readfile(file: str, default: str = "") -> str:
+	out: Union[str, None] = None
+	if os.path.isfile(file):
+		try:
+			with open(file, "r") as f:
+				out = f.read().strip()
+		except:
+			pass
+	return default if out is None else out
 
 def process_keys():
 	mouse_pos: Tuple[int, int] = (0, 0)
