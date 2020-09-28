@@ -1639,12 +1639,12 @@ class CpuBox(Box, SubBox):
 			return False
 
 		if cls.battery_path == "":
-			for directory in os.listdir("/sys/class/power_supply"):
-				if directory.startswith('BAT') or 'battery' in directory.lower():
-					cls.battery_path = f'/sys/class/power_supply/{directory}/'
-					break
-				else:
-					cls.battery_path = None
+			cls.battery_path = None
+			if os.path.isdir("/sys/class/power_supply"):
+				for directory in os.listdir("/sys/class/power_supply"):
+					if directory.startswith('BAT') or 'battery' in directory.lower():
+						cls.battery_path = f'/sys/class/power_supply/{directory}/'
+						break
 
 		return_true: bool = False
 		percent: int = ceil(getattr(psutil.sensors_battery(), "percent", 0))
