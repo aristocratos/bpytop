@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.40
+
+* Fixed: Title leading whitespace
+* Fixed: Battery meter crash on non Linux systems
+
 ## v1.0.39
 
 * Fixed: Manual sensor selection screen refresh
