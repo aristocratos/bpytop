@@ -151,6 +151,8 @@ https://aur.archlinux.org/packages/bpytop/
 
 ### Debian based
 
+Available in [official Debian repository](https://tracker.debian.org/pkg/bpytop) since Debian 11
+
 Available for debian/ubuntu from [Azlux's repository](http://packages.azlux.fr/)
 
 ### FreeBSD package
