@@ -1,5 +1,9 @@
 # ![bpytop](https://github.com/aristocratos/bpytop/raw/master/Imgs/logo.png)
 
+<a href="https://repology.org/project/bpytop/versions">
+    <img src="https://repology.org/badge/vertical-allrepos/bpytop.svg" alt="Packaging status" align="right">
+</a>
+
 ![Linux](https://img.shields.io/badge/-Linux-grey?logo=linux)
 ![OSX](https://img.shields.io/badge/-OSX-black?logo=apple)
 ![FreeBSD](https://img.shields.io/badge/-FreeBSD-red?logo=freebsd)
