@@ -1593,6 +1593,7 @@ class CpuBox(Box, SubBox):
 	old_battery_pos = 0
 	old_battery_len = 0
 	battery_path: Union[str, None] = ""
+	battery_clear: bool = False
 	clock_block: bool = True
 	Box.buffers.append(buffer)
 
@@ -1638,6 +1639,8 @@ class CpuBox(Box, SubBox):
 	@classmethod
 	def battery_activity(cls) -> bool:
 		if not hasattr(psutil, "sensors_battery") or psutil.sensors_battery() == None:
+			if cls.battery_percent != 1000:
+				cls.battery_clear = True
 			return False
 
 		if cls.battery_path == "":
@@ -1730,6 +1733,16 @@ class CpuBox(Box, SubBox):
 				("" if cls.width < 100 else f' {Fx.ub}{Meters.battery(cls.battery_percent)}{Fx.b}') +
 				f'{THEME.title}{battery_time}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}')
 			Draw.buffer("battery", f'{bat_out}{Term.fg}', only_save=Menu.active)
+		elif cls.battery_clear:
+			out += f'{Mv.to(y-1, cls.old_battery_pos)}{THEME.cpu_box(Symbol.h_line*cls.old_battery_len)}'
+			cls.battery_clear = False
+			cls.battery_percent = 1000
+			cls.battery_secs = 0
+			cls.battery_status = "Unknown"
+			cls.old_battery_pos = 0
+			cls.old_battery_len = 0
+			cls.battery_path = ""
+			Draw.clear("battery", saved=True)
 
 		cx = cy = cc = 0
 		ccw = (bw + 1) // cls.box_columns
