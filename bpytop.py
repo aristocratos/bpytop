@@ -1517,6 +1517,8 @@ class Box:
 		"/host" : os.uname()[1],
 		"/user" : os.environ.get("USER") or pwd.getpwuid(os.getuid())[0],
 		}
+	if clock_custom_format["/host"].endswith(".local"):
+		clock_custom_format["/host"] = clock_custom_format["/host"].replace(".local", "")
 
 	@classmethod
 	def calc_sizes(cls):
