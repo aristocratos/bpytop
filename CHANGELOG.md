@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.41
+
+* Fixed: Battery status not using same sensors as psutil
+* Added: Stripping of .local from /host clock format
+* Fixed: Battery clear if removed
+
 ## v1.0.40
 
 * Fixed: Title leading whitespace
