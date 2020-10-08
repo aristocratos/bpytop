@@ -1,10 +1,14 @@
 # Changelog
 
-## v1.0.41
+## v1.0.42
 
 * Fixed: Battery status not using same sensors as psutil
 * Added: Stripping of .local from /host clock format
 * Fixed: Battery clear if removed
+
+## v1.0.41
+
+* Skipped due to pypi - github versioning error
 
 ## v1.0.40
 
