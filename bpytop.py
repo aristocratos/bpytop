@@ -1641,7 +1641,7 @@ class CpuBox(Box, SubBox):
 		if cls.battery_path == "":
 			cls.battery_path = None
 			if os.path.isdir("/sys/class/power_supply"):
-				for directory in os.listdir("/sys/class/power_supply"):
+				for directory in sorted(os.listdir("/sys/class/power_supply")):
 					if directory.startswith('BAT') or 'battery' in directory.lower():
 						cls.battery_path = f'/sys/class/power_supply/{directory}/'
 						break
