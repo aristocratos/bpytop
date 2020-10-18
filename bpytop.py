@@ -2723,26 +2723,26 @@ class CpuCollector(Collector):
 						if temp == 1000 and name == s_name and (entry.label == s_label or str(num) == s_label) and round(entry.current) > 0:
 							cpu_type = "other"
 							if not cls.cpu_temp_high:
-								if hasattr(entry, "high") and entry.high: cls.cpu_temp_high = round(entry.high)
+								if hasattr(entry, "high") and entry.high > 1: cls.cpu_temp_high = round(entry.high)
 								else: cls.cpu_temp_high = 80
-								if hasattr(entry, "critical") and entry.critical: cls.cpu_temp_crit = round(entry.critical)
+								if hasattr(entry, "critical") and entry.critical > 1: cls.cpu_temp_crit = round(entry.critical)
 								else: cls.cpu_temp_crit = 95
 							temp = round(entry.current)
 						elif temp == 1000 and entry.label.startswith(("Package", "Tdie")) and hasattr(entry, "current") and round(entry.current) > 0:
 							cpu_type = "intel" if entry.label.startswith("Package") else "ryzen"
 							if not cls.cpu_temp_high:
-								if hasattr(entry, "high") and entry.high: cls.cpu_temp_high = round(entry.high)
+								if hasattr(entry, "high") and entry.high > 1: cls.cpu_temp_high = round(entry.high)
 								else: cls.cpu_temp_high = 80
-								if hasattr(entry, "critical") and entry.critical: cls.cpu_temp_crit = round(entry.critical)
+								if hasattr(entry, "critical") and entry.critical > 1: cls.cpu_temp_crit = round(entry.critical)
 								else: cls.cpu_temp_crit = 95
 							temp = round(entry.current)
 						elif (entry.label.startswith(("Core", "Tccd", "CPU")) or (name.lower().startswith("cpu") and not entry.label)) and hasattr(entry, "current") and round(entry.current) > 0:
 							if not cpu_type:
 								cpu_type = "other"
 								if not cls.cpu_temp_high:
-									if hasattr(entry, "high") and entry.high: cls.cpu_temp_high = round(entry.high)
+									if hasattr(entry, "high") and entry.high > 1: cls.cpu_temp_high = round(entry.high)
 									else: cls.cpu_temp_high = 60 if name == "cpu_thermal" else 80
-									if hasattr(entry, "critical") and entry.critical: cls.cpu_temp_crit = round(entry.critical)
+									if hasattr(entry, "critical") and entry.critical > 1: cls.cpu_temp_crit = round(entry.critical)
 									else: cls.cpu_temp_crit = 80 if name == "cpu_thermal" else 95
 								temp = round(entry.current)
 							cores.append(round(entry.current))
