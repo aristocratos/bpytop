@@ -4380,7 +4380,7 @@ def get_cpu_name() -> str:
 	nlist = name.split(" ")
 	try:
 		if "Xeon" in name and "CPU" in name:
-			name = nlist[nlist.index("CPU")+(-1 if name.endswith("CPU") else 1)]
+			name = nlist[nlist.index("CPU")+(-1 if name.endswith(("CPU", "z")) else 1)]
 		elif "Ryzen" in name:
 			name = " ".join(nlist[nlist.index("Ryzen"):nlist.index("Ryzen")+3])
 		elif "Duo" in name and "@" in name:
