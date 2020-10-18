@@ -1920,7 +1920,7 @@ class MemBox(Box):
 				out_misc += (f'{Mv.to(y-1, x + w - 7)}{THEME.mem_box(Symbol.title_left)}{Fx.b if CONFIG.swap_disk else ""}'
 				f'{THEME.hi_fg("s")}{THEME.title("wap")}{Fx.ub}{THEME.mem_box(Symbol.title_right)}')
 
-
+			if Collector.collect_interrupt: return
 			Draw.buffer("mem_misc", out_misc, only_save=True)
 
 		#* Mem
@@ -1935,6 +1935,7 @@ class MemBox(Box):
 
 		big_mem: bool = True if cls.mem_width > 21 else False
 		for name in cls.mem_names:
+			if Collector.collect_interrupt: return
 			if cls.mem_size > 2:
 				out += (f'{Mv.to(y+cy, x+cx)}{gli}{name.capitalize()[:None if big_mem else 5]+":":<{1 if big_mem else 6.6}}{Mv.to(y+cy, x+cx + cls.mem_width - 3 - (len(mem.string[name])))}{Fx.trans(mem.string[name])}'
 						f'{Mv.to(y+cy+1, x+cx)}{gbg}{Meters.mem[name](None if cls.resized else mem.percent[name])}{gmv}{str(mem.percent[name])+"%":>4}')
@@ -1943,7 +1944,7 @@ class MemBox(Box):
 				out += f'{Mv.to(y+cy, x+cx)}{name.capitalize():{5.5 if cls.mem_size > 1 else 1.1}} {gbg}{Meters.mem[name](None if cls.resized else mem.percent[name])}{mem.string[name][:None if cls.mem_size > 1 else -2]:>{9 if cls.mem_size > 1 else 7}}'
 				cy += 1 if not cls.graph_height else cls.graph_height
 		#* Swap
-		if cls.swap_on and CONFIG.show_swap and not CONFIG.swap_disk:
+		if cls.swap_on and CONFIG.show_swap and not CONFIG.swap_disk and mem.swap_string:
 			if h - cy > 5:
 				if cls.graph_height > 0: out += f'{Mv.to(y+cy, x+cx)}{gli}'
 				cy += 1
@@ -1951,6 +1952,7 @@ class MemBox(Box):
 			out += f'{Mv.to(y+cy, x+cx)}{THEME.title}{Fx.b}Swap:{mem.swap_string["total"]:>{cls.mem_width - 8}}{Fx.ub}{THEME.main_fg}'
 			cy += 1
 			for name in cls.swap_names:
+				if Collector.collect_interrupt: return
 				if cls.mem_size > 2:
 					out += (f'{Mv.to(y+cy, x+cx)}{gli}{name.capitalize()[:None if big_mem else 5]+":":<{1 if big_mem else 6.6}}{Mv.to(y+cy, x+cx + cls.mem_width - 3 - (len(mem.swap_string[name])))}{Fx.trans(mem.swap_string[name])}'
 							f'{Mv.to(y+cy+1, x+cx)}{gbg}{Meters.swap[name](None if cls.resized else mem.swap_percent[name])}{gmv}{str(mem.swap_percent[name])+"%":>4}')
@@ -1961,11 +1963,12 @@ class MemBox(Box):
 		if cls.graph_height > 0 and not cy == h: out += f'{Mv.to(y+cy, x+cx)}{gli}'
 
 		#* Disks
-		if CONFIG.show_disks:
+		if CONFIG.show_disks and mem.disks:
 			cx = x + cls.mem_width - 1; cy = 0
 			big_disk: bool = True if cls.disks_width >= 25 else False
 			gli = f'{Mv.l(2)}{THEME.div_line}{Symbol.title_right}{Symbol.h_line * cls.disks_width}{THEME.mem_box}{Symbol.title_left}{Mv.l(cls.disks_width - 1)}'
 			for name, item in mem.disks.items():
+				if Collector.collect_interrupt: return
 				if not name in Meters.disks_used:
 					continue
 				if cy > h - 2: break
