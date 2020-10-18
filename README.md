@@ -100,7 +100,7 @@ Also needs a UTF8 locale and a font that covers:
 * Unicode Block “Geometric Shapes” U+25A0 - U+25FF
 * Unicode Block "Box Drawing" and "Block Elements" U+2500 - U+259F
 
-#### Notice
+#### Notice (Text rendering issues)
 
 If you are having problems with the characters in the graphs not looking like they do in the screenshots,
 it's likely a problem with your systems configured fallback font not having support for braille characters.
@@ -109,8 +109,10 @@ See comments by @sgleizes [link](https://github.com/aristocratos/bpytop/issues/1
 
 If text are misaligned and you are using Konsole or Yakuake, turning off "Bi-Directional text rendering" is a possible fix.
 
+Characters clipping in to each other or text/border misalignments is not bugs caused by bpytop, but most likely a fontconfig or terminal problem where the braille characters making up the graphs aren't rendered correctly.
+Look to the creators of the terminal emulator you use to fix these issues if the previous mentioned fixes don't work for you.
 
-#### Notice
+#### Notice (SSH)
 
 Dropbear seems to not be able to set correct locale. So if accessing bpytop over ssh, OpenSSH is recommended.
 
