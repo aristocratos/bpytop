@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.43
+
+* Fixed: Battery meter not clearing properly when disabled
+* Fixed: Correction for broken cpu high and cpu critical temps
+* Fixed: get_cpu_name() function for some Xeon cpus
+* Fixed: Additional error handling to prevent crashes from graph and swap toggles
+
 ## v1.0.42
 
 * Fixed: Battery status not using same sensors as psutil
