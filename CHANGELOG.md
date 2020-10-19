@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.44
+
+* Added: Spread CPUs accross columns evenly if possible, by @ErwinJunge
+* Added: Additional crash fixes for graph and swap toggles
+
 ## v1.0.43
 
 * Fixed: Battery meter not clearing properly when disabled
