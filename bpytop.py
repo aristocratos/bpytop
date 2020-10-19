@@ -1772,7 +1772,7 @@ class CpuBox(Box, SubBox):
 				out += f'{cpu.cpu_temp[n][-1]:>4}{THEME.main_fg}°C'
 			out += f'{THEME.div_line(Symbol.v_line)}'
 			cy += 1
-			if cy == bh:
+			if cy > ceil(THREADS/cls.box_columns) and n != THREADS:
 				cc += 1; cy = 1; cx = ccw * cc
 				if cc == cls.box_columns: break
 
