@@ -1689,7 +1689,7 @@ class CpuBox(Box, SubBox):
 		x, y, w, h = cls.x + 1, cls.y + 1, cls.width - 2, cls.height - 2
 		bx, by, bw, bh = cls.box_x + 1, cls.box_y + 1, cls.box_width - 2, cls.box_height - 2
 		hh: int = ceil(h / 2)
-		hide_cores: bool = cpu.cpu_temp_only or not CONFIG.show_coretemp
+		hide_cores: bool = (cpu.cpu_temp_only or not CONFIG.show_coretemp) and cpu.got_sensors
 
 		if cls.resized or cls.redraw:
 			if not "m" in Key.mouse:
