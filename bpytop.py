@@ -1588,6 +1588,10 @@ class CpuBox(Box, SubBox):
 	old_battery_len = 0
 	battery_path: Union[str, None] = ""
 	battery_clear: bool = False
+	battery_symbols: Dict[str, str] = {"Charging": "▲",
+									"Discharging": "▼",
+									"Full": "■",
+									"Not charging": "■"}
 	clock_block: bool = True
 	Box.buffers.append(buffer)
 
@@ -1707,11 +1711,7 @@ class CpuBox(Box, SubBox):
 				battery_time = ""
 			if not hasattr(Meters, "battery") or cls.resized:
 				Meters.battery = Meter(cls.battery_percent, 10, "cpu", invert=True)
-			batery_symbols = {"Charging": "▲",
-							  "Discharging": "▼",
-							  "Full": "■",
-							  "Not charging": "■"}
-			battery_symbol: str = battery_symbols.get(cls.battery_status, "○")
+			battery_symbol: str = cls.battery_symbols.get(cls.battery_status, "○")
 			battery_len: int = len(f'{CONFIG.update_ms}') + (11 if cls.width >= 100 else 0) + len(battery_time) + len(f'{cls.battery_percent}')
 			battery_pos = cls.width - battery_len - 17
 			if (battery_pos != cls.old_battery_pos or battery_len != cls.old_battery_len) and cls.old_battery_pos > 0 and not cls.resized:
