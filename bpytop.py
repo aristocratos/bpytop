@@ -47,9 +47,8 @@ elif "darwin" in sys.platform: SYSTEM = "MacOS"
 else: SYSTEM = "Other"
 
 if errors:
-	print ("ERROR!")
-	for error in errors:
-		print(error)
+	print("ERROR!")
+	print("\n".join(errors))
 	if SYSTEM == "Other":
 		print("\nUnsupported platform!\n")
 	else:
@@ -1177,8 +1176,7 @@ class Theme:
 
 			else:
 				c = Color.fg(*rgb["start"])
-				for _ in range(101):
-					self.gradient[name] += [c]
+				self.gradient[name] += [c] * 101
 		#* Set terminal colors
 		Term.fg = self.main_fg
 		Term.bg = self.main_bg if CONFIG.theme_background else "\033[49m"
