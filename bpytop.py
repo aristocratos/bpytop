@@ -140,6 +140,9 @@ check_temp=$check_temp
 #* Which sensor to use for cpu temperature, use options menu to select from list of available sensors.
 cpu_sensor=$cpu_sensor
 
+#* Show temperatures for cpu cores also if check_temp is True and sensors has been found
+show_coretemp=$show_coretemp
+
 #* Draw a clock at top of screen, formatting according to strftime, empty string to disable.
 draw_clock="$draw_clock"
 
@@ -357,7 +360,7 @@ class Config:
 	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name",
 						"proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes", "disks_filter", "update_check", "log_level", "mem_graphs", "show_swap",
 						"swap_disk", "show_disks", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "view_mode", "theme_background",
-						"net_sync", "show_battery", "tree_depth", "cpu_sensor"]
+						"net_sync", "show_battery", "tree_depth", "cpu_sensor", "show_coretemp"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	theme_background: bool = True
@@ -372,6 +375,7 @@ class Config:
 	proc_mem_bytes: bool = True
 	check_temp: bool = True
 	cpu_sensor: str = "Auto"
+	show_coretemp: bool = True
 	draw_clock: str = "%X"
 	background_update: bool = True
 	custom_cpu_name: str = ""
@@ -1685,6 +1689,7 @@ class CpuBox(Box, SubBox):
 		x, y, w, h = cls.x + 1, cls.y + 1, cls.width - 2, cls.height - 2
 		bx, by, bw, bh = cls.box_x + 1, cls.box_y + 1, cls.box_width - 2, cls.box_height - 2
 		hh: int = ceil(h / 2)
+		hide_cores: bool = cpu.cpu_temp_only or not CONFIG.show_coretemp
 
 		if cls.resized or cls.redraw:
 			if not "m" in Key.mouse:
@@ -1695,11 +1700,13 @@ class CpuBox(Box, SubBox):
 			Meters.cpu = Meter(cpu.cpu_usage[0][-1], bw - (21 if cpu.got_sensors else 9), "cpu")
 			if cls.column_size > 0:
 				for n in range(THREADS):
-					Graphs.cores[n] = Graph(5 * cls.column_size, 1, None, cpu.cpu_usage[n + 1])
+					Graphs.cores[n] = Graph(5 * cls.column_size + (12 * hide_cores), 1, None, cpu.cpu_usage[n + 1])
 			if cpu.got_sensors:
 				Graphs.temps[0] = Graph(5, 1, None, cpu.cpu_temp[0], max_value=cpu.cpu_temp_crit, offset=-23)
 				if cls.column_size > 1:
 					for n in range(1, THREADS + 1):
+						if not cpu.cpu_temp[n]:
+							continue
 						Graphs.temps[n] = Graph(5, 1, None, cpu.cpu_temp[n], max_value=cpu.cpu_temp_crit, offset=-23)
 			Draw.buffer("cpu_misc", out_misc, only_save=True)
 
@@ -1748,16 +1755,18 @@ class CpuBox(Box, SubBox):
 		for n in range(1, THREADS + 1):
 			out += f'{THEME.main_fg}{Mv.to(by + cy, bx + cx)}{Fx.b + "C" + Fx.ub if THREADS < 100 else ""}{str(n):<{2 if cls.column_size == 0 else 3}}'
 			if cls.column_size > 0:
-				out += f'{THEME.inactive_fg}{"⡀" * (5 * cls.column_size)}{Mv.l(5 * cls.column_size)}{THEME.gradient["cpu"][cpu.cpu_usage[n][-1]]}{Graphs.cores[n-1](None if cls.resized else cpu.cpu_usage[n][-1])}'
+				out += f'{THEME.inactive_fg}{"⡀" * (5 * cls.column_size + (12 * hide_cores ))}{Mv.l(5 * cls.column_size + (12 * hide_cores ))}{THEME.gradient["cpu"][cpu.cpu_usage[n][-1]]}{Graphs.cores[n-1](None if cls.resized else cpu.cpu_usage[n][-1])}'
 			else:
 				out += f'{THEME.gradient["cpu"][cpu.cpu_usage[n][-1]]}'
 			out += f'{cpu.cpu_usage[n][-1]:>{3 if cls.column_size < 2 else 4}}{THEME.main_fg}%'
-			if cpu.got_sensors:
+			if cpu.got_sensors and cpu.cpu_temp[n] and not hide_cores:
 				if cls.column_size > 1:
 					out += f'{THEME.inactive_fg} ⡀⡀⡀⡀⡀{Mv.l(5)}{THEME.gradient["temp"][100 if cpu.cpu_temp[n][-1] >= cpu.cpu_temp_crit else (cpu.cpu_temp[n][-1] * 100 // cpu.cpu_temp_crit)]}{Graphs.temps[n](None if cls.resized else cpu.cpu_temp[n][-1])}'
 				else:
 					out += f'{THEME.gradient["temp"][100 if cpu.cpu_temp[n][-1] >= cpu.cpu_temp_crit else (cpu.cpu_temp[n][-1] * 100 // cpu.cpu_temp_crit)]}'
 				out += f'{cpu.cpu_temp[n][-1]:>4}{THEME.main_fg}°C'
+			elif cpu.got_sensors and not hide_cores:
+				out += f'{Mv.r(12)}'
 			out += f'{THEME.div_line(Symbol.v_line)}'
 			cy += 1
 			if cy > ceil(THREADS/cls.box_columns) and n != THREADS:
@@ -2641,6 +2650,8 @@ class CpuCollector(Collector):
 	buffer: str = CpuBox.buffer
 	sensor_method: str = ""
 	got_sensors: bool = False
+	sensor_swap: bool = False
+	cpu_temp_only: bool = False
 
 	@classmethod
 	def get_sensors(cls):
@@ -2678,6 +2689,8 @@ class CpuCollector(Collector):
 	@classmethod
 	def _collect(cls):
 		cls.cpu_usage[0].append(round(psutil.cpu_percent(percpu=False)))
+		if len(cls.cpu_usage[0]) > Term.width * 4:
+			del cls.cpu_usage[0][0]
 
 		for n, thread in enumerate(psutil.cpu_percent(percpu=True), start=1):
 			cls.cpu_usage[n].append(round(thread))
@@ -2703,6 +2716,8 @@ class CpuCollector(Collector):
 	def _collect_temps(cls):
 		temp: int = 1000
 		cores: List[int] = []
+		core_dict: Dict[int, int] = {}
+		entry_int: int = 0
 		cpu_type: str = ""
 		s_name: str = "_-_"
 		s_label: str = "_-_"
@@ -2713,8 +2728,14 @@ class CpuCollector(Collector):
 						if CONFIG.cpu_sensor != "Auto":
 							s_name, s_label = CONFIG.cpu_sensor.split(":", 1)
 						if temp == 1000 and name == s_name and (entry.label == s_label or str(num) == s_label) and round(entry.current) > 0:
-							cpu_type = "other"
-							if not cls.cpu_temp_high:
+							if entry.label.startswith("Package"):
+								cpu_type = "intel"
+							elif entry.label.startswith("Tdie"):
+								cpu_type = "ryzen"
+							else:
+								cpu_type = "other"
+							if not cls.cpu_temp_high or cls.sensor_swap:
+								cls.sensor_swap = False
 								if getattr(entry, "high", None) != None and entry.high > 1: cls.cpu_temp_high = round(entry.high)
 								else: cls.cpu_temp_high = 80
 								if getattr(entry, "critical", None) != None and entry.critical > 1: cls.cpu_temp_crit = round(entry.critical)
@@ -2722,57 +2743,70 @@ class CpuCollector(Collector):
 							temp = round(entry.current)
 						elif temp == 1000 and entry.label.startswith(("Package", "Tdie")) and hasattr(entry, "current") and round(entry.current) > 0:
 							cpu_type = "intel" if entry.label.startswith("Package") else "ryzen"
-							if not cls.cpu_temp_high:
+							if not cls.cpu_temp_high or cls.sensor_swap:
+								cls.sensor_swap = False
 								if getattr(entry, "high", None) != None and entry.high > 1: cls.cpu_temp_high = round(entry.high)
 								else: cls.cpu_temp_high = 80
 								if getattr(entry, "critical", None) != None and entry.critical > 1: cls.cpu_temp_crit = round(entry.critical)
 								else: cls.cpu_temp_crit = 95
 							temp = round(entry.current)
 						elif (entry.label.startswith(("Core", "Tccd", "CPU")) or (name.lower().startswith("cpu") and not entry.label)) and hasattr(entry, "current") and round(entry.current) > 0:
+							if (cpu_type == "intel" and entry.label.startswith("Core")) or (cpu_type == "ryzen" and entry.label.startswith("Tccd")):
+								entry_int = int(entry.label.replace("Core", "").replace("Tccd", ""))
+								if entry_int in core_dict:
+									continue
+								core_dict[entry_int] = round(entry.current)
+								continue
+							elif cpu_type in ["intel", "ryzen"]:
+								continue
 							if not cpu_type:
 								cpu_type = "other"
-								if not cls.cpu_temp_high:
+								if not cls.cpu_temp_high or cls.sensor_swap:
+									cls.sensor_swap = False
 									if getattr(entry, "high", None) != None and entry.high > 1: cls.cpu_temp_high = round(entry.high)
 									else: cls.cpu_temp_high = 60 if name == "cpu_thermal" else 80
 									if getattr(entry, "critical", None) != None and entry.critical > 1: cls.cpu_temp_crit = round(entry.critical)
 									else: cls.cpu_temp_crit = 80 if name == "cpu_thermal" else 95
 								temp = round(entry.current)
 							cores.append(round(entry.current))
-				if len(cores) < THREADS:
-					if cpu_type == "intel" or (cpu_type == "other" and len(cores) == THREADS // 2):
-						cls.cpu_temp[0].append(temp)
+				if core_dict:
+					cls.cpu_temp[0].append(temp)
+					if cpu_type == "ryzen":
+						ccds: int = len(core_dict)
+						cores_per_ccd: int = CORES // ccds
+						z: int = 1
+						for x in range(THREADS):
+							if x == CORES:
+								z = 1
+							if CORE_MAP[x] + 1 > cores_per_ccd * z:
+								z += 1
+							cls.cpu_temp[x+1].append(core_dict[z])
+					else:
+						for x in range(THREADS):
+							if not CORE_MAP[x] in core_dict:
+								continue
+							cls.cpu_temp[x+1].append(core_dict[CORE_MAP[x]])
+
+				elif len(cores) == THREADS / 2:
+					cls.cpu_temp[0].append(temp)
+					for n, t in enumerate(cores, start=1):
+						try:
+							cls.cpu_temp[n].append(t)
+							cls.cpu_temp[THREADS // 2 + n].append(t)
+						except IndexError:
+							break
+
+				else:
+					cls.cpu_temp[0].append(temp)
+					if len(cores) > 1:
 						for n, t in enumerate(cores, start=1):
 							try:
 								cls.cpu_temp[n].append(t)
-								cls.cpu_temp[THREADS // 2 + n].append(t)
 							except IndexError:
 								break
-					elif cpu_type == "ryzen" or cpu_type == "other":
-						cls.cpu_temp[0].append(temp)
-						if len(cores) < 1: cores.append(temp)
-						z = 1
-						for t in cores:
-							try:
-								for i in range(THREADS // len(cores)):
-									cls.cpu_temp[z + i].append(t)
-								z += i
-							except IndexError:
-								break
-					if cls.cpu_temp[0]:
-						for n in range(1, len(cls.cpu_temp)):
-							if len(cls.cpu_temp[n]) != len(cls.cpu_temp[n-1]):
-								cls.cpu_temp[n] = cls.cpu_temp[n//2].copy()
-				else:
-					cores.insert(0, temp)
-					for n, t in enumerate(cores):
-						try:
-							cls.cpu_temp[n].append(t)
-						except IndexError:
-							break
 			except Exception as e:
 					errlog.exception(f'{e}')
 					cls.got_sensors = False
-					#CONFIG.check_temp = False
 					CpuBox._calc_size()
 
 		else:
@@ -2780,7 +2814,7 @@ class CpuCollector(Collector):
 				if cls.sensor_method == "coretemp":
 					temp = max(0, int(subprocess.check_output(["coretemp", "-p"], text=True).strip()))
 					cores = [max(0, int(x)) for x in subprocess.check_output("coretemp", text=True).split()]
-					if len(cores) < THREADS:
+					if len(cores) == THREADS / 2:
 						cls.cpu_temp[0].append(temp)
 						for n, t in enumerate(cores, start=1):
 							try:
@@ -2814,12 +2848,14 @@ class CpuCollector(Collector):
 					CpuBox._calc_size()
 			else:
 				if not cores:
-					for n in range(THREADS + 1):
-						cls.cpu_temp[n].append(temp)
+					cls.cpu_temp[0].append(temp)
 
+		if not core_dict and len(cores) <= 1:
+			cls.cpu_temp_only = True
 		if len(cls.cpu_temp[0]) > 5:
 			for n in range(len(cls.cpu_temp)):
-				del cls.cpu_temp[n][0]
+				if cls.cpu_temp[n]:
+					del cls.cpu_temp[n][0]
 
 	@classmethod
 	def _draw(cls):
@@ -3826,6 +3862,11 @@ class Menu:
 				'Select the sensor that corresponds to',
 				'your cpu temperature.',
 				'Set to "Auto" for auto detection.'],
+			"show_coretemp" : [
+				'Show temperatures for cpu cores.',
+				'',
+				'Only works if check_temp is True and',
+				'the system is reporting core temps.'],
 			"draw_clock" : [
 				'Draw a clock at top of screen.',
 				'',
@@ -4165,6 +4206,7 @@ class Menu:
 						cpu_sensor_i += 1
 						if cpu_sensor_i > len(CONFIG.cpu_sensors) - 1: cpu_sensor_i = 0
 					Collector.collect_idle.wait()
+					CpuCollector.sensor_swap = True
 					CONFIG.cpu_sensor = CONFIG.cpu_sensors[cpu_sensor_i]
 					if CONFIG.check_temp and (CpuCollector.sensor_method != "psutil" or CONFIG.cpu_sensor == "Auto"):
 						CpuCollector.get_sensors()
@@ -4384,6 +4426,33 @@ def get_cpu_name() -> str:
 	name = " ".join(name.split())
 
 	return name
+
+def get_cpu_core_mapping() -> List[int]:
+	mapping: List[int] = []
+
+	if SYSTEM == "Linux" and os.path.isfile("/proc/cpuinfo"):
+		try:
+			mapping = [0] * THREADS
+			num = 0
+			with open("/proc/cpuinfo", "r") as f:
+				for line in f:
+					if line.startswith("processor"):
+						num = int(line.strip()[(line.index(": ")+2):])
+						if num > THREADS - 1:
+							break
+					elif line.startswith("core id"):
+						mapping[num] = int(line.strip()[(line.index(": ")+2):])
+			if num < THREADS - 1:
+				raise Exception
+		except:
+			mapping = []
+
+	if not mapping:
+		mapping = []
+		for _ in range(THREADS // CORES):
+			mapping.extend([x for x in range(CORES)])
+
+	return mapping
 
 def create_box(x: int = 0, y: int = 0, width: int = 0, height: int = 0, title: str = "", title2: str = "", line_color: Color = None, title_color: Color = None, fill: bool = True, box = None) -> str:
 	'''Create a box from a box object or by given arguments'''
@@ -4703,6 +4772,8 @@ def process_keys():
 
 
 CPU_NAME: str = get_cpu_name()
+
+CORE_MAP: List[int] = get_cpu_core_mapping()
 
 THEME: Theme
 
