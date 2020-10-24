@@ -81,10 +81,7 @@ elif stdargs.proc:
 elif stdargs.stat:
 	ARG_MODE = "stat"
 
-if stdargs.debug:
-	DEBUG = True
-else:
-	DEBUG = False
+DEBUG = stdargs.debug
 
 #? Variables ------------------------------------------------------------------------------------->
 
@@ -516,7 +513,7 @@ try:
 		errlog.setLevel(logging.DEBUG)
 	else:
 		errlog.setLevel(getattr(logging, CONFIG.log_level))
-		if CONFIG.log_level == "DEBUG": DEBUG = True
+		DEBUG = CONFIG.log_level == "DEBUG"
 	errlog.info(f'New instance of bpytop version {VERSION} started with pid {os.getpid()}')
 	errlog.info(f'Loglevel set to {"DEBUG" if DEBUG else CONFIG.log_level}')
 	errlog.debug(f'Using psutil version {".".join(str(x) for x in psutil.version_info)}')
@@ -781,8 +778,7 @@ class Key:
 
 	@classmethod
 	def has_key(cls) -> bool:
-		if cls.list: return True
-		else: return False
+		return bool(cls.list)
 
 	@classmethod
 	def clear(cls):
@@ -1154,8 +1150,8 @@ class Theme:
 
 		#* Get key names from DEFAULT_THEME dict to not leave any color unset if missing from theme dict
 		for item, value in DEFAULT_THEME.items():
-			default = False if item not in ["main_fg", "main_bg"] else True
-			depth = "fg" if item not in ["main_bg", "selected_bg"] else "bg"
+			default = item in ["main_fg", "main_bg"]
+			depth = "bg" if item in ["main_bg", "selected_bg"] else "fg"
 			if item in tdict:
 				setattr(self, item, Color(tdict[item], depth=depth, default=default))
 			else:
@@ -1501,8 +1497,8 @@ class Box:
 	y: int
 	width: int
 	height: int
-	proc_mode: bool = True if (CONFIG.view_mode == "proc" and not ARG_MODE) or ARG_MODE == "proc" else False
-	stat_mode: bool = True if (CONFIG.view_mode == "stat" and not ARG_MODE) or ARG_MODE == "stat" else False
+	proc_mode: bool = (CONFIG.view_mode == "proc" and not ARG_MODE) or ARG_MODE == "proc"
+	stat_mode: bool = (CONFIG.view_mode == "stat" and not ARG_MODE) or ARG_MODE == "stat"
 	out: str
 	bg: str
 	_b_cpu_h: int
@@ -1675,10 +1671,7 @@ class CpuBox(Box, SubBox):
 			cls.battery_status = status
 			return_true = True
 
-		if return_true or cls.resized or cls.redraw or Menu.active:
-			return True
-		else:
-			return False
+		return return_true or cls.resized or cls.redraw or Menu.active
 
 	@classmethod
 	def _draw_fg(cls):
@@ -1933,7 +1926,7 @@ class MemBox(Box):
 				gbg = f'{Mv.l(1)}'
 				gmv = f'{Mv.l(cls.mem_width - 2)}{Mv.u(cls.graph_height - 1)}'
 
-			big_mem: bool = True if cls.mem_width > 21 else False
+			big_mem: bool = cls.mem_width > 21
 			for name in cls.mem_names:
 				if Collector.collect_interrupt: return
 				if cls.mem_size > 2:
@@ -1965,7 +1958,7 @@ class MemBox(Box):
 			#* Disks
 			if CONFIG.show_disks and mem.disks:
 				cx = x + cls.mem_width - 1; cy = 0
-				big_disk: bool = True if cls.disks_width >= 25 else False
+				big_disk: bool = cls.disks_width >= 25
 				gli = f'{Mv.l(2)}{THEME.div_line}{Symbol.title_right}{Symbol.h_line * cls.disks_width}{THEME.mem_box}{Symbol.title_left}{Mv.l(cls.disks_width - 1)}'
 				for name, item in mem.disks.items():
 					if Collector.collect_interrupt: return
@@ -2068,7 +2061,7 @@ class NetBox(Box, SubBox):
 			if cls.redraw: stats["redraw"] = True
 			if stats["redraw"] or cls.resized:
 				Graphs.net[direction] = Graph(w - bw - 3, cls.graph_height[direction], THEME.gradient[direction], stats["speed"], max_value=net.sync_top if CONFIG.net_sync else stats["graph_top"],
-					invert=False if direction == "download" else True, color_max_value=net.net_min.get(direction) if CONFIG.net_color_fixed else None)
+					invert=direction != "download", color_max_value=net.net_min.get(direction) if CONFIG.net_color_fixed else None)
 			out += f'{Mv.to(y if direction == "download" else y + cls.graph_height["download"], x)}{Graphs.net[direction](None if stats["redraw"] else stats["speed"][-1])}'
 
 			out += (f'{Mv.to(by+cy, bx)}{THEME.main_fg}{cls.symbols[direction]} {strings["byte_ps"]:<10.10}' +
@@ -2685,7 +2678,7 @@ class CpuCollector(Collector):
 				if which("vcgencmd") and subprocess.check_output(["vcgencmd", "measure_temp"], text=True).strip().endswith("'C"):
 					cls.sensor_method = "vcgencmd"
 			except: pass
-		cls.got_sensors = True if cls.sensor_method else False
+		cls.got_sensors = bool(cls.sensor_method)
 
 	@classmethod
 	def _collect(cls):
@@ -2931,7 +2924,7 @@ class MemCollector(Collector):
 				filtering = tuple(v.strip() for v in CONFIG.disks_filter.strip().split(","))
 
 		try:
-			io_counters = psutil.disk_io_counters(perdisk=True if SYSTEM == "Linux" else False, nowrap=True)
+			io_counters = psutil.disk_io_counters(perdisk=SYSTEM == "Linux", nowrap=True)
 		except ValueError as e:
 			if not cls.io_error:
 				cls.io_error = True
@@ -3421,7 +3414,7 @@ class ProcCollector(Collector):
 				if pid in cls.collapsed:
 					collapse = cls.collapsed[pid]
 				else:
-					collapse = True if depth > CONFIG.tree_depth else False
+					collapse = depth > CONFIG.tree_depth
 					cls.collapsed[pid] = collapse
 
 				if collapse_to and not search:
@@ -3609,7 +3602,7 @@ class Menu:
 		redraw: bool = True
 		key: str = ""
 		skip: bool = False
-		main_active: bool = True if cls.active else False
+		main_active: bool = cls.active
 		cls.active = True
 		cls.resized = True
 		if not cls.background:
@@ -3738,7 +3731,7 @@ class Menu:
 		redraw: bool = True
 		key: str = ""
 		skip: bool = False
-		main_active: bool = True if cls.active else False
+		main_active: bool = cls.active
 		cls.active = True
 		cls.resized = True
 		d_quote: str
@@ -4095,11 +4088,11 @@ class Menu:
 								if selected.startswith("net_"):
 									NetCollector.net_min = {"download" : -1, "upload" : -1}
 								elif selected == "draw_clock":
-									Box.clock_on = True if len(CONFIG.draw_clock) > 0 else False
+									Box.clock_on = len(CONFIG.draw_clock) > 0
 									if not Box.clock_on: Draw.clear("clock", saved=True)
 							Term.refresh(force=True)
 							cls.resized = False
-					elif key == "backspace" and len(input_val) > 0:
+					elif key == "backspace" and len(input_val):
 						input_val = input_val[:-1]
 					elif key == "delete":
 							input_val = ""
@@ -4190,8 +4183,8 @@ class Menu:
 						view_mode_i += 1
 						if view_mode_i > len(CONFIG.view_modes) - 1: view_mode_i = 0
 					CONFIG.view_mode = CONFIG.view_modes[view_mode_i]
-					Box.proc_mode = True if CONFIG.view_mode == "proc" else False
-					Box.stat_mode = True if CONFIG.view_mode == "stat" else False
+					Box.proc_mode = CONFIG.view_mode == "proc"
+					Box.stat_mode = CONFIG.view_mode == "stat"
 					if ARG_MODE:
 						ARG_MODE = ""
 					Draw.clear(saved=True)
@@ -4247,10 +4240,7 @@ class Timer:
 		if cls.return_zero:
 			cls.return_zero = False
 			return False
-		if cls.timestamp + (CONFIG.update_ms / 1000) > time():
-			return True
-		else:
-			return False
+		return cls.timestamp + (CONFIG.update_ms / 1000) > time()
 
 	@classmethod
 	def left(cls) -> float:
@@ -4670,8 +4660,8 @@ def process_keys():
 				CONFIG.view_mode = CONFIG.view_modes[0]
 			else:
 				CONFIG.view_mode = CONFIG.view_modes[(CONFIG.view_modes.index(CONFIG.view_mode) + 1)]
-			Box.proc_mode = True if CONFIG.view_mode == "proc" else False
-			Box.stat_mode = True if CONFIG.view_mode == "stat" else False
+			Box.proc_mode = CONFIG.view_mode == "proc"
+			Box.stat_mode = CONFIG.view_mode == "stat"
 			Draw.clear(saved=True)
 			Term.refresh(force=True)
 		elif key.lower() in ["t", "k", "i"] and (ProcBox.selected > 0 or ProcCollector.detailed):
