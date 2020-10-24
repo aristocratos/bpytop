@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.45
+
+* Fixed: Missing temps if high or crit is None, by @TheComputerGuy96
+* Changed: Some refactoring by @dpshelio
+* Added: Proper mapping for correct coretemp display and added toggle for coretemp
+* Fixed: Cleanup of escaped characters in process argument string
+
 ## v1.0.44
 
 * Added: Spread CPUs accross columns evenly if possible, by @ErwinJunge
