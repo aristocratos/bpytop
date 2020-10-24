@@ -1228,7 +1228,7 @@ class Banner:
 			line_dark = Color.fg(f'#{80 - num * 6}')
 			for n, letter in enumerate(line):
 				if letter == "█" and c_color != line_color:
-					if n > 5 and n < 25: c_color = line_color2
+					if 5 < n < 25: c_color = line_color2
 					else: c_color = line_color
 					out_var += c_color
 				elif letter == " ":
@@ -2167,7 +2167,7 @@ class ProcBox(Box):
 			if cls.start < ProcCollector.num_procs - cls.select_max + 1: cls.start = ProcCollector.num_procs - cls.select_max + 1
 			elif cls.selected < cls.select_max: cls.selected = cls.select_max
 		elif key == "mouse_click":
-			if mouse_pos[0] > cls.x + cls.width - 4 and mouse_pos[1] > cls.current_y + 1 and mouse_pos[1] < cls.current_y + 1 + cls.select_max + 1:
+			if mouse_pos[0] > cls.x + cls.width - 4 and cls.current_y + 1 < mouse_pos[1] < cls.current_y + 1 + cls.select_max + 1:
 				if mouse_pos[1] == cls.current_y + 2:
 					cls.start = 1
 				elif mouse_pos[1] == cls.current_y + 1 + cls.select_max:
@@ -2462,7 +2462,7 @@ class ProcBox(Box):
 
 			end = f'{THEME.main_fg}{Fx.ub}' if CONFIG.proc_colors else Fx.ub
 			if cls.selected > cy: calc = cls.selected - cy
-			elif cls.selected > 0 and cls.selected <= cy: calc = cy - cls.selected
+			elif 0 < cls.selected <= cy: calc = cy - cls.selected
 			else: calc = cy
 			if CONFIG.proc_colors and not is_selected:
 				vals = []
@@ -3541,7 +3541,7 @@ class Menu:
 				if Key.mouse_moved():
 					mx, my = Key.get_mouse()
 					for name, pos in mouse_items.items():
-						if mx >= pos["x1"] and mx <= pos["x2"] and my >= pos["y1"] and my <= pos["y2"]:
+						if pos["x1"] <= mx <= pos["x2"] and pos["y1"] <= my <= pos["y2"]:
 							mouse_over = True
 							if name != menu_current:
 								menu_current = name
@@ -3686,10 +3686,10 @@ class Menu:
 
 				if key == "mouse_click":
 					mx, my = Key.get_mouse()
-					if mx >= x and mx < x + w and my >= y and my < y + h + 3:
-						if pages and my == y and mx > x + 56 and mx < x + 61:
+					if x <= mx < x + w and y <= my < y + h + 3:
+						if pages and my == y and x + 56 <  mx < x + 61:
 							key = "up"
-						elif pages and my == y and mx > x + 63 and mx < x + 68:
+						elif pages and my == y and x + 63 < mx < x + 68:
 							key = "down"
 					else:
 						key = "escape"
@@ -4044,11 +4044,11 @@ class Menu:
 				has_sel = False
 				if key == "mouse_click" and not inputting:
 					mx, my = Key.get_mouse()
-					if mx > x and mx < x + w and my > y and my < y + h + 2:
+					if x < mx < x + w and y < my < y + h + 2:
 						mouse_sel = ceil((my - y) / 2) - 1 + ceil((page-1) * (h / 2))
-						if pages and my == y+h+1 and mx > x+11 and mx < x+16:
+						if pages and my == y+h+1 and x+11 < mx < x+16:
 							key = "page_up"
-						elif pages and my == y+h+1 and mx > x+19 and mx < x+24:
+						elif pages and my == y+h+1 and x+19 < mx < x+24:
 							key = "page_down"
 						elif my == y+h+1:
 							pass
@@ -4572,7 +4572,7 @@ def process_keys():
 		key = Key.get()
 		if key in ["mouse_scroll_up", "mouse_scroll_down", "mouse_click"]:
 			mouse_pos = Key.get_mouse()
-			if mouse_pos[0] >= ProcBox.x and mouse_pos[1] >= ProcBox.current_y + 1 and mouse_pos[1] < ProcBox.current_y + ProcBox.current_h - 1:
+			if mouse_pos[0] >= ProcBox.x and ProcBox.current_y + 1 <= mouse_pos[1] < ProcBox.current_y + ProcBox.current_h - 1:
 				pass
 			elif key == "mouse_click":
 				key = "mouse_unselect"
