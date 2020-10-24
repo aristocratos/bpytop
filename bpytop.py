@@ -1707,14 +1707,11 @@ class CpuBox(Box, SubBox):
 				battery_time = ""
 			if not hasattr(Meters, "battery") or cls.resized:
 				Meters.battery = Meter(cls.battery_percent, 10, "cpu", invert=True)
-			if cls.battery_status == "Charging":
-				battery_symbol: str = "▲"
-			elif cls.battery_status == "Discharging":
-				battery_symbol = "▼"
-			elif cls.battery_status in ["Full", "Not charging"]:
-				battery_symbol = "■"
-			else:
-				battery_symbol = "○"
+			batery_symbols = {"Charging": "▲",
+							  "Discharging": "▼",
+							  "Full": "■",
+							  "Not charging": "■"}
+			battery_symbol: str = battery_symbols.get(cls.battery_status, "○")
 			battery_len: int = len(f'{CONFIG.update_ms}') + (11 if cls.width >= 100 else 0) + len(battery_time) + len(f'{cls.battery_percent}')
 			battery_pos = cls.width - battery_len - 17
 			if (battery_pos != cls.old_battery_pos or battery_len != cls.old_battery_len) and cls.old_battery_pos > 0 and not cls.resized:
