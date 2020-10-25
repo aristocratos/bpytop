@@ -2723,32 +2723,30 @@ class CpuCollector(Collector):
 		s_label: str = "_-_"
 		if cls.sensor_method == "psutil":
 			try:
+				if CONFIG.cpu_sensor != "Auto":
+					s_name, s_label = CONFIG.cpu_sensor.split(":", 1)
 				for name, entries in psutil.sensors_temperatures().items():
 					for num, entry in enumerate(entries, 1):
-						if CONFIG.cpu_sensor != "Auto":
-							s_name, s_label = CONFIG.cpu_sensor.split(":", 1)
-						if temp == 1000 and name == s_name and (entry.label == s_label or str(num) == s_label) and round(entry.current) > 0:
+						if name == s_name and (entry.label == s_label or str(num) == s_label) and round(entry.current) > 0:
 							if entry.label.startswith("Package"):
 								cpu_type = "intel"
 							elif entry.label.startswith("Tdie"):
 								cpu_type = "ryzen"
 							else:
 								cpu_type = "other"
-							if not cls.cpu_temp_high or cls.sensor_swap:
-								cls.sensor_swap = False
-								if getattr(entry, "high", None) != None and entry.high > 1: cls.cpu_temp_high = round(entry.high)
-								else: cls.cpu_temp_high = 80
-								if getattr(entry, "critical", None) != None and entry.critical > 1: cls.cpu_temp_crit = round(entry.critical)
-								else: cls.cpu_temp_crit = 95
+							if getattr(entry, "high", None) != None and entry.high > 1: cls.cpu_temp_high = round(entry.high)
+							else: cls.cpu_temp_high = 80
+							if getattr(entry, "critical", None) != None and entry.critical > 1: cls.cpu_temp_crit = round(entry.critical)
+							else: cls.cpu_temp_crit = 95
 							temp = round(entry.current)
-						elif temp == 1000 and entry.label.startswith(("Package", "Tdie")) and hasattr(entry, "current") and round(entry.current) > 0:
-							cpu_type = "intel" if entry.label.startswith("Package") else "ryzen"
-							if not cls.cpu_temp_high or cls.sensor_swap:
+						elif entry.label.startswith(("Package", "Tdie")) and cpu_type in ["", "other"] and s_name == "_-_" and hasattr(entry, "current") and round(entry.current) > 0:
+							if not cls.cpu_temp_high or cls.sensor_swap or cpu_type == "other":
 								cls.sensor_swap = False
 								if getattr(entry, "high", None) != None and entry.high > 1: cls.cpu_temp_high = round(entry.high)
 								else: cls.cpu_temp_high = 80
 								if getattr(entry, "critical", None) != None and entry.critical > 1: cls.cpu_temp_crit = round(entry.critical)
 								else: cls.cpu_temp_crit = 95
+							cpu_type = "intel" if entry.label.startswith("Package") else "ryzen"
 							temp = round(entry.current)
 						elif (entry.label.startswith(("Core", "Tccd", "CPU")) or (name.lower().startswith("cpu") and not entry.label)) and hasattr(entry, "current") and round(entry.current) > 0:
 							if (cpu_type == "intel" and entry.label.startswith("Core")) or (cpu_type == "ryzen" and entry.label.startswith("Tccd")):
