@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.46
+
+* Changed: psutil update to 5.7.3 in pypi package
+* Fixed: Better sensor and temperature detection
+
 ## v1.0.45
 
 * Fixed: Missing temps if high or crit is None, by @TheComputerGuy96
