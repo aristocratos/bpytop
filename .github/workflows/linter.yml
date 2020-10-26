@@ -51,3 +51,4 @@ jobs:
           DEFAULT_BRANCH: master
           MARKDOWN_CONFIG_FILE: .markdown-lint.yml
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
