@@ -3,6 +3,7 @@
 ## v1.0.47 (Under development)
 
 * Added: Testing, by @ErwinJunge
+* Added: Theme matcha-dark-sea, by @TheCynicalLiger
 
 ## v1.0.46
 
