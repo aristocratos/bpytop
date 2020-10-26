@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.47 (Under development)
+
+* Added: Testing, by @ErwinJunge
+
 ## v1.0.46
 
 * Changed: psutil update to 5.7.3 in pypi package
