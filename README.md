@@ -160,6 +160,12 @@ https://aur.archlinux.org/packages/bpytop/
 
 Available in [official Debian repository](https://tracker.debian.org/pkg/bpytop) since Debian 11
 
+>Installation
+
+```bash
+sudo apt install bpytop
+```
+
 Available for debian/ubuntu from [Azlux's repository](http://packages.azlux.fr/)
 
 ### FreeBSD package
