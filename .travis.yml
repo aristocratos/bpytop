@@ -9,6 +9,10 @@ jobs:
       python: 3.8
       env:
         - TOXENV=mypy
+    - name: "pylint"
+      python: 3.8
+      env:
+        - TOXENV=pylint
 before_install: pip install poetry
 install: pip install tox-travis
 script: tox
