@@ -934,7 +934,7 @@ class Draw:
 		out: str = ""
 		if not cls.strings: return
 		if names:
-			for name in sorted(cls.z_order, key=cls.z_order.get, reverse=True):
+			for name in sorted(cls.z_order, key=cls.z_order.get, reverse=True): #type: ignore
 				if name in names and name in cls.strings:
 					out += cls.strings[name]
 					if cls.save[name]:
@@ -943,7 +943,7 @@ class Draw:
 						cls.clear(name)
 			cls.now(out)
 		else:
-			for name in sorted(cls.z_order, key=cls.z_order.get, reverse=True):
+			for name in sorted(cls.z_order, key=cls.z_order.get, reverse=True): #type: ignore
 				if name in cls.strings:
 					out += cls.strings[name]
 					if cls.save[name]:
@@ -957,7 +957,7 @@ class Draw:
 	@classmethod
 	def saved_buffer(cls) -> str:
 		out: str = ""
-		for name in sorted(cls.z_order, key=cls.z_order.get, reverse=True):
+		for name in sorted(cls.z_order, key=cls.z_order.get, reverse=True): #type: ignore
 			if name in cls.saved:
 				out += cls.saved[name]
 		return out
@@ -1104,7 +1104,7 @@ class Theme:
 	cached: Dict[str, Dict[str, str]] = { "Default" : DEFAULT_THEME }
 	current: str = ""
 
-	main_bg = main_fg = title = hi_fg = selected_bg = selected_fg = inactive_fg = proc_misc = cpu_box = mem_box = net_box = proc_box = div_line = temp_start = temp_mid = temp_end = cpu_start = cpu_mid = cpu_end = free_start = free_mid = free_end = cached_start = cached_mid = cached_end = available_start = available_mid = available_end = used_start = used_mid = used_end = download_start = download_mid = download_end = upload_start = upload_mid = upload_end = graph_text = meter_bg = process_start = process_mid = process_end = NotImplemented
+	main_bg = main_fg = title = hi_fg = selected_bg = selected_fg = inactive_fg = proc_misc = cpu_box = mem_box = net_box = proc_box = div_line = temp_start = temp_mid = temp_end = cpu_start = cpu_mid = cpu_end = free_start = free_mid = free_end = cached_start = cached_mid = cached_end = available_start = available_mid = available_end = used_start = used_mid = used_end = download_start = download_mid = download_end = upload_start = upload_mid = upload_end = graph_text = meter_bg = process_start = process_mid = process_end = Colors.default
 
 	gradient: Dict[str, List[str]] = {
 		"temp" : [],
@@ -1182,8 +1182,8 @@ class Theme:
 				c = Color.fg(*rgb["start"])
 				self.gradient[name] += [c] * 101
 		#* Set terminal colors
-		Term.fg = self.main_fg
-		Term.bg = self.main_bg if CONFIG.theme_background else "\033[49m"
+		Term.fg = f'{self.main_fg}'
+		Term.bg = f'{self.main_bg}' if CONFIG.theme_background else "\033[49m"
 		Draw.now(self.main_fg, self.main_bg)
 
 	@classmethod
@@ -2391,7 +2391,7 @@ class ProcBox(Box):
 		#* Detailed box draw
 		if proc.detailed:
 			if proc.details["status"] == psutil.STATUS_RUNNING: stat_color = Fx.b
-			elif proc.details["status"] in [psutil.STATUS_DEAD, psutil.STATUS_STOPPED, psutil.STATUS_ZOMBIE]: stat_color = THEME.inactive_fg
+			elif proc.details["status"] in [psutil.STATUS_DEAD, psutil.STATUS_STOPPED, psutil.STATUS_ZOMBIE]: stat_color = f'{THEME.inactive_fg}'
 			else: stat_color = ""
 			expand = proc.expand
 			iw = (dw - 3) // (4 + expand)
@@ -4166,7 +4166,7 @@ class Menu:
 						if selected == "net_auto": NetCollector.auto_min = CONFIG.net_auto
 						NetBox.redraw = True
 					if selected == "theme_background":
-						Term.bg = THEME.main_bg if CONFIG.theme_background else "\033[49m"
+						Term.bg = f'{THEME.main_bg}' if CONFIG.theme_background else "\033[49m"
 						Draw.now(Term.bg)
 					if selected == "show_battery":
 						Draw.clear("battery", saved=True)
