@@ -14,6 +14,7 @@ psutil = "^5.7.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.1.1"
+mypy = "^0.790"
 
 [tool.poetry.scripts]
 bpytop = "bpytop:main"

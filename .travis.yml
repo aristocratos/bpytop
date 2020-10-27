@@ -3,6 +3,12 @@ python:
   - "3.6"
   - "3.7"
   - "3.8"
+jobs:
+  include:
+    - name: "mypy"
+      python: 3.8
+      env:
+        - TOXENV=mypy
 before_install: pip install poetry
 install: pip install tox-travis
 script: tox
