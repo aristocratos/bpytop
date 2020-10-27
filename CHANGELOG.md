@@ -1,9 +1,11 @@
 # Changelog
 
-## v1.0.47 (Under development)
+## v1.0.47
 
 * Added: Testing, by @ErwinJunge
 * Added: Theme matcha-dark-sea, by @TheCynicalLiger
+* Fixed: New type errors for mypy v 0.790
+* Added: pylint and mypy test with tox, by @ErwinJunge
 
 ## v1.0.46
 
