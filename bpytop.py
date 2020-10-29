@@ -2582,7 +2582,7 @@ class Collector:
 		debugged: bool = False
 		try:
 			while not cls.stopping:
-				if CONFIG.draw_clock: Box.draw_clock()
+				if CONFIG.draw_clock and CONFIG.update_ms != 1000: Box.draw_clock()
 				cls.collect_run.wait(0.1)
 				if not cls.collect_run.is_set():
 					continue
@@ -2603,6 +2603,7 @@ class Collector:
 				if cls.draw_now and not Menu.active and not cls.collect_interrupt:
 					if cls.use_draw_list: Draw.out(*draw_buffers)
 					else: Draw.out()
+				if CONFIG.draw_clock and CONFIG.update_ms == 1000: Box.draw_clock()
 				cls.collect_idle.set()
 				cls.collect_done.set()
 		except Exception as e:
