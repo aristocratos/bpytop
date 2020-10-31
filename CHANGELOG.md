@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.48
+
+* Added: Sync clock to timer if timer = 1000ms
+* Fixed: Wrong coretemp mapping when missing package id 0
+* Fixed: Sizing when coretemp is hidden
+* Added: Link to Terminess Powerline with included braille symbols in README.md
+
 ## v1.0.47
 
 * Added: Testing, by @ErwinJunge
