@@ -1690,6 +1690,7 @@ class CpuBox(Box, SubBox):
 		bx, by, bw, bh = cls.box_x + 1, cls.box_y + 1, cls.box_width - 2, cls.box_height - 2
 		hh: int = ceil(h / 2)
 		hide_cores: bool = (cpu.cpu_temp_only or not CONFIG.show_coretemp) and cpu.got_sensors
+		ct_width: int = (max(6, 6 * cls.column_size)) * hide_cores
 
 		if cls.resized or cls.redraw:
 			if not "m" in Key.mouse:
@@ -1698,9 +1699,9 @@ class CpuBox(Box, SubBox):
 			Graphs.cpu["up"] = Graph(w - bw - 3, hh, THEME.gradient["cpu"], cpu.cpu_usage[0])
 			Graphs.cpu["down"] = Graph(w - bw - 3, h - hh, THEME.gradient["cpu"], cpu.cpu_usage[0], invert=True)
 			Meters.cpu = Meter(cpu.cpu_usage[0][-1], bw - (21 if cpu.got_sensors else 9), "cpu")
-			if cls.column_size > 0:
+			if cls.column_size > 0 or ct_width > 0:
 				for n in range(THREADS):
-					Graphs.cores[n] = Graph(5 * cls.column_size + (12 * hide_cores), 1, None, cpu.cpu_usage[n + 1])
+					Graphs.cores[n] = Graph(5 * cls.column_size + ct_width, 1, None, cpu.cpu_usage[n + 1])
 			if cpu.got_sensors:
 				Graphs.temps[0] = Graph(5, 1, None, cpu.cpu_temp[0], max_value=cpu.cpu_temp_crit, offset=-23)
 				if cls.column_size > 1:
@@ -1754,8 +1755,8 @@ class CpuBox(Box, SubBox):
 		cy += 1
 		for n in range(1, THREADS + 1):
 			out += f'{THEME.main_fg}{Mv.to(by + cy, bx + cx)}{Fx.b + "C" + Fx.ub if THREADS < 100 else ""}{str(n):<{2 if cls.column_size == 0 else 3}}'
-			if cls.column_size > 0:
-				out += f'{THEME.inactive_fg}{"⡀" * (5 * cls.column_size + (12 * hide_cores ))}{Mv.l(5 * cls.column_size + (12 * hide_cores ))}{THEME.gradient["cpu"][cpu.cpu_usage[n][-1]]}{Graphs.cores[n-1](None if cls.resized else cpu.cpu_usage[n][-1])}'
+			if cls.column_size > 0 or ct_width > 0:
+				out += f'{THEME.inactive_fg}{"⡀" * (5 * cls.column_size + ct_width)}{Mv.l(5 * cls.column_size + ct_width)}{THEME.gradient["cpu"][cpu.cpu_usage[n][-1]]}{Graphs.cores[n-1](None if cls.resized else cpu.cpu_usage[n][-1])}'
 			else:
 				out += f'{THEME.gradient["cpu"][cpu.cpu_usage[n][-1]]}'
 			out += f'{cpu.cpu_usage[n][-1]:>{3 if cls.column_size < 2 else 4}}{THEME.main_fg}%'
@@ -1766,7 +1767,7 @@ class CpuBox(Box, SubBox):
 					out += f'{THEME.gradient["temp"][100 if cpu.cpu_temp[n][-1] >= cpu.cpu_temp_crit else (cpu.cpu_temp[n][-1] * 100 // cpu.cpu_temp_crit)]}'
 				out += f'{cpu.cpu_temp[n][-1]:>4}{THEME.main_fg}°C'
 			elif cpu.got_sensors and not hide_cores:
-				out += f'{Mv.r(12)}'
+				out += f'{Mv.r(6 * cls.column_size)}'
 			out += f'{THEME.div_line(Symbol.v_line)}'
 			cy += 1
 			if cy > ceil(THREADS/cls.box_columns) and n != THREADS:
