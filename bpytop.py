@@ -2750,7 +2750,7 @@ class CpuCollector(Collector):
 							cpu_type = "intel" if entry.label.startswith("Package") else "ryzen"
 							temp = round(entry.current)
 						elif (entry.label.startswith(("Core", "Tccd", "CPU")) or (name.lower().startswith("cpu") and not entry.label)) and hasattr(entry, "current") and round(entry.current) > 0:
-							if (cpu_type == "intel" and entry.label.startswith("Core")) or (cpu_type == "ryzen" and entry.label.startswith("Tccd")):
+							if entry.label.startswith(("Core", "Tccd")):
 								entry_int = int(entry.label.replace("Core", "").replace("Tccd", ""))
 								if entry_int in core_dict:
 									continue
@@ -2769,6 +2769,8 @@ class CpuCollector(Collector):
 								temp = round(entry.current)
 							cores.append(round(entry.current))
 				if core_dict:
+					if not temp:
+						temp = core_dict.get(0, 0)
 					cls.cpu_temp[0].append(temp)
 					if cpu_type == "ryzen":
 						ccds: int = len(core_dict)
