@@ -1767,7 +1767,7 @@ class CpuBox(Box, SubBox):
 					out += f'{THEME.gradient["temp"][100 if cpu.cpu_temp[n][-1] >= cpu.cpu_temp_crit else (cpu.cpu_temp[n][-1] * 100 // cpu.cpu_temp_crit)]}'
 				out += f'{cpu.cpu_temp[n][-1]:>4}{THEME.main_fg}°C'
 			elif cpu.got_sensors and not hide_cores:
-				out += f'{Mv.r(6 * cls.column_size)}'
+				out += f'{Mv.r(max(6, 6 * cls.column_size))}'
 			out += f'{THEME.div_line(Symbol.v_line)}'
 			cy += 1
 			if cy > ceil(THREADS/cls.box_columns) and n != THREADS:
