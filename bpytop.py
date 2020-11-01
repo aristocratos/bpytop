@@ -2784,12 +2784,12 @@ class CpuCollector(Collector):
 								z = 1
 							if CORE_MAP[x] + 1 > cores_per_ccd * z:
 								z += 1
-							cls.cpu_temp[x+1].append(core_dict[z])
+							if z in core_dict:
+								cls.cpu_temp[x+1].append(core_dict[z])
 					else:
 						for x in range(THREADS):
-							if not CORE_MAP[x] in core_dict:
-								continue
-							cls.cpu_temp[x+1].append(core_dict[CORE_MAP[x]])
+							if CORE_MAP[x] in core_dict:
+								cls.cpu_temp[x+1].append(core_dict[CORE_MAP[x]])
 
 				elif len(cores) == THREADS / 2:
 					cls.cpu_temp[0].append(temp)
