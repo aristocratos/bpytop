@@ -55,7 +55,7 @@ if errors:
 		print("\nInstall required modules!\n")
 	raise SystemExit(1)
 
-VERSION: str = "1.0.48"
+VERSION: str = "1.0.49"
 
 #? Argument parser ------------------------------------------------------------------------------->
 args = argparse.ArgumentParser()
@@ -2772,6 +2772,8 @@ class CpuCollector(Collector):
 				if core_dict:
 					if not temp:
 						temp = core_dict.get(0, 0)
+					if not cls.cpu_temp_high or not cls.cpu_temp_crit:
+						cls.cpu_temp_high, cls.cpu_temp_crit = 80, 95
 					cls.cpu_temp[0].append(temp)
 					if cpu_type == "ryzen":
 						ccds: int = len(core_dict)
