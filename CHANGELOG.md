@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.49
+
+* Fixed: Missing default values for cpu temp high and crit
+
 ## v1.0.48
 
 * Added: Sync clock to timer if timer = 1000ms
