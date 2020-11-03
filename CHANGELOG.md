@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.50
+
+* Fixed: Correction for missing coretemp values
+* Fixed: Cpu temp calculation from cores if missing and better multi cpu temp support
+* Added: New theme dusklight, by @drazil100
+
 ## v1.0.49
 
 * Fixed: Missing default values for cpu temp high and crit

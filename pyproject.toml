@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bpytop"
-version = "1.0.49"
+version = "1.0.50"
 description = "Resource monitor that shows usage and stats for processor, memory, disks, network and processes."
 readme = "README.md"
 authors = ["Aristocratos <jakob@qvantnet.com>"]
