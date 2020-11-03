@@ -200,6 +200,17 @@ Available from [adrien-overlay](https://github.com/aaaaadrien/adrien-overlay)
 sudo emerge -av sys-process/bpytop
 ```
 
+### Mageia Cauldron (Mageia 8)
+
+Available in Mageia Cauldron and then Mageia 8 when it is released.
+
+>Installation
+
+``` bash
+sudo urpmi bpytop
+sudo dnf install bpytop
+```
+
 ### MX Linux
 
 Available in the MX Test Repo as `bpytop`
