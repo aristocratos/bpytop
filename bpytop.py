@@ -2721,6 +2721,7 @@ class CpuCollector(Collector):
 		core_dict: Dict[int, int] = {}
 		entry_int: int = 0
 		cpu_type: str = ""
+		c_max: int = 0
 		s_name: str = "_-_"
 		s_label: str = "_-_"
 		if cls.sensor_method == "psutil":
@@ -2753,7 +2754,13 @@ class CpuCollector(Collector):
 						elif (entry.label.startswith(("Core", "Tccd", "CPU")) or (name.lower().startswith("cpu") and not entry.label)) and hasattr(entry, "current") and round(entry.current) > 0:
 							if entry.label.startswith(("Core", "Tccd")):
 								entry_int = int(entry.label.replace("Core", "").replace("Tccd", ""))
-								if entry_int in core_dict:
+								if entry_int in core_dict and cpu_type != "ryzen":
+									if c_max == 0:
+										c_max = max(core_dict) + 1
+									if c_max < THREADS // 2 and (entry_int + c_max) not in core_dict:
+										core_dict[(entry_int + c_max)] = round(entry.current)
+									continue
+								elif entry_int in core_dict:
 									continue
 								core_dict[entry_int] = round(entry.current)
 								continue
@@ -2770,8 +2777,8 @@ class CpuCollector(Collector):
 								temp = round(entry.current)
 							cores.append(round(entry.current))
 				if core_dict:
-					if not temp:
-						temp = core_dict.get(0, 0)
+					if not temp or temp == 1000:
+						temp = sum(core_dict.values()) // len(core_dict)
 					if not cls.cpu_temp_high or not cls.cpu_temp_crit:
 						cls.cpu_temp_high, cls.cpu_temp_crit = 80, 95
 					cls.cpu_temp[0].append(temp)
