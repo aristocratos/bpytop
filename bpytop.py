@@ -4678,10 +4678,10 @@ def process_keys():
 			continue
 		elif key == "q":
 			clean_quit()
-		elif key == "+" and CONFIG.update_ms + 100 <= 86399900:
+		elif (key == "+" or key == "=") and CONFIG.update_ms + 100 <= 86399900:
 			CONFIG.update_ms += 100
 			Box.draw_update_ms()
-		elif key == "-" and CONFIG.update_ms - 100 >= 100:
+		elif (key == "-" or key == "_") and CONFIG.update_ms - 100 >= 100:
 			CONFIG.update_ms -= 100
 			Box.draw_update_ms()
 		elif key in ["b", "n"]:
