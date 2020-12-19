@@ -152,8 +152,8 @@ background_update=$background_update
 #* Custom cpu model name, empty string to disable.
 custom_cpu_name="$custom_cpu_name"
 
-#* Optional filter for shown disks, should be last folder in path of a mountpoint, "root" replaces "/", separate multiple values with comma.
-#* Begin line with "exclude=" to change to exclude filter, oterwise defaults to "most include" filter. Example: disks_filter="exclude=boot, home"
+#* Optional filter for shown disks, should be full path of a mountpoint, separate multiple values with a comma ",".
+#* Begin line with "exclude=" to change to exclude filter, oterwise defaults to "most include" filter. Example: disks_filter="exclude=/boot, /home/user"
 disks_filter="$disks_filter"
 
 #* Show graphs instead of meters for memory values.
@@ -2980,11 +2980,11 @@ class MemCollector(Collector):
 			disk_io = None
 			io_string = ""
 			disk_name = disk.mountpoint.rsplit('/', 1)[-1] if not disk.mountpoint == "/" else "root"
-			while disk_name in disk_list: disk_name += "_"
+			#while disk_name in disk_list: disk_name += "_"
 			disk_list += [disk_name]
 			if cls.excludes and disk.fstype in cls.excludes:
 				continue
-			if filtering and ((not filter_exclude and not disk_name.endswith(filtering)) or (filter_exclude and disk_name.endswith(filtering))):
+			if filtering and ((not filter_exclude and not disk.mountpoint in filtering) or (filter_exclude and disk.mountpoint in filtering)):
 				continue
 			#elif filtering and disk_name.endswith(filtering)
 			if SYSTEM == "MacOS" and disk.mountpoint == "/private/var/vm":
@@ -3907,14 +3907,14 @@ class Menu:
 			"disks_filter" : [
 				'Optional filter for shown disks.',
 				'',
-				'Should be last folder in path of a mountpoint,',
+				'Should be full path of a mountpoint,',
 				'"root" replaces "/", separate multiple values',
-				'with a comma.',
+				'with a comma ",".',
 				'Begin line with "exclude=" to change to exclude',
 				'filter.',
 				'Oterwise defaults to "most include" filter.',
 				'',
-				'Example: disks_filter="exclude=boot, home"'],
+				'Example: disks_filter="exclude=/boot, /home/user"'],
 			"mem_graphs" : [
 				'Show graphs for memory values.',
 				'',
