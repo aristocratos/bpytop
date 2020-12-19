@@ -2661,9 +2661,9 @@ class CpuCollector(Collector):
 		cls.sensor_method = ""
 		if SYSTEM == "MacOS":
 			try:
-				if which("coretemp") and subprocess.check_output(["coretemp", "-p"], text=True).strip().replace("-", "").isdigit():
+				if which("coretemp") and subprocess.check_output(["coretemp", "-p"], universal_newlines=True).strip().replace("-", "").isdigit():
 					cls.sensor_method = "coretemp"
-				elif which("osx-cpu-temp") and subprocess.check_output("osx-cpu-temp", text=True).rstrip().endswith("°C"):
+				elif which("osx-cpu-temp") and subprocess.check_output("osx-cpu-temp", universal_newlines=True).rstrip().endswith("°C"):
 					cls.sensor_method = "osx-cpu-temp"
 			except: pass
 		elif CONFIG.cpu_sensor != "Auto" and CONFIG.cpu_sensor in CONFIG.cpu_sensors:
@@ -2683,7 +2683,7 @@ class CpuCollector(Collector):
 			except: pass
 		if not cls.sensor_method and SYSTEM == "Linux":
 			try:
-				if which("vcgencmd") and subprocess.check_output(["vcgencmd", "measure_temp"], text=True).strip().endswith("'C"):
+				if which("vcgencmd") and subprocess.check_output(["vcgencmd", "measure_temp"], universal_newlines=True).strip().endswith("'C"):
 					cls.sensor_method = "vcgencmd"
 			except: pass
 		cls.got_sensors = bool(cls.sensor_method)
@@ -2823,8 +2823,8 @@ class CpuCollector(Collector):
 		else:
 			try:
 				if cls.sensor_method == "coretemp":
-					temp = max(0, int(subprocess.check_output(["coretemp", "-p"], text=True).strip()))
-					cores = [max(0, int(x)) for x in subprocess.check_output("coretemp", text=True).split()]
+					temp = max(0, int(subprocess.check_output(["coretemp", "-p"], universal_newlines=True).strip()))
+					cores = [max(0, int(x)) for x in subprocess.check_output("coretemp", universal_newlines=True).split()]
 					if len(cores) == THREADS / 2:
 						cls.cpu_temp[0].append(temp)
 						for n, t in enumerate(cores, start=1):
@@ -2844,12 +2844,12 @@ class CpuCollector(Collector):
 						cls.cpu_temp_high = 85
 						cls.cpu_temp_crit = 100
 				elif cls.sensor_method == "osx-cpu-temp":
-					temp = max(0, round(float(subprocess.check_output("osx-cpu-temp", text=True).strip()[:-2])))
+					temp = max(0, round(float(subprocess.check_output("osx-cpu-temp", universal_newlines=True).strip()[:-2])))
 					if not cls.cpu_temp_high:
 						cls.cpu_temp_high = 85
 						cls.cpu_temp_crit = 100
 				elif cls.sensor_method == "vcgencmd":
-					temp = max(0, round(float(subprocess.check_output(["vcgencmd", "measure_temp"], text=True).strip()[5:-2])))
+					temp = max(0, round(float(subprocess.check_output(["vcgencmd", "measure_temp"], universal_newlines=True).strip()[5:-2])))
 					if not cls.cpu_temp_high:
 						cls.cpu_temp_high = 60
 						cls.cpu_temp_crit = 80
