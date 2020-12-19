@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.51
+
+* Fixed: Text argument in subprocess not working on python 3.6
+* Changed: Disks filtering now uses full mountpoint path for better accuracy
+* Fixed: Disable battery detection if /sys/class/power_supply is missing to avoid exception is psutil
+* Fixed: Catch faulty temperature readings instead of crashing
+* Changed: psutil update to 5.8.0 in pypi package (fixes errors on apple silicon cpus)
+
 ## v1.0.50
 
 * Fixed: Correction for missing coretemp values
