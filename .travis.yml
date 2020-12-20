@@ -3,14 +3,15 @@ python:
   - "3.6"
   - "3.7"
   - "3.8"
+  - "3.9"
 jobs:
   include:
     - name: "mypy"
-      python: 3.8
+      python: 3.9
       env:
         - TOXENV=mypy
     - name: "pylint"
-      python: 3.8
+      python: 3.9
       env:
         - TOXENV=pylint
 before_install: pip install poetry
