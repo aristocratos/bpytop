@@ -12,7 +12,7 @@ jobs:
       - run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
       - run: isort --profile black . || true
       - run: mypy .
-      - run: pylint -E bpytop || true
       - run: poetry install
+      - run: poetry run pylint -E bpytop
       - run: poetry run pytest
       - run: shopt -s globstar && pyupgrade --py36-plus **/*.py || true
