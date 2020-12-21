@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.52
+
+* Fixed: Removed "/sys/class/power_supply" check for FreeBSD and OsX
+
 ## v1.0.51
 
 * Fixed: Text argument in subprocess not working on python 3.6
