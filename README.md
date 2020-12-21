@@ -90,6 +90,9 @@ Recommended alternative [iTerm2](https://www.iterm2.com/)
 
 Will also need to be run as superuser to display stats for processes not owned by user.
 
+OsX on Apple Silicon (arm) requires psutil version 5.8.0 to work and currently has no temperature monitoring.
+Upgrade psutil with `sudo pip3 install psutil --upgrade`
+
 #### Linux, Mac Os X and FreeBSD
 
 For correct display, a terminal with support for:
@@ -153,6 +156,26 @@ Options menu.
 ``` bash
 pip3 install bpytop --upgrade
 ```
+
+### Mac OsX
+
+>Install with Homebrew
+```bash
+brew install bpytop
+```
+
+>Optional coretemp (Shows temperatures for cpu cores)
+```bash
+brew install hacker1024/hacker1024/coretemp
+```
+
+>Alternatively install with MacPorts
+```bash
+port install bpytop
+```
+
+OsX on Apple Silicon (arm) requires psutil version 5.8.0 to work and currently has no temperature monitoring.
+Upgrade psutil with `sudo pip3 install psutil --upgrade`
 
 ### Arch Linux
 
