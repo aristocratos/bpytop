@@ -533,7 +533,8 @@ except Exception as e:
 	errlog.exception(f'{e}')
 	raise SystemExit(1)
 
-if not os.path.isdir("/sys/class/power_supply"):
+if not (os.path.isdir("/sys/class/power_supply") or
+        subprocess.call(['sysctl', '-q', 'hw.acpi.battery.units'], stdout=subprocess.DEVNULL) == 0):
 	CONFIG.show_battery = False
 
 if psutil.version_info[0] < 5 or (psutil.version_info[0] == 5 and psutil.version_info[1] < 7):
