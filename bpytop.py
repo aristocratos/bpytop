@@ -533,7 +533,7 @@ except Exception as e:
 	errlog.exception(f'{e}')
 	raise SystemExit(1)
 
-if not os.path.isdir("/sys/class/power_supply"):
+if SYSTEM == "Linux" and not os.path.isdir("/sys/class/power_supply"):
 	CONFIG.show_battery = False
 
 if psutil.version_info[0] < 5 or (psutil.version_info[0] == 5 and psutil.version_info[1] < 7):
