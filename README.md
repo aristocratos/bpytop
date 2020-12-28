@@ -8,7 +8,7 @@
 ![OSX](https://img.shields.io/badge/-OSX-black?logo=apple)
 ![FreeBSD](https://img.shields.io/badge/-FreeBSD-red?logo=freebsd)
 ![Usage](https://img.shields.io/badge/Usage-System%20resource%20monitor-yellow)
-![Python](https://img.shields.io/badge/Python-v3.6%5E-green?logo=python)
+![Python](https://img.shields.io/badge/Python-v3.7%5E-green?logo=python)
 ![bpytop_version](https://img.shields.io/github/v/tag/aristocratos/bpytop?label=version)
 [![pypi_version](https://img.shields.io/pypi/v/bpytop?label=pypi)](https://pypi.org/project/bpytop)
 [![Build Status](https://travis-ci.com/aristocratos/bpytop.svg?branch=master)](https://travis-ci.com/aristocratos/bpytop)
@@ -126,7 +126,7 @@ Dropbear seems to not be able to set correct locale. So if accessing bpytop over
 
 ## Dependencies
 
-**[Python3](https://www.python.org/downloads/)** (v3.6 or later)
+**[Python3](https://www.python.org/downloads/)** (v3.7 or later)
 
 **[psutil module](https://github.com/giampaolo/psutil)** (v5.7.0 or later)
 
