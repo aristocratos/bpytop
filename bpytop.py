@@ -462,23 +462,25 @@ class Config:
 					line = line.strip()
 					if line.startswith("#? Config"):
 						new_config["version"] = line[line.find("v. ") + 3:]
-					for key in self.keys:
-						if line.startswith(key):
-							line = line.replace(key + "=", "")
-							if line.startswith('"'):
-								line = line.strip('"')
-							if type(getattr(self, key)) == int:
-								try:
-									new_config[key] = int(line)
-								except ValueError:
-									self.warnings.append(f'Config key "{key}" should be an integer!')
-							if type(getattr(self, key)) == bool:
-								try:
-									new_config[key] = bool(strtobool(line))
-								except ValueError:
-									self.warnings.append(f'Config key "{key}" can only be True or False!')
-							if type(getattr(self, key)) == str:
-									new_config[key] = str(line)
+						continue
+					if not '=' in line:
+						continue
+					key, line = line.split('=', maxsplit=1)
+					if not key in self.keys:
+						continue
+					line = line.strip('"')
+					if type(getattr(self, key)) == int:
+						try:
+							new_config[key] = int(line)
+						except ValueError:
+							self.warnings.append(f'Config key "{key}" should be an integer!')
+					if type(getattr(self, key)) == bool:
+						try:
+							new_config[key] = bool(strtobool(line))
+						except ValueError:
+							self.warnings.append(f'Config key "{key}" can only be True or False!')
+					if type(getattr(self, key)) == str:
+						new_config[key] = str(line)
 		except Exception as e:
 			errlog.exception(str(e))
 		if "proc_sorting" in new_config and not new_config["proc_sorting"] in self.sorting_options:
