@@ -3092,6 +3092,7 @@ class NetCollector(Collector):
 	def _get_nics(cls):
 		'''Get a list of all network devices sorted by highest throughput'''
 		cls.nic_i = 0
+		cls.nics = []
 		cls.nic = ""
 		try:
 			io_all = psutil.net_io_counters(pernic=True)
@@ -3110,10 +3111,15 @@ class NetCollector(Collector):
 
 	@classmethod
 	def switch(cls, key: str):
-		if len(cls.nics) < 2: return
-		cls.nic_i += +1 if key == "n" else -1
-		if cls.nic_i >= len(cls.nics): cls.nic_i = 0
-		elif cls.nic_i < 0: cls.nic_i = len(cls.nics) - 1
+		if len(cls.nics) < 2 and cls.nic in cls.nics:
+			return
+
+		if cls.nic_i == -1:
+			cls.nic_i = 0 if key == "n" else -1
+		else:
+			cls.nic_i += +1 if key == "n" else -1
+
+		cls.nic_i %= len(cls.nics)
 		cls.new_nic = cls.nics[cls.nic_i]
 		cls.switched = True
 		Collector.collect(NetCollector, redraw=True)
@@ -3124,11 +3130,20 @@ class NetCollector(Collector):
 		stat: Dict
 		up_stat = psutil.net_if_stats()
 
+		if sorted(cls.nics) != sorted(nic for nic in up_stat if up_stat[nic].isup):
+			old_nic = cls.nic
+			cls._get_nics()
+			cls.nic = old_nic
+			if cls.nic not in cls.nics:
+				cls.nic_i = -1
+			else:
+				cls.nic_i = cls.nics.index(cls.nic)
+
 		if cls.switched:
 			cls.nic = cls.new_nic
 			cls.switched = False
 
-		if not cls.nic or cls.nic not in up_stat or not up_stat[cls.nic].isup:
+		if not cls.nic or cls.nic not in up_stat:
 			cls._get_nics()
 			if not cls.nic: return
 		try:
