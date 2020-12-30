@@ -346,7 +346,7 @@ Config files stored in "$HOME/.config/bpytop" folder
 "/etc/bpytop.conf" will be used as default seed for config file creation if it exists.
 
 ```bash
-#? Config file for bpytop v. 1.0.22
+#? Config file for bpytop v. 1.0.53
 
 #* Color theme, looks for a .theme file in "/usr/[local/]share/bpytop/themes" and "~/.config/bpytop/themes", "Default" for builtin default theme.
 #* Prefix name by a plus sign (+) for a theme located in user themes folder, i.e. color_theme="+monokai"
@@ -361,6 +361,10 @@ view_mode=full
 #* Update time in milliseconds, increases automatically if set below internal loops processing time, recommended 2000 ms or above for better sample times for graphs.
 update_ms=2000
 
+#* Processes update multiplier, sets how often the process list is updated as a multiplier of "update_ms".
+#* Set to 2 or higher to greatly decrease bpytop cpu usage. (Only integers)
+proc_update_mult=2
+
 #* Processes sorting, "pid" "program" "arguments" "threads" "user" "memory" "cpu lazy" "cpu responsive",
 #* "cpu lazy" updates top process over time, "cpu responsive" updates top process directly.
 proc_sorting="cpu lazy"
@@ -371,6 +375,9 @@ proc_reversed=False
 #* Show processes as a tree
 proc_tree=False
 
+#* Which depth the tree view should auto collapse processes at
+tree_depth=3
+
 #* Use the cpu graph colors in the process list.
 proc_colors=True
 
@@ -378,7 +385,7 @@ proc_colors=True
 proc_gradient=True
 
 #* If process cpu usage should be of the core it's running on or usage of the total available cpu power.
-proc_per_core=True
+proc_per_core=False
 
 #* Show process memory as bytes instead of percent
 proc_mem_bytes=True
@@ -386,8 +393,14 @@ proc_mem_bytes=True
 #* Check cpu temperature, needs "osx-cpu-temp" on MacOS X.
 check_temp=True
 
+#* Which sensor to use for cpu temperature, use options menu to select from list of available sensors.
+cpu_sensor=Auto
+
+#* Show temperatures for cpu cores also if check_temp is True and sensors has been found
+show_coretemp=True
+
 #* Draw a clock at top of screen, formatting according to strftime, empty string to disable.
-draw_clock="%X"
+draw_clock="%H:%M"
 
 #* Update main ui in background when menus are showing, set this to false if the menus is flickering too much for comfort.
 background_update=True
@@ -395,9 +408,9 @@ background_update=True
 #* Custom cpu model name, empty string to disable.
 custom_cpu_name=""
 
-#* Optional filter for shown disks, should be last folder in path of a mountpoint, "root" replaces "/", separate multiple values with comma.
-#* Begin line with "exclude=" to change to exclude filter, oterwise defaults to "most include" filter. Example: disks_filter="exclude=boot, home"
-disks_filter=""
+#* Optional filter for shown disks, should be full path of a mountpoint, separate multiple values with a comma ",".
+#* Begin line with "exclude=" to change to exclude filter, oterwise defaults to "most include" filter. Example: disks_filter="exclude=/boot, /home/user"
+disks_filter="exclude=/boot"
 
 #* Show graphs instead of meters for memory values.
 mem_graphs=True
@@ -419,10 +432,13 @@ net_upload="100Mbit"
 net_auto=True
 
 #* Sync the scaling for download and upload to whichever currently has the highest scale
-net_sync=False
+net_sync=True
 
 #* If the network graphs color gradient should scale to bandwith usage or auto scale, bandwith usage is based on "net_download" and "net_upload" values
 net_color_fixed=False
+
+#* Show battery stats in top right if battery is present
+show_battery=True
 
 #* Show init screen at startup, the init screen is purely cosmetical
 show_init=False
@@ -432,7 +448,7 @@ update_check=True
 
 #* Set loglevel for "~/.config/bpytop/error.log" levels are: "ERROR" "WARNING" "INFO" "DEBUG".
 #* The level set includes all lower levels, i.e. "DEBUG" will show all logging info.
-log_level=WARNING
+log_level=DEBUG
 
 ```
 
