@@ -109,6 +109,10 @@ view_mode=$view_mode
 #* Update time in milliseconds, increases automatically if set below internal loops processing time, recommended 2000 ms or above for better sample times for graphs.
 update_ms=$update_ms
 
+#* Processes update multiplier, sets how often the process list is updated as a multiplier of "update_ms".
+#* Set to 2 or higher to greatly decrease bpytop cpu usage. (Only integers)
+proc_update_mult=$proc_update_mult
+
 #* Processes sorting, "pid" "program" "arguments" "threads" "user" "memory" "cpu lazy" "cpu responsive",
 #* "cpu lazy" updates top process over time, "cpu responsive" updates top process directly.
 proc_sorting="$proc_sorting"
@@ -360,11 +364,12 @@ class Config:
 	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name",
 						"proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes", "disks_filter", "update_check", "log_level", "mem_graphs", "show_swap",
 						"swap_disk", "show_disks", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "view_mode", "theme_background",
-						"net_sync", "show_battery", "tree_depth", "cpu_sensor", "show_coretemp"]
+						"net_sync", "show_battery", "tree_depth", "cpu_sensor", "show_coretemp", "proc_update_mult"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	theme_background: bool = True
 	update_ms: int = 2000
+	proc_update_mult: int = 2
 	proc_sorting: str = "cpu lazy"
 	proc_reversed: bool = False
 	proc_tree: bool = False
@@ -2566,6 +2571,7 @@ class Collector:
 	collect_interrupt: bool = False
 	proc_interrupt: bool = False
 	use_draw_list: bool = False
+	proc_counter: int = 1
 
 	@classmethod
 	def start(cls):
@@ -2640,9 +2646,19 @@ class Collector:
 		if collectors:
 			cls.collect_queue = [*collectors]
 			cls.use_draw_list = True
+			if ProcCollector in cls.collect_queue:
+				cls.proc_counter = 1
 
 		else:
 			cls.collect_queue = list(cls.__subclasses__())
+			if CONFIG.proc_update_mult > 1:
+				if cls.proc_counter > 1:
+					cls.collect_queue.remove(ProcCollector)
+				if cls.proc_counter == CONFIG.proc_update_mult:
+					cls.proc_counter = 0
+				cls.proc_counter += 1
+
+
 
 		cls.collect_run.set()
 
@@ -3841,6 +3857,13 @@ class Menu:
 				'',
 				'Min value: 100 ms',
 				'Max value: 86400000 ms = 24 hours.'],
+			"proc_update_mult" : [
+				'Processes update multiplier.',
+				'Sets how often the process list is updated as',
+				'a multiplier of "update_ms".',
+				'',
+				'Set to 2 or higher to greatly decrease bpytop',
+				'cpu usage. (Only integers)'],
 			"proc_sorting" : [
 				'Processes sorting option.',
 				'',
@@ -4150,6 +4173,12 @@ class Menu:
 									CONFIG.update_ms = 86399900
 								else:
 									CONFIG.update_ms = int(input_val)
+							elif selected == "proc_update_mult":
+								if not input_val or int(input_val) < 1:
+									CONFIG.proc_update_mult = 1
+								else:
+									CONFIG.proc_update_mult = int(input_val)
+								Collector.proc_counter = 1
 							elif selected == "tree_depth":
 								if not input_val or int(input_val) < 0:
 									CONFIG.tree_depth = 0
@@ -4178,7 +4207,7 @@ class Menu:
 				elif key in ["escape", "o", "M", "f2"]:
 					cls.close = True
 					break
-				elif key == "enter" and selected in ["update_ms", "disks_filter", "custom_cpu_name", "net_download", "net_upload", "draw_clock", "tree_depth"]:
+				elif key == "enter" and selected in ["update_ms", "disks_filter", "custom_cpu_name", "net_download", "net_upload", "draw_clock", "tree_depth", "proc_update_mult"]:
 					inputting = True
 					input_val = str(getattr(CONFIG, selected))
 				elif key == "left" and selected == "update_ms" and CONFIG.update_ms - 100 >= 100:
@@ -4187,6 +4216,12 @@ class Menu:
 				elif key == "right" and selected == "update_ms" and CONFIG.update_ms + 100 <= 86399900:
 					CONFIG.update_ms += 100
 					Box.draw_update_ms()
+				elif key == "left" and selected == "proc_update_mult" and CONFIG.proc_update_mult > 1:
+					CONFIG.proc_update_mult -= 1
+					Collector.proc_counter = 1
+				elif key == "right" and selected == "proc_update_mult":
+					CONFIG.proc_update_mult += 1
+					Collector.proc_counter = 1
 				elif key == "left" and selected == "tree_depth" and CONFIG.tree_depth > 0:
 					CONFIG.tree_depth -= 1
 					ProcCollector.collapsed = {}
