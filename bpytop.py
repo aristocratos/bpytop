@@ -497,7 +497,7 @@ class Config:
 		if "view_mode" in new_config and not new_config["view_mode"] in self.view_modes:
 			new_config["view_mode"] = "_error_"
 			self.warnings.append(f'Config key "view_mode" didn\'t get an acceptable value!')
-		if isinstance(new_config["update_ms"], int) and new_config["update_ms"] < 100:
+		if "update_ms" in new_config and int(new_config["update_ms"]) < 100:
 			new_config["update_ms"] = 100
 			self.warnings.append(f'Config key "update_ms" can\'t be lower than 100!')
 		for net_name in ["net_download", "net_upload"]:
