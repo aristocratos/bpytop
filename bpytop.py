@@ -225,7 +225,7 @@ THREADS: int = psutil.cpu_count(logical=True) or 1
 THREAD_ERROR: int = 0
 
 DEFAULT_THEME: Dict[str, str] = {
-	"main_bg" : "",
+	"main_bg" : "#00",
 	"main_fg" : "#cc",
 	"title" : "#ee",
 	"hi_fg" : "#969696",
