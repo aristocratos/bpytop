@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.0.53
+
+* Added: Process update multiplier (only update processes every X times) to reduce cpu usage (set to 2 by default)
+* Changed: Patch for faster loading of config file, by @rohithill
+* Added: Network interface list now updates automatically, by @UmarJ
+* Notice: Bumped minimum python version to 3.7 because of unicode issues in 3.6
+* Added: pylint disable=unsubscriptable-object because of python 3.9 issue
+* Changed: Default theme now has a black background
+* Fixed: Crash if bpytop.conf exists but don't have update_ms variable set
+
 ## v1.0.52
 
 * Fixed: Removed "/sys/class/power_supply" check for FreeBSD and OsX
