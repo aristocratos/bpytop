@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.54
+
+* Fixed: Added nullfs filesystem to auto exclude from disks list
+* Fixed: Process box not updating on window resize
+
 ## v1.0.53
 
 * Added: Process update multiplier (only update processes every X times) to reduce cpu usage (set to 2 by default)
