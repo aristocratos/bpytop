@@ -2919,7 +2919,7 @@ class MemCollector(Collector):
 
 	old_disks: List[str] = []
 
-	excludes: List[str] = ["squashfs"]
+	excludes: List[str] = ["squashfs", "nullfs"]
 	if SYSTEM == "BSD": excludes += ["devfs", "tmpfs", "procfs", "linprocfs", "gvfs", "fusefs"]
 
 	buffer: str = MemBox.buffer
