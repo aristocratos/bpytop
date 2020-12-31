@@ -604,6 +604,7 @@ class Term:
 
 		Key.mouse = {}
 		Box.calc_sizes()
+		Collector.proc_counter = 1
 		if Init.running: cls.resized = False; return
 		if Menu.active: Menu.resized = True
 		Box.draw_bg(now=False)
