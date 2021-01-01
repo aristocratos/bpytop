@@ -1910,13 +1910,10 @@ class MemBox(Box):
 						Meters.mem[name] = Meter(mem.percent[name], cls.mem_meter, name)
 				if cls.swap_on:
 					for name in cls.swap_names:
-						if CONFIG.mem_graphs and not CONFIG.swap_disk:
-							Meters.swap[name] = Graph(cls.mem_meter, cls.graph_height, THEME.gradient[name], mem.swap_vlist[name])
-						elif CONFIG.swap_disk and CONFIG.show_disks:
-							Meters.disks_used["__swap"] = Meter(mem.swap_percent["used"], cls.disk_meter, "used")
-							if len(mem.disks) * 3 <= h + 1:
-								Meters.disks_free["__swap"] = Meter(mem.swap_percent["free"], cls.disk_meter, "free")
+						if CONFIG.swap_disk and CONFIG.show_disks:
 							break
+						elif CONFIG.mem_graphs and not CONFIG.swap_disk:
+							Meters.swap[name] = Graph(cls.mem_meter, cls.graph_height, THEME.gradient[name], mem.swap_vlist[name])
 						else:
 							Meters.swap[name] = Meter(mem.swap_percent[name], cls.mem_meter, name)
 			if cls.disk_meter > 0:
@@ -1990,14 +1987,14 @@ class MemBox(Box):
 					out += Fx.trans(f'{Mv.to(y+cy, x+cx)}{gli}{THEME.title}{Fx.b}{item["name"]:{cls.disks_width - 2}.12}{Mv.to(y+cy, x + cx + cls.disks_width - 11)}{item["total"][:None if big_disk else -2]:>9}')
 					out += f'{Mv.to(y+cy, x + cx + (cls.disks_width // 2) - (len(item["io"]) // 2) - 2)}{Fx.ub}{THEME.main_fg}{item["io"]}{Fx.ub}{THEME.main_fg}{Mv.to(y+cy+1, x+cx)}'
 					out += f'Used:{str(item["used_percent"]) + "%":>4} ' if big_disk else "U "
-					out += f'{Meters.disks_used[name]}{item["used"][:None if big_disk else -2]:>{9 if big_disk else 7}}'
+					out += f'{Meters.disks_used[name](None if cls.resized else mem.disks[name]["used_percent"])}{item["used"][:None if big_disk else -2]:>{9 if big_disk else 7}}'
 					cy += 2
 
 					if len(mem.disks) * 3 <= h + 1:
 						if cy > h - 1: break
 						out += Mv.to(y+cy, x+cx)
 						out += f'Free:{str(item["free_percent"]) + "%":>4} ' if big_disk else f'{"F "}'
-						out += f'{Meters.disks_free[name]}{item["free"][:None if big_disk else -2]:>{9 if big_disk else 7}}'
+						out += f'{Meters.disks_free[name](None if cls.resized else mem.disks[name]["free_percent"])}{item["free"][:None if big_disk else -2]:>{9 if big_disk else 7}}'
 						cy += 1
 						if len(mem.disks) * 4 <= h + 1: cy += 1
 		except (KeyError, TypeError):
