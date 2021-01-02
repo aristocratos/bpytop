@@ -62,6 +62,7 @@ args = argparse.ArgumentParser()
 args.add_argument("-f" , "--full"		,action="store_true" ,help ="Start in full mode showing all boxes [default]")
 args.add_argument("-p" , "--proc"		,action="store_true" ,help ="Start in minimal mode without memory and net boxes")
 args.add_argument("-s" , "--stat"		,action="store_true" ,help ="Start in minimal mode without process box")
+args.add_argument("-n" , "--net"                ,action="store_true" ,help ="Start in net mode showing only the graph for network usage")
 args.add_argument("-v" , "--version"	,action="store_true" ,help ="Show version info and exit")
 args.add_argument("--debug"				,action="store_true" ,help ="Start with loglevel set to DEBUG overriding value set in config")
 stdargs = args.parse_args()
@@ -79,6 +80,8 @@ elif stdargs.proc:
 	ARG_MODE = "proc"
 elif stdargs.stat:
 	ARG_MODE = "stat"
+elif stdargs.net:
+	ARG_MODE = "net"
 
 DEBUG = stdargs.debug
 
@@ -406,7 +409,7 @@ class Config:
 	sorting_options: List[str] = ["pid", "program", "arguments", "threads", "user", "memory", "cpu lazy", "cpu responsive"]
 	log_levels: List[str] = ["ERROR", "WARNING", "INFO", "DEBUG"]
 
-	view_modes: List[str] = ["full", "proc", "stat"]
+	view_modes: List[str] = ["full", "proc", "stat", "net"]
 
 	cpu_sensors: List[str] = [ "Auto" ]
 
@@ -1512,6 +1515,7 @@ class Box:
 	height: int
 	proc_mode: bool = (CONFIG.view_mode == "proc" and not ARG_MODE) or ARG_MODE == "proc"
 	stat_mode: bool = (CONFIG.view_mode == "stat" and not ARG_MODE) or ARG_MODE == "stat"
+	net_mode: bool = (CONFIG.view_mode == "net" and not ARG_MODE) or ARG_MODE == "net"
 	out: str
 	bg: str
 	_b_cpu_h: int
@@ -1643,6 +1647,7 @@ class CpuBox(Box, SubBox):
 
 	@classmethod
 	def _draw_bg(cls) -> str:
+		if cls.net_mode: return ""
 		if not "M" in Key.mouse:
 			Key.mouse["M"] = [[cls.x + 10 + i, cls.y] for i in range(6)]
 		return (f'{create_box(box=cls, line_color=THEME.cpu_box)}'
@@ -1692,6 +1697,7 @@ class CpuBox(Box, SubBox):
 
 	@classmethod
 	def _draw_fg(cls):
+		if cls.net_mode: return ""
 		cpu = CpuCollector
 		if cpu.redraw: cls.redraw = True
 		out: str = ""
@@ -1875,6 +1881,7 @@ class MemBox(Box):
 	@classmethod
 	def _draw_bg(cls) -> str:
 		if cls.proc_mode: return ""
+		if cls.net_mode: return ""
 		out: str = ""
 		out += f'{create_box(box=cls, line_color=THEME.mem_box)}'
 		if CONFIG.show_disks:
@@ -1887,6 +1894,7 @@ class MemBox(Box):
 	@classmethod
 	def _draw_fg(cls):
 		if cls.proc_mode: return
+		if cls.net_mode: return
 		mem = MemCollector
 		if mem.redraw: cls.redraw = True
 		out: str = ""
@@ -2021,13 +2029,17 @@ class NetBox(Box, SubBox):
 
 	@classmethod
 	def _calc_size(cls):
-		width_p: int
+		width_p: int; height_p: int
 		if cls.stat_mode:
 			width_p = 100
 		else:
 			width_p = cls.width_p
 		cls.width = round(Term.width * width_p / 100)
 		cls.height = Term.height - Box._b_cpu_h - Box._b_mem_h
+		if cls.net_mode:
+			width_p, height_p = 100, 100
+			cls.width = round(Term.width * width_p / 100)
+			cls.height = round(Term.height * height_p / 100)
 		cls.y = Term.height - cls.height + 1
 		cls.box_width = 27 if cls.width > 45 else 19
 		cls.box_height = 9 if cls.height > 10 else cls.height - 2
@@ -2153,6 +2165,7 @@ class ProcBox(Box):
 	@classmethod
 	def _draw_bg(cls) -> str:
 		if cls.stat_mode: return ""
+		if cls.net_mode: return ""
 		return create_box(box=cls, line_color=THEME.proc_box)
 
 	@classmethod
@@ -2222,6 +2235,7 @@ class ProcBox(Box):
 	@classmethod
 	def _draw_fg(cls):
 		if cls.stat_mode: return
+		if cls.net_mode: return
 		proc = ProcCollector
 		if proc.proc_interrupt: return
 		if proc.redraw: cls.redraw = True
@@ -3849,7 +3863,8 @@ class Menu:
 				'',
 				'"full" for everything shown.',
 				'"proc" for cpu stats and processes.',
-				'"stat" for cpu, mem, disks and net stats shown.'],
+				'"stat" for cpu, mem, disks and net stats shown.'
+				'"net"  for net stats shown.'],
 			"update_ms" : [
 				'Update time in milliseconds.',
 				'',
@@ -4295,6 +4310,7 @@ class Menu:
 					CONFIG.view_mode = CONFIG.view_modes[view_mode_i]
 					Box.proc_mode = CONFIG.view_mode == "proc"
 					Box.stat_mode = CONFIG.view_mode == "stat"
+					Box.stat_mode = CONFIG.view_mode == "net"
 					if ARG_MODE:
 						ARG_MODE = ""
 					Draw.clear(saved=True)
@@ -4799,6 +4815,7 @@ def process_keys():
 				CONFIG.view_mode = CONFIG.view_modes[(CONFIG.view_modes.index(CONFIG.view_mode) + 1)]
 			Box.proc_mode = CONFIG.view_mode == "proc"
 			Box.stat_mode = CONFIG.view_mode == "stat"
+			Box.stat_mode = CONFIG.view_mode == "net"
 			Draw.clear(saved=True)
 			Term.refresh(force=True)
 		elif key.lower() in ["t", "k", "i"] and (ProcBox.selected > 0 or ProcCollector.detailed):
