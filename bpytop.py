@@ -3047,17 +3047,22 @@ class MemCollector(Collector):
 		disk_name: str
 		filtering: Tuple = ()
 		filter_exclude: bool = False
+		filter_all: bool = False
 		io_string: str
 		u_percent: int
 		disk_list: List[str] = []
 		cls.disks = {}
 
 		if CONFIG.disks_filter:
-			if CONFIG.disks_filter.startswith("exclude="):
+			disks_filter = CONFIG.disks_filter
+			if disks_filter.startswith("ALL"):
+				filter_all = True
+				disks_filter = disks_filter.replace("ALL,", "").strip()
+			if disks_filter.startswith("exclude="):
 				filter_exclude = True
-				filtering = tuple(v.strip() for v in CONFIG.disks_filter.replace("exclude=", "").strip().split(","))
+				filtering = tuple(v.strip() for v in disks_filter.replace("exclude=", "").strip().split(","))
 			else:
-				filtering = tuple(v.strip() for v in CONFIG.disks_filter.strip().split(","))
+				filtering = tuple(v.strip() for v in disks_filter.strip().split(","))
 
 		try:
 			io_counters = psutil.disk_io_counters(perdisk=SYSTEM == "Linux", nowrap=True)
@@ -3070,7 +3075,7 @@ class MemCollector(Collector):
 				errlog.exception(f'{e}')
 			io_counters = None
 
-		for disk in psutil.disk_partitions():
+		for disk in psutil.disk_partitions(filter_all):
 			disk_io = None
 			io_string = ""
 			disk_name = disk.mountpoint.rsplit('/', 1)[-1] if not disk.mountpoint == "/" else "root"
@@ -4033,7 +4038,9 @@ class Menu:
 				'with a comma ",".',
 				'Begin line with "exclude=" to change to exclude',
 				'filter.',
-				'Oterwise defaults to "most include" filter.',
+				'Begin with "ALL," to include all mountpoints,',
+				'useful if you want to monitor ramdisks.',
+				'Otherwise defaults to "most include" filter.',
 				'',
 				'Example: disks_filter="exclude=/boot, /home/user"'],
 			"mem_graphs" : [
