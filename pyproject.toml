@@ -9,7 +9,7 @@ license = "Apache-2.0"
 include = ["bpytop-themes/*.theme"]
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = "^3.7"
 psutil = "^5.7.0"
 
 [tool.poetry.dev-dependencies]
