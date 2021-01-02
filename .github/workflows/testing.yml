@@ -5,6 +5,7 @@ on: [pull_request, push]
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip tests]')"
     strategy:
       max-parallel: 3
       matrix:
