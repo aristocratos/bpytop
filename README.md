@@ -11,7 +11,7 @@
 ![Python](https://img.shields.io/badge/Python-v3.7%5E-green?logo=python)
 ![bpytop_version](https://img.shields.io/github/v/tag/aristocratos/bpytop?label=version)
 [![pypi_version](https://img.shields.io/pypi/v/bpytop?label=pypi)](https://pypi.org/project/bpytop)
-[![Test Status](https://img.shields.io/github/workflow/status/aristocratos/bpytop/CI?label=tests)](https://github.com/aristocratos/bpytop/actions?query=workflow%3Abuild)
+[![Test Status](https://img.shields.io/github/workflow/status/aristocratos/bpytop/CI?label=tests)](https://github.com/aristocratos/bpytop/actions?query=workflow%3Atesting)
 [![Donate](https://img.shields.io/badge/-Donate-yellow?logo=paypal)](https://paypal.me/aristocratos)
 [![Sponsor](https://img.shields.io/badge/-Sponsor-red?logo=github)](https://github.com/sponsors/aristocratos)
 [![Coffee](https://img.shields.io/badge/-Buy%20me%20a%20Coffee-grey?logo=Ko-fi)](https://ko-fi.com/aristocratos)
