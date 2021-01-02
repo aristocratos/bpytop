@@ -11,7 +11,7 @@
 ![Python](https://img.shields.io/badge/Python-v3.7%5E-green?logo=python)
 ![bpytop_version](https://img.shields.io/github/v/tag/aristocratos/bpytop?label=version)
 [![pypi_version](https://img.shields.io/pypi/v/bpytop?label=pypi)](https://pypi.org/project/bpytop)
-[![Build Status](https://travis-ci.com/aristocratos/bpytop.svg?branch=master)](https://travis-ci.com/aristocratos/bpytop)
+[![Test Status](https://img.shields.io/github/workflow/status/aristocratos/bpytop/CI?label=tests)](https://github.com/aristocratos/bpytop/actions?query=workflow%3Abuild)
 [![Donate](https://img.shields.io/badge/-Donate-yellow?logo=paypal)](https://paypal.me/aristocratos)
 [![Sponsor](https://img.shields.io/badge/-Sponsor-red?logo=github)](https://github.com/sponsors/aristocratos)
 [![Coffee](https://img.shields.io/badge/-Buy%20me%20a%20Coffee-grey?logo=Ko-fi)](https://ko-fi.com/aristocratos)
@@ -346,17 +346,17 @@ Config files stored in "$HOME/.config/bpytop" folder
 "/etc/bpytop.conf" will be used as default seed for config file creation if it exists.
 
 ```bash
-#? Config file for bpytop v. 1.0.53
+#? Config file for bpytop v. 1.0.54
 
 #* Color theme, looks for a .theme file in "/usr/[local/]share/bpytop/themes" and "~/.config/bpytop/themes", "Default" for builtin default theme.
 #* Prefix name by a plus sign (+) for a theme located in user themes folder, i.e. color_theme="+monokai"
-color_theme="Default"
+color_theme="monokai"
 
 #* If the theme set background should be shown, set to False if you want terminal background transparency
-theme_background=False
+theme_background=True
 
-#* Set bpytop view mode, "full" for everything shown, "proc" for cpu stats and processes, "stat" for cpu, mem, disks and net stats shown.
-view_mode=full
+#* Manually set which boxes to show. Available values are "cpu mem net proc", seperate values with whitespace.
+shown_boxes="cpu mem net proc"
 
 #* Update time in milliseconds, increases automatically if set below internal loops processing time, recommended 2000 ms or above for better sample times for graphs.
 update_ms=2000
@@ -455,15 +455,14 @@ log_level=DEBUG
 #### Command line options:
 
 ``` text
-USAGE: bpytop [argument]
+usage: bpytop.py [-h] [-b BOXES] [-v] [--debug]
 
-Arguments:
-    -f, --full            Start in full mode showing all boxes [default]
-    -p, --proc            Start in minimal mode without memory and net boxes
-    -s, --stat            Start in minimal mode without process box
-    -v, --version         Show version info and exit
-    -h, --help            Show this help message and exit
-    --debug               Start with loglevel set to DEBUG overriding value set in config
+optional arguments:
+  -h, --help            show this help message and exit
+  -b BOXES, --boxes BOXES
+                        Which boxes to show at start, example: -b "cpu mem net proc"
+  -v, --version         Show version info and exit
+  --debug               Start with loglevel set to DEBUG overriding value set in config
 ```
 
 ## TODO
