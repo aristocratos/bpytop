@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.55
+
+* Fixed: Disks usage and free meters not updating unless resized
+* Changed: All boxes are now toggeable with key 1-4, start argument -b/--boxes and config variable shown_boxes.
+* Changed: Moved testing from Travis CI to Github workflow
+
 ## v1.0.54
 
 * Fixed: Added nullfs filesystem to auto exclude from disks list
