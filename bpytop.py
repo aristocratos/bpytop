@@ -59,11 +59,9 @@ VERSION: str = "1.0.54"
 
 #? Argument parser ------------------------------------------------------------------------------->
 args = argparse.ArgumentParser()
-args.add_argument("-f" , "--full"		,action="store_true" ,help ="Start in full mode showing all boxes [default]")
-args.add_argument("-p" , "--proc"		,action="store_true" ,help ="Start in minimal mode without memory and net boxes")
-args.add_argument("-s" , "--stat"		,action="store_true" ,help ="Start in minimal mode without process box")
-args.add_argument("-v" , "--version"	,action="store_true" ,help ="Show version info and exit")
-args.add_argument("--debug"				,action="store_true" ,help ="Start with loglevel set to DEBUG overriding value set in config")
+args.add_argument("-b", "--boxes",		action="store",	dest="boxes", help ="Which boxes to show at start, example: -b \"cpu mem net proc\"")
+args.add_argument("-v", "--version",	action="store_true" ,help ="Show version info and exit")
+args.add_argument("--debug",			action="store_true" ,help ="Start with loglevel set to DEBUG overriding value set in config")
 stdargs = args.parse_args()
 
 if stdargs.version:
@@ -71,14 +69,7 @@ if stdargs.version:
 		f'psutil version: {".".join(str(x) for x in psutil.version_info)}')
 	raise SystemExit(0)
 
-ARG_MODE: str = ""
-
-if stdargs.full:
-	ARG_MODE = "full"
-elif stdargs.proc:
-	ARG_MODE = "proc"
-elif stdargs.stat:
-	ARG_MODE = "stat"
+ARG_BOXES: str = stdargs.boxes
 
 DEBUG = stdargs.debug
 
@@ -103,8 +94,8 @@ color_theme="$color_theme"
 #* If the theme set background should be shown, set to False if you want terminal background transparency
 theme_background=$theme_background
 
-#* Set bpytop view mode, "full" for everything shown, "proc" for cpu stats and processes, "stat" for cpu, mem, disks and net stats shown.
-view_mode=$view_mode
+#* Manually set which boxes to show. Available values are "cpu mem net proc", seperate values with whitespace.
+shown_boxes="$shown_boxes"
 
 #* Update time in milliseconds, increases automatically if set below internal loops processing time, recommended 2000 ms or above for better sample times for graphs.
 update_ms=$update_ms
@@ -310,6 +301,8 @@ UNITS: Dict[str, Tuple[str, ...]] = {
 	"byte" : ("Byte", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB", "BiB", "GEB")
 }
 
+SUBSCRIPT: Tuple[str, ...] = ("₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉")
+
 #? Setup error logger ---------------------------------------------------------------->
 
 try:
@@ -363,11 +356,12 @@ class Config:
 	'''Holds all config variables and functions for loading from and saving to disk'''
 	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name",
 						"proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes", "disks_filter", "update_check", "log_level", "mem_graphs", "show_swap",
-						"swap_disk", "show_disks", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "view_mode", "theme_background",
-						"net_sync", "show_battery", "tree_depth", "cpu_sensor", "show_coretemp", "proc_update_mult"]
+						"swap_disk", "show_disks", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "theme_background",
+						"net_sync", "show_battery", "tree_depth", "cpu_sensor", "show_coretemp", "proc_update_mult", "shown_boxes"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	theme_background: bool = True
+	shown_boxes: str = "cpu mem net proc"
 	update_ms: int = 2000
 	proc_update_mult: int = 2
 	proc_sorting: str = "cpu lazy"
@@ -397,7 +391,6 @@ class Config:
 	net_sync: bool = False
 	show_battery: bool = True
 	show_init: bool = True
-	view_mode: str = "full"
 	log_level: str = "WARNING"
 
 	warnings: List[str] = []
@@ -405,8 +398,6 @@ class Config:
 
 	sorting_options: List[str] = ["pid", "program", "arguments", "threads", "user", "memory", "cpu lazy", "cpu responsive"]
 	log_levels: List[str] = ["ERROR", "WARNING", "INFO", "DEBUG"]
-
-	view_modes: List[str] = ["full", "proc", "stat"]
 
 	cpu_sensors: List[str] = [ "Auto" ]
 
@@ -494,9 +485,6 @@ class Config:
 		if "log_level" in new_config and not new_config["log_level"] in self.log_levels:
 			new_config["log_level"] = "_error_"
 			self.warnings.append(f'Config key "log_level" didn\'t get an acceptable value!')
-		if "view_mode" in new_config and not new_config["view_mode"] in self.view_modes:
-			new_config["view_mode"] = "_error_"
-			self.warnings.append(f'Config key "view_mode" didn\'t get an acceptable value!')
 		if "update_ms" in new_config and int(new_config["update_ms"]) < 100:
 			new_config["update_ms"] = 100
 			self.warnings.append(f'Config key "update_ms" can\'t be lower than 100!')
@@ -506,6 +494,12 @@ class Config:
 		if "cpu_sensor" in new_config and not new_config["cpu_sensor"] in self.cpu_sensors:
 			new_config["cpu_sensor"] = "_error_"
 			self.warnings.append(f'Config key "cpu_sensor" does not contain an available sensor!')
+		if "shown_boxes" in new_config and not new_config["shown_boxes"] == "":
+			for box in new_config["shown_boxes"].split(): #type: ignore
+				if not box in ["cpu", "mem", "net", "proc"]:
+					new_config["shown_boxes"] = "_error_"
+					self.warnings.append(f'Config key "shown_boxes" contains invalid box names!')
+					break
 		return new_config
 
 	def save_config(self):
@@ -539,6 +533,14 @@ try:
 except Exception as e:
 	errlog.exception(f'{e}')
 	raise SystemExit(1)
+
+if ARG_BOXES:
+	_new_boxes: List = []
+	for _box in ARG_BOXES.split():
+		if _box in ["cpu", "mem", "net", "proc"]:
+			_new_boxes.append(_box)
+	CONFIG.shown_boxes = " ".join(_new_boxes)
+	del _box, _new_boxes
 
 if SYSTEM == "Linux" and not os.path.isdir("/sys/class/power_supply"):
 	CONFIG.show_battery = False
@@ -1504,14 +1506,22 @@ class Meters:
 class Box:
 	'''Box class with all needed attributes for create_box() function'''
 	name: str
+	num: int = 0
+	boxes: List = []
+	view_modes: Dict[str, List] = {"full" : ["cpu", "mem", "net", "proc"], "stat" : ["cpu", "mem", "net"], "proc" : ["cpu", "proc"]}
+	view_mode: str
+	for view_mode in view_modes:
+		if sorted(CONFIG.shown_boxes.split(), key=str.lower) == view_modes[view_mode]:
+			break
+	else:
+		view_mode = "user"
+		view_modes["user"] = CONFIG.shown_boxes.split()
 	height_p: int
 	width_p: int
 	x: int
 	y: int
 	width: int
 	height: int
-	proc_mode: bool = (CONFIG.view_mode == "proc" and not ARG_MODE) or ARG_MODE == "proc"
-	stat_mode: bool = (CONFIG.view_mode == "stat" and not ARG_MODE) or ARG_MODE == "stat"
 	out: str
 	bg: str
 	_b_cpu_h: int
@@ -1532,12 +1542,14 @@ class Box:
 	@classmethod
 	def calc_sizes(cls):
 		'''Calculate sizes of boxes'''
+		cls.boxes = CONFIG.shown_boxes.split()
 		for sub in cls.__subclasses__():
 			sub._calc_size() # type: ignore
 			sub.resized = True # type: ignore
 
 	@classmethod
 	def draw_update_ms(cls, now: bool = True):
+		if not "cpu" in cls.boxes: return
 		update_string: str = f'{CONFIG.update_ms}ms'
 		xpos: int = CpuBox.x + CpuBox.width - len(update_string) - 15
 		if not "+" in Key.mouse:
@@ -1553,9 +1565,10 @@ class Box:
 
 	@classmethod
 	def draw_clock(cls, force: bool = False):
+		if not "cpu" in cls.boxes or not cls.clock_on: return
 		out: str = ""
 		if force: pass
-		elif not cls.clock_on or Term.resized or strftime(CONFIG.draw_clock) == cls.clock: return
+		elif Term.resized or strftime(CONFIG.draw_clock) == cls.clock: return
 		clock_string = cls.clock = strftime(CONFIG.draw_clock)
 		for custom in cls.clock_custom_format:
 			if custom in clock_string:
@@ -1573,9 +1586,27 @@ class Box:
 				Draw.out("battery")
 
 	@classmethod
+	def empty_bg(cls) -> str:
+		return (f'{Term.clear}{Banner.draw(Term.height // 2 - 10, center=True)}'
+				f'{Mv.d(1)}{Mv.l(46)}{Colors.black_bg}{Colors.default}{Fx.b}[esc] Menu'
+				f'{Mv.r(25)}{Fx.i}Version: {VERSION}{Fx.ui}'
+				f'{Mv.d(1)}{Mv.l(34)}{Fx.b}All boxes hidden!'
+				f'{Mv.d(1)}{Mv.l(17)}{Fx.b}[1] {Fx.ub}Toggle CPU box'
+				f'{Mv.d(1)}{Mv.l(18)}{Fx.b}[2] {Fx.ub}Toggle MEM box'
+				f'{Mv.d(1)}{Mv.l(18)}{Fx.b}[3] {Fx.ub}Toggle NET box'
+				f'{Mv.d(1)}{Mv.l(18)}{Fx.b}[4] {Fx.ub}Toggle PROC box'
+				f'{Mv.d(1)}{Mv.l(19)}{Fx.b}[m] {Fx.ub}Cycle presets'
+				f'{Mv.d(1)}{Mv.l(17)}{Fx.b}[q] Quit {Fx.ub}{Term.bg}{Term.fg}')
+
+	@classmethod
 	def draw_bg(cls, now: bool = True):
 		'''Draw all boxes outlines and titles'''
-		Draw.buffer("bg", "".join(sub._draw_bg() for sub in cls.__subclasses__()), now=now, z=1000, only_save=Menu.active, once=True) # type: ignore
+		out: str = ""
+		if not cls.boxes:
+			out = cls.empty_bg()
+		else:
+			out = "".join(sub._draw_bg() for sub in cls.__subclasses__()) # type: ignore
+		Draw.buffer("bg", out, now=now, z=1000, only_save=Menu.active, once=True)
 		cls.draw_update_ms(now=now)
 		if CONFIG.draw_clock: cls.draw_clock(force=True)
 
@@ -1589,6 +1620,7 @@ class SubBox:
 
 class CpuBox(Box, SubBox):
 	name = "cpu"
+	num = 1
 	x = 1
 	y = 1
 	height_p = 32
@@ -1612,10 +1644,16 @@ class CpuBox(Box, SubBox):
 
 	@classmethod
 	def _calc_size(cls):
+		if not "cpu" in cls.boxes:
+			Box._b_cpu_h = 0
+			cls.width = Term.width
+			return
 		cpu = CpuCollector
 		height_p: int
-		if cls.proc_mode: height_p = 20
-		else: height_p = cls.height_p
+		if cls.boxes == ["cpu"]:
+			height_p = 100
+		else:
+			height_p = cls.height_p
 		cls.width = round(Term.width * cls.width_p / 100)
 		cls.height = round(Term.height * height_p / 100)
 		if cls.height < 8: cls.height = 8
@@ -1643,6 +1681,7 @@ class CpuBox(Box, SubBox):
 
 	@classmethod
 	def _draw_bg(cls) -> str:
+		if not "cpu" in cls.boxes: return ""
 		if not "M" in Key.mouse:
 			Key.mouse["M"] = [[cls.x + 10 + i, cls.y] for i in range(6)]
 		return (f'{create_box(box=cls, line_color=THEME.cpu_box)}'
@@ -1692,6 +1731,7 @@ class CpuBox(Box, SubBox):
 
 	@classmethod
 	def _draw_fg(cls):
+		if not "cpu" in cls.boxes: return
 		cpu = CpuCollector
 		if cpu.redraw: cls.redraw = True
 		out: str = ""
@@ -1706,7 +1746,7 @@ class CpuBox(Box, SubBox):
 		if cls.resized or cls.redraw:
 			if not "m" in Key.mouse:
 				Key.mouse["m"] = [[cls.x + 16 + i, cls.y] for i in range(12)]
-			out_misc += f'{Mv.to(cls.y, cls.x + 16)}{THEME.cpu_box(Symbol.title_left)}{Fx.b}{THEME.hi_fg("m")}{THEME.title}ode:{ARG_MODE or CONFIG.view_mode}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}'
+			out_misc += f'{Mv.to(cls.y, cls.x + 16)}{THEME.cpu_box(Symbol.title_left)}{Fx.b}{THEME.hi_fg("m")}{THEME.title}ode:{Box.view_mode}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}'
 			Graphs.cpu["up"] = Graph(w - bw - 3, hh, THEME.gradient["cpu"], cpu.cpu_usage[0])
 			Graphs.cpu["down"] = Graph(w - bw - 3, h - hh, THEME.gradient["cpu"], cpu.cpu_usage[0], invert=True)
 			Meters.cpu = Meter(cpu.cpu_usage[0][-1], bw - (21 if cpu.got_sensors else 9), "cpu")
@@ -1812,6 +1852,7 @@ class CpuBox(Box, SubBox):
 
 class MemBox(Box):
 	name = "mem"
+	num = 2
 	height_p = 38
 	width_p = 45
 	x = 1
@@ -1833,11 +1874,23 @@ class MemBox(Box):
 
 	@classmethod
 	def _calc_size(cls):
+		if not "mem" in cls.boxes:
+			Box._b_mem_h = 0
+			cls.width = Term.width
+			return
 		width_p: int; height_p: int
-		if cls.stat_mode:
-			width_p, height_p = 100, cls.height_p
+		if not "proc" in cls.boxes:
+			width_p = 100
 		else:
-			width_p, height_p = cls.width_p, cls.height_p
+			width_p = cls.width_p
+
+		if not "cpu" in cls.boxes:
+			height_p = 60 if "net" in cls.boxes else 98
+		elif not "net" in cls.boxes:
+			height_p = 98 - CpuBox.height_p
+		else:
+			height_p = cls.height_p
+
 		cls.width = round(Term.width * width_p / 100)
 		cls.height = round(Term.height * height_p / 100) + 1
 		Box._b_mem_h = cls.height
@@ -1874,19 +1927,23 @@ class MemBox(Box):
 
 	@classmethod
 	def _draw_bg(cls) -> str:
-		if cls.proc_mode: return ""
+		if not "mem" in cls.boxes: return ""
 		out: str = ""
 		out += f'{create_box(box=cls, line_color=THEME.mem_box)}'
 		if CONFIG.show_disks:
-			out += (f'{Mv.to(cls.y, cls.divider + 2)}{THEME.mem_box(Symbol.title_left)}{Fx.b}{THEME.title("disks")}{Fx.ub}{THEME.mem_box(Symbol.title_right)}'
+			out += (f'{Mv.to(cls.y, cls.divider + 2)}{THEME.mem_box(Symbol.title_left)}{Fx.b}{THEME.hi_fg("d")}{THEME.title("isks")}{Fx.ub}{THEME.mem_box(Symbol.title_right)}'
 					f'{Mv.to(cls.y, cls.divider)}{THEME.mem_box(Symbol.div_up)}'
 					f'{Mv.to(cls.y + cls.height - 1, cls.divider)}{THEME.mem_box(Symbol.div_down)}{THEME.div_line}'
 					f'{"".join(f"{Mv.to(cls.y + i, cls.divider)}{Symbol.v_line}" for i in range(1, cls.height - 1))}')
+			Key.mouse["d"] = [[cls.divider + 3 + i, cls.y] for i in range(5)]
+		else:
+			out += f'{Mv.to(cls.y, cls.x + cls.width - 9)}{THEME.mem_box(Symbol.title_left)}{THEME.hi_fg("d")}{THEME.title("isks")}{THEME.mem_box(Symbol.title_right)}'
+			Key.mouse["d"] = [[cls.x + cls.width - 8 + i, cls.y] for i in range(5)]
 		return out
 
 	@classmethod
 	def _draw_fg(cls):
-		if cls.proc_mode: return
+		if not "mem" in cls.boxes: return
 		mem = MemCollector
 		if mem.redraw: cls.redraw = True
 		out: str = ""
@@ -1923,8 +1980,8 @@ class MemBox(Box):
 					if len(mem.disks) * 3 <= h + 1:
 						Meters.disks_free[name] = Meter(mem.disks[name]["free_percent"], cls.disk_meter, "free")
 			if not "g" in Key.mouse:
-				Key.mouse["g"] = [[x + cls.mem_width - 8 + i, y-1] for i in range(5)]
-			out_misc += (f'{Mv.to(y-1, x + cls.mem_width - 9)}{THEME.mem_box(Symbol.title_left)}{Fx.b if CONFIG.mem_graphs else ""}'
+				Key.mouse["g"] = [[x + 8 + i, y-1] for i in range(5)]
+			out_misc += (f'{Mv.to(y-1, x + 7)}{THEME.mem_box(Symbol.title_left)}{Fx.b if CONFIG.mem_graphs else ""}'
 				f'{THEME.hi_fg("g")}{THEME.title("raph")}{Fx.ub}{THEME.mem_box(Symbol.title_right)}')
 			if CONFIG.show_disks:
 				if not "s" in Key.mouse:
@@ -2004,6 +2061,7 @@ class MemBox(Box):
 
 class NetBox(Box, SubBox):
 	name = "net"
+	num = 3
 	height_p = 30
 	width_p = 45
 	x = 1
@@ -2018,11 +2076,14 @@ class NetBox(Box, SubBox):
 
 	@classmethod
 	def _calc_size(cls):
-		width_p: int
-		if cls.stat_mode:
+		if not "net" in cls.boxes:
+			cls.width = Term.width
+			return
+		if not "proc" in cls.boxes:
 			width_p = 100
 		else:
 			width_p = cls.width_p
+
 		cls.width = round(Term.width * width_p / 100)
 		cls.height = Term.height - Box._b_cpu_h - Box._b_mem_h
 		cls.y = Term.height - cls.height + 1
@@ -2036,13 +2097,13 @@ class NetBox(Box, SubBox):
 
 	@classmethod
 	def _draw_bg(cls) -> str:
-		if cls.proc_mode: return ""
+		if not "net" in cls.boxes: return ""
 		return f'{create_box(box=cls, line_color=THEME.net_box)}\
 		{create_box(x=cls.box_x, y=cls.box_y, width=cls.box_width, height=cls.box_height, line_color=THEME.div_line, fill=False, title="Download", title2="Upload")}'
 
 	@classmethod
 	def _draw_fg(cls):
-		if cls.proc_mode: return
+		if not "net" in cls.boxes: return
 		net = NetCollector
 		if net.redraw: cls.redraw = True
 		if not net.nic: return
@@ -2103,6 +2164,7 @@ class NetBox(Box, SubBox):
 
 class ProcBox(Box):
 	name = "proc"
+	num = 4
 	height_p = 68
 	width_p = 55
 	x = 1
@@ -2131,11 +2193,20 @@ class ProcBox(Box):
 
 	@classmethod
 	def _calc_size(cls):
+		if not "proc" in cls.boxes:
+			cls.width = Term.width
+			return
 		width_p: int; height_p: int
-		if cls.proc_mode:
-			width_p, height_p = 100, 80
+		if not "net" in cls.boxes and not "mem" in cls.boxes:
+			width_p = 100
 		else:
-			width_p, height_p = cls.width_p, cls.height_p
+			width_p = cls.width_p
+
+		if not "cpu" in cls.boxes:
+			height_p = 100
+		else:
+			height_p = cls.height_p
+
 		cls.width = round(Term.width * width_p / 100)
 		cls.height = round(Term.height * height_p / 100)
 		if cls.height + Box._b_cpu_h > Term.height: cls.height = Term.height - Box._b_cpu_h
@@ -2149,7 +2220,7 @@ class ProcBox(Box):
 
 	@classmethod
 	def _draw_bg(cls) -> str:
-		if cls.stat_mode: return ""
+		if not "proc" in cls.boxes: return ""
 		return create_box(box=cls, line_color=THEME.proc_box)
 
 	@classmethod
@@ -2218,7 +2289,7 @@ class ProcBox(Box):
 
 	@classmethod
 	def _draw_fg(cls):
-		if cls.stat_mode: return
+		if not "proc" in cls.boxes: return
 		proc = ProcCollector
 		if proc.proc_interrupt: return
 		if proc.redraw: cls.redraw = True
@@ -2276,7 +2347,7 @@ class ProcBox(Box):
 				for k in ["e", "r", "c", "t", "k", "i", "enter", "left", " ", "f", "delete"]:
 					if k in Key.mouse: del Key.mouse[k]
 			if proc.detailed:
-				killed = proc.details["killed"]
+				killed = proc.details.get("killed", False)
 				main = THEME.main_fg if cls.selected == 0 and not killed else THEME.inactive_fg
 				hi = THEME.hi_fg if cls.selected == 0 and not killed else THEME.inactive_fg
 				title = THEME.title if cls.selected == 0 and not killed else THEME.inactive_fg
@@ -2285,7 +2356,7 @@ class ProcBox(Box):
 					cls.current_h = cls.height - 8
 					for i in range(7): out_misc += f'{Mv.to(dy+i, x)}{" " * w}'
 					out_misc += (f'{Mv.to(dy+7, x-1)}{THEME.proc_box}{Symbol.title_right}{Symbol.h_line*w}{Symbol.title_left}'
-					f'{Mv.to(dy+7, x+1)}{THEME.proc_box(Symbol.title_left)}{Fx.b}{THEME.title(cls.name)}{Fx.ub}{THEME.proc_box(Symbol.title_right)}{THEME.div_line}')
+					f'{Mv.to(dy+7, x+1)}{THEME.proc_box(Symbol.title_left)}{Fx.b}{THEME.hi_fg(SUBSCRIPT[cls.num])}{THEME.title(cls.name)}{Fx.ub}{THEME.proc_box(Symbol.title_right)}{THEME.div_line}')
 					for i in range(7):
 						out_misc += f'{Mv.to(dy + i, dgx + dgw + 1)}{Symbol.v_line}'
 
@@ -2322,7 +2393,7 @@ class ProcBox(Box):
 					cls.current_h = cls.height
 					y, h = cls.y + 1, cls.height - 2
 					out_misc += (f'{Mv.to(y-1, x-1)}{THEME.proc_box}{Symbol.left_up}{Symbol.h_line*w}{Symbol.right_up}'
-						f'{Mv.to(y-1, x+1)}{THEME.proc_box(Symbol.title_left)}{Fx.b}{THEME.title(cls.name)}{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
+						f'{Mv.to(y-1, x+1)}{THEME.proc_box(Symbol.title_left)}{Fx.b}{THEME.hi_fg(SUBSCRIPT[cls.num])}{THEME.title(cls.name)}{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
 						f'{Mv.to(y+7, x-1)}{THEME.proc_box(Symbol.v_line)}{Mv.r(w)}{THEME.proc_box(Symbol.v_line)}')
 				cls.select_max = cls.height - 3
 
@@ -2352,12 +2423,12 @@ class ProcBox(Box):
 				out_misc += (f'{Mv.to(y-1, sort_pos - 25)}{THEME.proc_box(Symbol.title_left)}{Fx.b if CONFIG.proc_per_core else ""}'
 					f'{THEME.title("per-")}{THEME.hi_fg("c")}{THEME.title("ore")}{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
 
-			if not "f" in Key.mouse or cls.resized: Key.mouse["f"] = [[x+5 + i, y-1] for i in range(6 if not proc.search_filter else 2 + len(proc.search_filter[-10:]))]
+			if not "f" in Key.mouse or cls.resized: Key.mouse["f"] = [[x+6 + i, y-1] for i in range(6 if not proc.search_filter else 2 + len(proc.search_filter[-10:]))]
 			if proc.search_filter:
-				if not "delete" in Key.mouse: Key.mouse["delete"] = [[x+11 + len(proc.search_filter[-10:]) + i, y-1] for i in range(3)]
+				if not "delete" in Key.mouse: Key.mouse["delete"] = [[x+12 + len(proc.search_filter[-10:]) + i, y-1] for i in range(3)]
 			elif "delete" in Key.mouse:
 				del Key.mouse["delete"]
-			out_misc += (f'{Mv.to(y-1, x + 7)}{THEME.proc_box(Symbol.title_left)}{Fx.b if cls.filtering or proc.search_filter else ""}{THEME.hi_fg("f")}{THEME.title}' +
+			out_misc += (f'{Mv.to(y-1, x + 8)}{THEME.proc_box(Symbol.title_left)}{Fx.b if cls.filtering or proc.search_filter else ""}{THEME.hi_fg("f")}{THEME.title}' +
 				("ilter" if not proc.search_filter and not cls.filtering else f' {proc.search_filter[-(10 if w < 83 else w - 74):]}{(Fx.bl + "█" + Fx.ubl) if cls.filtering else THEME.hi_fg(" del")}') +
 				f'{THEME.proc_box(Symbol.title_right)}')
 
@@ -2655,8 +2726,6 @@ class Collector:
 				if cls.proc_counter == CONFIG.proc_update_mult:
 					cls.proc_counter = 0
 				cls.proc_counter += 1
-
-
 
 		cls.collect_run.set()
 
@@ -3278,7 +3347,7 @@ class ProcCollector(Collector):
 	@classmethod
 	def _collect(cls):
 		'''List all processess with pid, name, arguments, threads, username, memory percent and cpu percent'''
-		if Box.stat_mode: return
+		if not "proc" in Box.boxes: return
 		out: Dict = {}
 		cls.det_cpu = 0.0
 		sorting: str = CONFIG.proc_sorting
@@ -3694,7 +3763,12 @@ class Menu:
 			"Selected (Mouse 1)" : "Show detailed information for selected process.",
 			"(Mouse scroll)" : "Scrolls any scrollable list/text under cursor.",
 			"(Esc, shift+m)" : "Toggles main menu.",
-			"(m)" : "Change current view mode, order full->proc->stat.",
+			"(m)" : "Cycle view presets, order: full->proc->stat->user.",
+			"(1)" : "Toggle CPU box.",
+			"(2)" : "Toggle MEM box.",
+			"(3)" : "Toggle NET box.",
+			"(4)" : "Toggle PROC box.",
+			"(d)" : "Toggle disks view in MEM box.",
 			"(F2, o)" : "Shows options.",
 			"(F1, h)" : "Shows this window.",
 			"(ctrl+z)" : "Sleep program and put in background.",
@@ -3819,7 +3893,6 @@ class Menu:
 		d_quote: str
 		inputting: bool = False
 		input_val: str = ""
-		global ARG_MODE
 		Theme.refresh()
 		if not cls.background:
 			cls.background = f'{THEME.inactive_fg}' + Fx.uncolor(f'{Draw.saved_buffer()}') + f'{Term.fg}'
@@ -3841,12 +3914,13 @@ class Menu:
 				'',
 				'Set to False if you want terminal background',
 				'transparency.'],
-			"view_mode" : [
-				'Set bpytop view mode.',
+			"shown_boxes" : [
+				'Manually set which boxes to show.',
 				'',
-				'"full" for everything shown.',
-				'"proc" for cpu stats and processes.',
-				'"stat" for cpu, mem, disks and net stats shown.'],
+				'Available values are "cpu mem net proc".',
+				'Seperate values with whitespace.',
+				'',
+				'Toggle between presets with mode key "m".'],
 			"update_ms" : [
 				'Update time in milliseconds.',
 				'',
@@ -4050,7 +4124,6 @@ class Menu:
 		option_len: int = len(option_items) * 2
 		sorting_i: int = CONFIG.sorting_options.index(CONFIG.proc_sorting)
 		loglevel_i: int = CONFIG.log_levels.index(CONFIG.log_level)
-		view_mode_i: int = CONFIG.view_modes.index(CONFIG.view_mode)
 		cpu_sensor_i: int = CONFIG.cpu_sensors.index(CONFIG.cpu_sensor)
 		color_i: int
 		while not cls.close:
@@ -4096,15 +4169,13 @@ class Menu:
 						counter = f' {sorting_i + 1}/{len(CONFIG.sorting_options)}'
 					elif opt == "log_level":
 						counter = f' {loglevel_i + 1}/{len(CONFIG.log_levels)}'
-					elif opt == "view_mode":
-						counter = f' {view_mode_i + 1}/{len(CONFIG.view_modes)}'
 					elif opt == "cpu_sensor":
 						counter = f' {cpu_sensor_i + 1}/{len(CONFIG.cpu_sensors)}'
 					else:
 						counter = ""
 					out += f'{Mv.to(y+1+cy, x+1)}{t_color}{Fx.b}{opt.replace("_", " ").capitalize() + counter:^24.24}{Fx.ub}{Mv.to(y+2+cy, x+1)}{v_color}'
 					if opt == selected:
-						if isinstance(value, bool) or opt in ["color_theme", "proc_sorting", "log_level", "view_mode", "cpu_sensor"]:
+						if isinstance(value, bool) or opt in ["color_theme", "proc_sorting", "log_level", "cpu_sensor"]:
 							out += f'{t_color} {Symbol.left}{v_color}{d_quote + str(value) + d_quote:^20.20}{t_color}{Symbol.right} '
 						elif inputting:
 							out += f'{str(input_val)[-17:] + Fx.bl + "█" + Fx.ubl + "" + Symbol.enter:^33.33}'
@@ -4183,6 +4254,15 @@ class Menu:
 								else:
 									CONFIG.tree_depth = int(input_val)
 								ProcCollector.collapsed = {}
+							elif selected == "shown_boxes":
+								new_boxes: List = []
+								for box in input_val.split():
+									if box in ["cpu", "mem", "net", "proc"]:
+										new_boxes.append(box)
+								CONFIG.shown_boxes = " ".join(new_boxes)
+								Box.view_mode = "user"
+								Box.view_modes["user"] = CONFIG.shown_boxes.split()
+								Draw.clear(saved=True)
 							elif isinstance(getattr(CONFIG, selected), str):
 								setattr(CONFIG, selected, input_val)
 								if selected.startswith("net_"):
@@ -4205,7 +4285,7 @@ class Menu:
 				elif key in ["escape", "o", "M", "f2"]:
 					cls.close = True
 					break
-				elif key == "enter" and selected in ["update_ms", "disks_filter", "custom_cpu_name", "net_download", "net_upload", "draw_clock", "tree_depth", "proc_update_mult"]:
+				elif key == "enter" and selected in ["update_ms", "disks_filter", "custom_cpu_name", "net_download", "net_upload", "draw_clock", "tree_depth", "proc_update_mult", "shown_boxes"]:
 					inputting = True
 					input_val = str(getattr(CONFIG, selected))
 				elif key == "left" and selected == "update_ms" and CONFIG.update_ms - 100 >= 100:
@@ -4282,21 +4362,6 @@ class Menu:
 						CpuCollector.get_sensors()
 						Term.refresh(force=True)
 						cls.resized = False
-				elif key in ["left", "right"] and selected == "view_mode":
-					if key == "left":
-						view_mode_i -= 1
-						if view_mode_i < 0: view_mode_i = len(CONFIG.view_modes) - 1
-					elif key == "right":
-						view_mode_i += 1
-						if view_mode_i > len(CONFIG.view_modes) - 1: view_mode_i = 0
-					CONFIG.view_mode = CONFIG.view_modes[view_mode_i]
-					Box.proc_mode = CONFIG.view_mode == "proc"
-					Box.stat_mode = CONFIG.view_mode == "stat"
-					if ARG_MODE:
-						ARG_MODE = ""
-					Draw.clear(saved=True)
-					Term.refresh(force=True)
-					cls.resized = False
 				elif key == "up":
 					selected_int -= 1
 					if selected_int < 0: selected_int = len(option_items) - 1
@@ -4527,6 +4592,7 @@ def get_cpu_core_mapping() -> List[int]:
 def create_box(x: int = 0, y: int = 0, width: int = 0, height: int = 0, title: str = "", title2: str = "", line_color: Color = None, title_color: Color = None, fill: bool = True, box = None) -> str:
 	'''Create a box from a box object or by given arguments'''
 	out: str = f'{Term.fg}{Term.bg}'
+	num: int = 0
 	if not line_color: line_color = THEME.div_line
 	if not title_color: title_color = THEME.title
 
@@ -4535,8 +4601,9 @@ def create_box(x: int = 0, y: int = 0, width: int = 0, height: int = 0, title: s
 		x = box.x
 		y = box.y
 		width = box.width
-		height =box.height
+		height = box.height
 		title = box.name
+		num = box.num
 	hlines: Tuple[int, int] = (y, y + height - 1)
 
 	out += f'{line_color}'
@@ -4557,7 +4624,8 @@ def create_box(x: int = 0, y: int = 0, width: int = 0, height: int = 0, title: s
 
 	#* Draw titles if enabled
 	if title:
-		out += f'{Mv.to(y, x + 2)}{Symbol.title_left}{title_color}{Fx.b}{title}{Fx.ub}{line_color}{Symbol.title_right}'
+		numbered: str = "" if not num else f'{THEME.hi_fg(SUBSCRIPT[num])}'
+		out += f'{Mv.to(y, x + 2)}{Symbol.title_left}{Fx.b}{numbered}{title_color}{title}{Fx.ub}{line_color}{Symbol.title_right}'
 	if title2:
 		out += f'{Mv.to(hlines[1], x + 2)}{Symbol.title_left}{title_color}{Fx.b}{title2}{Fx.ub}{line_color}{Symbol.title_right}'
 
@@ -4701,9 +4769,10 @@ def readfile(file: str, default: str = "") -> str:
 def process_keys():
 	mouse_pos: Tuple[int, int] = (0, 0)
 	filtered: bool = False
-	global ARG_MODE
+	box_keys = {"1" : "cpu", "2" : "mem", "3" : "net", "4" : "proc"}
 	while Key.has_key():
 		key = Key.get()
+		found: bool = True
 		if key in ["mouse_scroll_up", "mouse_scroll_down", "mouse_click"]:
 			mouse_pos = Key.get_mouse()
 			if mouse_pos[0] >= ProcBox.x and ProcBox.current_y + 1 <= mouse_pos[1] < ProcBox.current_y + ProcBox.current_h - 1:
@@ -4732,7 +4801,6 @@ def process_keys():
 			filtered = True
 			continue
 
-
 		if key == "_null":
 			continue
 		elif key == "q":
@@ -4743,99 +4811,125 @@ def process_keys():
 		elif key == "-" and CONFIG.update_ms - 100 >= 100:
 			CONFIG.update_ms -= 100
 			Box.draw_update_ms()
-		elif key in ["b", "n"]:
-			NetCollector.switch(key)
 		elif key in ["M", "escape"]:
 			Menu.main()
 		elif key in ["o", "f2"]:
 			Menu.options()
 		elif key in ["h", "f1"]:
 			Menu.help()
-		elif key == "z":
-			NetCollector.reset = not NetCollector.reset
-			Collector.collect(NetCollector, redraw=True)
-		elif key == "y":
-			CONFIG.net_sync = not CONFIG.net_sync
-			Collector.collect(NetCollector, redraw=True)
-		elif key == "a":
-			NetCollector.auto_min = not NetCollector.auto_min
-			NetCollector.net_min = {"download" : -1, "upload" : -1}
-			Collector.collect(NetCollector, redraw=True)
-		elif key in ["left", "right"]:
-			ProcCollector.sorting(key)
-		elif key == " " and CONFIG.proc_tree and ProcBox.selected > 0:
-			if ProcBox.selected_pid in ProcCollector.collapsed:
-				ProcCollector.collapsed[ProcBox.selected_pid] = not ProcCollector.collapsed[ProcBox.selected_pid]
-			Collector.collect(ProcCollector, interrupt=True, redraw=True)
-		elif key == "e":
-			CONFIG.proc_tree = not CONFIG.proc_tree
-			Collector.collect(ProcCollector, interrupt=True, redraw=True)
-		elif key == "r":
-			CONFIG.proc_reversed = not CONFIG.proc_reversed
-			Collector.collect(ProcCollector, interrupt=True, redraw=True)
-		elif key == "c":
-			CONFIG.proc_per_core = not CONFIG.proc_per_core
-			Collector.collect(ProcCollector, interrupt=True, redraw=True)
-		elif key == "g":
-			CONFIG.mem_graphs = not CONFIG.mem_graphs
-			Collector.collect(MemCollector, interrupt=True, redraw=True)
-		elif key == "s":
-			Collector.collect_idle.wait()
-			CONFIG.swap_disk = not CONFIG.swap_disk
-			Collector.collect(MemCollector, interrupt=True, redraw=True)
-		elif key == "f":
-			ProcBox.filtering = True
-			if not ProcCollector.search_filter: ProcBox.start = 0
-			Collector.collect(ProcCollector, redraw=True, only_draw=True)
 		elif key == "m":
-			if ARG_MODE:
-				ARG_MODE = ""
-			elif CONFIG.view_modes.index(CONFIG.view_mode) + 1 > len(CONFIG.view_modes) - 1:
-				CONFIG.view_mode = CONFIG.view_modes[0]
+			if list(Box.view_modes).index(Box.view_mode) + 1 > len(list(Box.view_modes)) - 1:
+				Box.view_mode = list(Box.view_modes)[0]
 			else:
-				CONFIG.view_mode = CONFIG.view_modes[(CONFIG.view_modes.index(CONFIG.view_mode) + 1)]
-			Box.proc_mode = CONFIG.view_mode == "proc"
-			Box.stat_mode = CONFIG.view_mode == "stat"
+				Box.view_mode = list(Box.view_modes)[(list(Box.view_modes).index(Box.view_mode) + 1)]
+			CONFIG.shown_boxes = " ".join(Box.view_modes[Box.view_mode])
 			Draw.clear(saved=True)
 			Term.refresh(force=True)
-		elif key.lower() in ["t", "k", "i"] and (ProcBox.selected > 0 or ProcCollector.detailed):
-			pid: int = ProcBox.selected_pid if ProcBox.selected > 0 else ProcCollector.detailed_pid # type: ignore
-			if psutil.pid_exists(pid):
-				if key.lower() == "t": sig = signal.SIGTERM
-				elif key.lower() == "k": sig = signal.SIGKILL
-				elif key.lower() == "i": sig = signal.SIGINT
-				try:
-					os.kill(pid, sig)
-				except Exception as e:
-					errlog.error(f'Exception when sending signal {sig} to pid {pid}')
-					errlog.exception(f'{e}')
-		elif key == "delete" and ProcCollector.search_filter:
-			ProcCollector.search_filter = ""
-			Collector.collect(ProcCollector, proc_interrupt=True, redraw=True)
-		elif key == "enter":
-			if ProcBox.selected > 0 and ProcCollector.detailed_pid != ProcBox.selected_pid and psutil.pid_exists(ProcBox.selected_pid):
-				ProcCollector.detailed = True
-				ProcBox.last_selection = ProcBox.selected
-				ProcBox.selected = 0
-				ProcCollector.detailed_pid = ProcBox.selected_pid
-				ProcBox.resized = True
-			elif ProcCollector.detailed:
-				ProcBox.selected = ProcBox.last_selection
-				ProcBox.last_selection = 0
-				ProcCollector.detailed = False
-				ProcCollector.detailed_pid = None
-				ProcBox.resized = True
+		elif key in box_keys:
+			boxes = CONFIG.shown_boxes.split()
+			if box_keys[key] in boxes:
+				boxes.remove(box_keys[key])
 			else:
-				continue
-			ProcCollector.details = {}
-			ProcCollector.details_cpu = []
-			ProcCollector.details_mem = []
-			Graphs.detailed_cpu = NotImplemented
-			Graphs.detailed_mem = NotImplemented
-			Collector.collect(ProcCollector, proc_interrupt=True, redraw=True)
+				boxes.append(box_keys[key])
+			CONFIG.shown_boxes = " ".join(boxes)
+			Box.view_mode = "user"
+			Box.view_modes["user"] = CONFIG.shown_boxes.split()
+			Draw.clear(saved=True)
+			Term.refresh(force=True)
+		else:
+			found = False
 
-		elif key in ["up", "down", "mouse_scroll_up", "mouse_scroll_down", "page_up", "page_down", "home", "end", "mouse_click", "mouse_unselect"]:
-			ProcBox.selector(key, mouse_pos)
+		if found: continue
+
+		if "proc" in Box.boxes:
+			if key in ["left", "right"]:
+				ProcCollector.sorting(key)
+			elif key == " " and CONFIG.proc_tree and ProcBox.selected > 0:
+				if ProcBox.selected_pid in ProcCollector.collapsed:
+					ProcCollector.collapsed[ProcBox.selected_pid] = not ProcCollector.collapsed[ProcBox.selected_pid]
+				Collector.collect(ProcCollector, interrupt=True, redraw=True)
+			elif key == "e":
+				CONFIG.proc_tree = not CONFIG.proc_tree
+				Collector.collect(ProcCollector, interrupt=True, redraw=True)
+			elif key == "r":
+				CONFIG.proc_reversed = not CONFIG.proc_reversed
+				Collector.collect(ProcCollector, interrupt=True, redraw=True)
+			elif key == "c":
+				CONFIG.proc_per_core = not CONFIG.proc_per_core
+				Collector.collect(ProcCollector, interrupt=True, redraw=True)
+			elif key == "f":
+				ProcBox.filtering = True
+				if not ProcCollector.search_filter: ProcBox.start = 0
+				Collector.collect(ProcCollector, redraw=True, only_draw=True)
+			elif key.lower() in ["t", "k", "i"] and (ProcBox.selected > 0 or ProcCollector.detailed):
+				pid: int = ProcBox.selected_pid if ProcBox.selected > 0 else ProcCollector.detailed_pid # type: ignore
+				if psutil.pid_exists(pid):
+					if key.lower() == "t": sig = signal.SIGTERM
+					elif key.lower() == "k": sig = signal.SIGKILL
+					elif key.lower() == "i": sig = signal.SIGINT
+					try:
+						os.kill(pid, sig)
+					except Exception as e:
+						errlog.error(f'Exception when sending signal {sig} to pid {pid}')
+						errlog.exception(f'{e}')
+			elif key == "delete" and ProcCollector.search_filter:
+				ProcCollector.search_filter = ""
+				Collector.collect(ProcCollector, proc_interrupt=True, redraw=True)
+			elif key == "enter":
+				if ProcBox.selected > 0 and ProcCollector.detailed_pid != ProcBox.selected_pid and psutil.pid_exists(ProcBox.selected_pid):
+					ProcCollector.detailed = True
+					ProcBox.last_selection = ProcBox.selected
+					ProcBox.selected = 0
+					ProcCollector.detailed_pid = ProcBox.selected_pid
+					ProcBox.resized = True
+					Collector.proc_counter = 1
+				elif ProcCollector.detailed:
+					ProcBox.selected = ProcBox.last_selection
+					ProcBox.last_selection = 0
+					ProcCollector.detailed = False
+					ProcCollector.detailed_pid = None
+					ProcBox.resized = True
+					Collector.proc_counter = 1
+				else:
+					continue
+				ProcCollector.details = {}
+				ProcCollector.details_cpu = []
+				ProcCollector.details_mem = []
+				Graphs.detailed_cpu = NotImplemented
+				Graphs.detailed_mem = NotImplemented
+				Collector.collect(ProcCollector, proc_interrupt=True, redraw=True)
+			elif key in ["up", "down", "mouse_scroll_up", "mouse_scroll_down", "page_up", "page_down", "home", "end", "mouse_click", "mouse_unselect"]:
+				ProcBox.selector(key, mouse_pos)
+
+		if "net" in Box.boxes:
+			if key in ["b", "n"]:
+				NetCollector.switch(key)
+			elif key == "z":
+				NetCollector.reset = not NetCollector.reset
+				Collector.collect(NetCollector, redraw=True)
+			elif key == "y":
+				CONFIG.net_sync = not CONFIG.net_sync
+				Collector.collect(NetCollector, redraw=True)
+			elif key == "a":
+				NetCollector.auto_min = not NetCollector.auto_min
+				NetCollector.net_min = {"download" : -1, "upload" : -1}
+				Collector.collect(NetCollector, redraw=True)
+
+		if "mem" in Box.boxes:
+			if key == "g":
+				CONFIG.mem_graphs = not CONFIG.mem_graphs
+				Collector.collect(MemCollector, interrupt=True, redraw=True)
+			elif key == "s":
+				Collector.collect_idle.wait()
+				CONFIG.swap_disk = not CONFIG.swap_disk
+				Collector.collect(MemCollector, interrupt=True, redraw=True)
+			elif key == "d":
+				Collector.collect_idle.wait()
+				CONFIG.show_disks = not CONFIG.show_disks
+				Collector.collect(MemCollector, interrupt=True, redraw=True)
+
+
+
 
 
 #? Pre main -------------------------------------------------------------------------------------->
