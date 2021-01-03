@@ -4747,8 +4747,8 @@ def units_to_bytes(value: str) -> int:
 		elif value.isdigit():
 			value_i = int(value)
 
-		if bit: value_i = round(value_i / 8)
 		out = int(value_i) << (10 * mult)
+		if bit: out = round(out / 8)
 	except ValueError:
 		out = 0
 	return out
