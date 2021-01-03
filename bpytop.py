@@ -163,6 +163,9 @@ swap_disk=$swap_disk
 #* If mem box should be split to also show disks info.
 show_disks=$show_disks
 
+#* Read disks list from /etc/fstab.
+use_fstab=$use_fstab
+
 #* Set fixed values for network graphs, default "10M" = 10 Mibibytes, possible units "K", "M", "G", append with "bit" for bits instead of bytes, i.e "100mbit"
 net_download="$net_download"
 net_upload="$net_upload"
@@ -356,7 +359,7 @@ class Config:
 	'''Holds all config variables and functions for loading from and saving to disk'''
 	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name",
 						"proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes", "disks_filter", "update_check", "log_level", "mem_graphs", "show_swap",
-						"swap_disk", "show_disks", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "theme_background",
+						"swap_disk", "show_disks", "use_fstab", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "theme_background",
 						"net_sync", "show_battery", "tree_depth", "cpu_sensor", "show_coretemp", "proc_update_mult", "shown_boxes"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
@@ -384,6 +387,7 @@ class Config:
 	show_swap: bool = True
 	swap_disk: bool = True
 	show_disks: bool = True
+	use_fstab: bool = False
 	net_download: str = "10M"
 	net_upload: str = "10M"
 	net_color_fixed: bool = False
@@ -392,7 +396,7 @@ class Config:
 	show_battery: bool = True
 	show_init: bool = True
 	log_level: str = "WARNING"
-
+	
 	warnings: List[str] = []
 	info: List[str] = []
 
@@ -3050,6 +3054,7 @@ class MemCollector(Collector):
 		io_string: str
 		u_percent: int
 		disk_list: List[str] = []
+		fstab_filter: List[str] = []
 		cls.disks = {}
 
 		if CONFIG.disks_filter:
@@ -3069,10 +3074,22 @@ class MemCollector(Collector):
 					errlog.error(f'Caused by outdated psutil version.')
 				errlog.exception(f'{e}')
 			io_counters = None
+		try:
+			with open('/etc/fstab','r') as fstab:
+				for line in fstab:
+					line = line.strip()
+					if line and not line.startswith('#'):
+						mount_data = (line.split())
+						if mount_data[2].lower() != "swap":
+							fstab_filter += [mount_data[1]]
+		except IOError:
+			pass
 
-		for disk in psutil.disk_partitions():
+		for disk in psutil.disk_partitions(CONFIG.use_fstab):
 			disk_io = None
 			io_string = ""
+			if CONFIG.use_fstab and disk.mountpoint not in fstab_filter:
+				continue
 			disk_name = disk.mountpoint.rsplit('/', 1)[-1] if not disk.mountpoint == "/" else "root"
 			#while disk_name in disk_list: disk_name += "_"
 			disk_list += [disk_name]
@@ -4051,6 +4068,10 @@ class Menu:
 				'Inserts itself after first disk.'],
 			"show_disks" : [
 				'Split memory box to also show disks.',
+				'',
+				'True or False.'],
+			"use_fstab" : [
+				'Read disks list from /etc/fstab.',
 				'',
 				'True or False.'],
 			"net_download" : [
