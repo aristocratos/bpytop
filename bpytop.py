@@ -2990,6 +2990,8 @@ class MemCollector(Collector):
 
 	old_disks: List[str] = []
 
+	fstab_filter: List[str] = []
+
 	excludes: List[str] = ["squashfs", "nullfs"]
 	if SYSTEM == "BSD": excludes += ["devfs", "tmpfs", "procfs", "linprocfs", "gvfs", "fusefs"]
 
@@ -3054,7 +3056,6 @@ class MemCollector(Collector):
 		io_string: str
 		u_percent: int
 		disk_list: List[str] = []
-		fstab_filter: List[str] = []
 		cls.disks = {}
 
 		if CONFIG.disks_filter:
@@ -3074,21 +3075,28 @@ class MemCollector(Collector):
 					errlog.error(f'Caused by outdated psutil version.')
 				errlog.exception(f'{e}')
 			io_counters = None
-		try:
-			with open('/etc/fstab','r') as fstab:
-				for line in fstab:
-					line = line.strip()
-					if line and not line.startswith('#'):
-						mount_data = (line.split())
-						if mount_data[2].lower() != "swap":
-							fstab_filter += [mount_data[1]]
-		except IOError:
-			pass
+
+		if CONFIG.use_fstab and not cls.fstab_filter:
+			try:
+				with open('/etc/fstab','r') as fstab:
+					for line in fstab:
+						line = line.strip()
+						if line and not line.startswith('#'):
+							mount_data = (line.split())
+							if mount_data[2].lower() != "swap":
+								cls.fstab_filter += [mount_data[1]]
+				errlog.debug(f'new fstab_filter set : {cls.fstab_filter}')
+			except IOError:
+				CONFIG.use_fstab = False
+				errlog.debug(f'Error reading fstab, use_fstab flag reset to {CONFIG.use_fstab}')
+		if not CONFIG.use_fstab and cls.fstab_filter:
+			cls.fstab_filter = []
+			errlog.debug(f'use_fstab flag has been turned to {CONFIG.use_fstab}, fstab_filter cleared')
 
 		for disk in psutil.disk_partitions(CONFIG.use_fstab):
 			disk_io = None
 			io_string = ""
-			if CONFIG.use_fstab and disk.mountpoint not in fstab_filter:
+			if CONFIG.use_fstab and disk.mountpoint not in cls.fstab_filter:
 				continue
 			disk_name = disk.mountpoint.rsplit('/', 1)[-1] if not disk.mountpoint == "/" else "root"
 			#while disk_name in disk_list: disk_name += "_"
