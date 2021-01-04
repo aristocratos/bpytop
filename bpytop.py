@@ -3080,7 +3080,7 @@ class MemCollector(Collector):
 				errlog.exception(f'{e}')
 			io_counters = None
 
-		if CONFIG.use_fstab and not cls.fstab_filter:
+		if CONFIG.use_fstab and SYSTEM != "MacOS" and not cls.fstab_filter:
 			try:
 				with open('/etc/fstab','r') as fstab:
 					for line in fstab:
