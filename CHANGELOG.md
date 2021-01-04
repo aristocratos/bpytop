@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.56
+
+* Fixed: units_to_bytes returning 0 if input value <10 and in bits
+* Added: Testing for some functions and classes
+
 ## v1.0.55
 
 * Fixed: Disks usage and free meters not updating unless resized
