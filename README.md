@@ -25,7 +25,7 @@
 * [Features](#features)
 * [Themes](#themes)
 * [Support and funding](#support-and-funding)
-* [Prerequisites](#prerequisites)
+* [Prerequisites](#prerequisites) (Read this if you are having issues!)
 * [Dependencies](#dependencies)
 * [Screenshots](#screenshots)
 * [Installation](#installation)
