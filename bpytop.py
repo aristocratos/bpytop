@@ -176,6 +176,9 @@ net_sync=$net_sync
 #* If the network graphs color gradient should scale to bandwith usage or auto scale, bandwith usage is based on "net_download" and "net_upload" values
 net_color_fixed=$net_color_fixed
 
+#* Starts with the Network Interface specified here.
+net_iface=$net_iface
+
 #* Show battery stats in top right if battery is present
 show_battery=$show_battery
 
@@ -356,7 +359,7 @@ class Config:
 	'''Holds all config variables and functions for loading from and saving to disk'''
 	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name",
 						"proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes", "disks_filter", "update_check", "log_level", "mem_graphs", "show_swap",
-						"swap_disk", "show_disks", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "theme_background",
+						"swap_disk", "show_disks", "net_download", "net_upload", "net_auto", "net_color_fixed", "net_iface", "show_init", "theme_background",
 						"net_sync", "show_battery", "tree_depth", "cpu_sensor", "show_coretemp", "proc_update_mult", "shown_boxes"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
@@ -389,6 +392,7 @@ class Config:
 	net_color_fixed: bool = False
 	net_auto: bool = True
 	net_sync: bool = False
+	net_iface: str = ""
 	show_battery: bool = True
 	show_init: bool = True
 	log_level: str = "WARNING"
@@ -3170,6 +3174,7 @@ class NetCollector(Collector):
 	timestamp: float = time()
 	net_min: Dict[str, int] = {"download" : -1, "upload" : -1}
 	auto_min: bool = CONFIG.net_auto
+	net_iface: str = CONFIG.net_iface
 	sync_top: int = 0
 	sync_string: str = ""
 
@@ -3193,9 +3198,14 @@ class NetCollector(Collector):
 			cls.nics.append(nic)
 		if not cls.nics: cls.nics = [""]
 		cls.nic = cls.nics[cls.nic_i]
+		if cls.net_iface and cls.net_iface in cls.nics: 
+                        cls.nic = cls.net_iface
+                        cls.nic_i = cls.nics.index(cls.nic)
+
 
 	@classmethod
 	def switch(cls, key: str):
+		if cls.net_iface: cls.net_iface = ""
 		if len(cls.nics) < 2 and cls.nic in cls.nics:
 			return
 
@@ -4099,6 +4109,11 @@ class Menu:
 				'The bandwidth usage is based on the',
 				'"net_download" and "net_upload" values set',
 				'above.'],
+			"net_iface" : [
+				'Network Interface.',
+				'',
+				'Starts with the Network Interface specified here.',
+				''],
 			"show_battery" : [
 				'Show battery stats.',
 				'',
