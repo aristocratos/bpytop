@@ -163,7 +163,10 @@ swap_disk=$swap_disk
 #* If mem box should be split to also show disks info.
 show_disks=$show_disks
 
-#* Read disks list from /etc/fstab.
+#* Filter out non physical disks. Set this to False to include network disks, RAM disks and similar.
+only_physical=$only_physical
+
+#* Read disks list from /etc/fstab. This also disables only_physical.
 use_fstab=$use_fstab
 
 #* Set fixed values for network graphs, default "10M" = 10 Mibibytes, possible units "K", "M", "G", append with "bit" for bits instead of bytes, i.e "100mbit"
@@ -308,6 +311,7 @@ UNITS: Dict[str, Tuple[str, ...]] = {
 }
 
 SUBSCRIPT: Tuple[str, ...] = ("₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉")
+SUPERSCRIPT: Tuple[str, ...] = ("⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹")
 
 #? Setup error logger ---------------------------------------------------------------->
 
@@ -363,7 +367,7 @@ class Config:
 	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name",
 						"proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes", "disks_filter", "update_check", "log_level", "mem_graphs", "show_swap",
 						"swap_disk", "show_disks", "use_fstab", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "theme_background",
-						"net_sync", "show_battery", "tree_depth", "cpu_sensor", "show_coretemp", "proc_update_mult", "shown_boxes", "net_iface"]
+						"net_sync", "show_battery", "tree_depth", "cpu_sensor", "show_coretemp", "proc_update_mult", "shown_boxes", "net_iface", "only_physical"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	theme_background: bool = True
@@ -390,6 +394,7 @@ class Config:
 	show_swap: bool = True
 	swap_disk: bool = True
 	show_disks: bool = True
+	only_physical: bool = True
 	use_fstab: bool = False
 	net_download: str = "10M"
 	net_upload: str = "10M"
@@ -2364,7 +2369,7 @@ class ProcBox(Box):
 					cls.current_h = cls.height - 8
 					for i in range(7): out_misc += f'{Mv.to(dy+i, x)}{" " * w}'
 					out_misc += (f'{Mv.to(dy+7, x-1)}{THEME.proc_box}{Symbol.title_right}{Symbol.h_line*w}{Symbol.title_left}'
-					f'{Mv.to(dy+7, x+1)}{THEME.proc_box(Symbol.title_left)}{Fx.b}{THEME.hi_fg(SUBSCRIPT[cls.num])}{THEME.title(cls.name)}{Fx.ub}{THEME.proc_box(Symbol.title_right)}{THEME.div_line}')
+					f'{Mv.to(dy+7, x+1)}{THEME.proc_box(Symbol.title_left)}{Fx.b}{THEME.hi_fg(SUPERSCRIPT[cls.num])}{THEME.title(cls.name)}{Fx.ub}{THEME.proc_box(Symbol.title_right)}{THEME.div_line}')
 					for i in range(7):
 						out_misc += f'{Mv.to(dy + i, dgx + dgw + 1)}{Symbol.v_line}'
 
@@ -2401,7 +2406,7 @@ class ProcBox(Box):
 					cls.current_h = cls.height
 					y, h = cls.y + 1, cls.height - 2
 					out_misc += (f'{Mv.to(y-1, x-1)}{THEME.proc_box}{Symbol.left_up}{Symbol.h_line*w}{Symbol.right_up}'
-						f'{Mv.to(y-1, x+1)}{THEME.proc_box(Symbol.title_left)}{Fx.b}{THEME.hi_fg(SUBSCRIPT[cls.num])}{THEME.title(cls.name)}{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
+						f'{Mv.to(y-1, x+1)}{THEME.proc_box(Symbol.title_left)}{Fx.b}{THEME.hi_fg(SUPERSCRIPT[cls.num])}{THEME.title(cls.name)}{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
 						f'{Mv.to(y+7, x-1)}{THEME.proc_box(Symbol.v_line)}{Mv.r(w)}{THEME.proc_box(Symbol.v_line)}')
 				cls.select_max = cls.height - 3
 
@@ -3097,7 +3102,7 @@ class MemCollector(Collector):
 			cls.fstab_filter = []
 			errlog.debug(f'use_fstab flag has been turned to {CONFIG.use_fstab}, fstab_filter cleared')
 
-		for disk in psutil.disk_partitions(CONFIG.use_fstab):
+		for disk in psutil.disk_partitions(all=CONFIG.use_fstab or not CONFIG.only_physical):
 			disk_io = None
 			io_string = ""
 			if CONFIG.use_fstab and disk.mountpoint not in cls.fstab_filter:
@@ -3920,6 +3925,12 @@ class Menu:
 		out: str = ""
 		out_misc : str = ""
 		redraw: bool = True
+		selected_cat: str = ""
+		selected_int: int = 0
+		option_items: Dict[str, List[str]] = {}
+		cat_list: List[str] = []
+		cat_int: int = 0
+		change_cat: bool = False
 		key: str = ""
 		skip: bool = False
 		main_active: bool = cls.active
@@ -3931,267 +3942,303 @@ class Menu:
 		Theme.refresh()
 		if not cls.background:
 			cls.background = f'{THEME.inactive_fg}' + Fx.uncolor(f'{Draw.saved_buffer()}') + f'{Term.fg}'
-		option_items: Dict[str, List[str]] = {
-			"color_theme" : [
-				'Set color theme.',
-				'',
-				'Choose from all theme files in',
-				'"/usr/[local/]share/bpytop/themes" and',
-				'"~/.config/bpytop/themes".',
-				'',
-				'"Default" for builtin default theme.',
-				'User themes are prefixed by a plus sign "+".',
-				'',
-				'For theme updates see:',
-				'https://github.com/aristocratos/bpytop'],
-			"theme_background" : [
-				'If the theme set background should be shown.',
-				'',
-				'Set to False if you want terminal background',
-				'transparency.'],
-			"shown_boxes" : [
-				'Manually set which boxes to show.',
-				'',
-				'Available values are "cpu mem net proc".',
-				'Seperate values with whitespace.',
-				'',
-				'Toggle between presets with mode key "m".'],
-			"update_ms" : [
-				'Update time in milliseconds.',
-				'',
-				'Recommended 2000 ms or above for better sample',
-				'times for graphs.',
-				'',
-				'Min value: 100 ms',
-				'Max value: 86400000 ms = 24 hours.'],
-			"proc_update_mult" : [
-				'Processes update multiplier.',
-				'Sets how often the process list is updated as',
-				'a multiplier of "update_ms".',
-				'',
-				'Set to 2 or higher to greatly decrease bpytop',
-				'cpu usage. (Only integers)'],
-			"proc_sorting" : [
-				'Processes sorting option.',
-				'',
-				'Possible values: "pid", "program", "arguments",',
-				'"threads", "user", "memory", "cpu lazy" and',
-				'"cpu responsive".',
-				'',
-				'"cpu lazy" updates top process over time,',
-				'"cpu responsive" updates top process directly.'],
-			"proc_reversed" : [
-				'Reverse processes sorting order.',
-				'',
-				'True or False.'],
-			"proc_tree" : [
-				'Processes tree view.',
-				'',
-				'Set true to show processes grouped by parents,',
-				'with lines drawn between parent and child',
-				'process.'],
-			"tree_depth" : [
-				'Process tree auto collapse depth.',
-				'',
-				'Sets the depth were the tree view will auto',
-				'collapse processes at.'],
-			"proc_colors" : [
-				'Enable colors in process view.',
-				'',
-				'Uses the cpu graph gradient colors.'],
-			"proc_gradient" : [
-				'Enable process view gradient fade.',
-				'',
-				'Fades from top or current selection.',
-				'Max fade value is equal to current themes',
-				'"inactive_fg" color value.'],
-			"proc_per_core" : [
-				'Process usage per core.',
-				'',
-				'If process cpu usage should be of the core',
-				'it\'s running on or usage of the total',
-				'available cpu power.',
-				'',
-				'If true and process is multithreaded',
-				'cpu usage can reach over 100%.'],
-			"proc_mem_bytes" : [
-				'Show memory as bytes in process list.',
-				' ',
-				'True or False.'
-			],
-			"check_temp" : [
-				'Enable cpu temperature reporting.',
-				'',
-				'True or False.'],
-			"cpu_sensor" : [
-				'Cpu temperature sensor',
-				'',
-				'Select the sensor that corresponds to',
-				'your cpu temperature.',
-				'Set to "Auto" for auto detection.'],
-			"show_coretemp" : [
-				'Show temperatures for cpu cores.',
-				'',
-				'Only works if check_temp is True and',
-				'the system is reporting core temps.'],
-			"draw_clock" : [
-				'Draw a clock at top of screen.',
-				'',
-				'Formatting according to strftime, empty',
-				'string to disable.',
-				'',
-				'Custom formatting options:',
-				'"/host" = hostname',
-				'"/user" = username',
-				'',
-				'Examples of strftime formats:',
-				'"%X" = locale HH:MM:SS',
-				'"%H" = 24h hour, "%I" = 12h hour',
-				'"%M" = minute, "%S" = second',
-				'"%d" = day, "%m" = month, "%y" = year'],
-			"background_update" : [
-				'Update main ui when menus are showing.',
-				'',
-				'True or False.',
-				'',
-				'Set this to false if the menus is flickering',
-				'too much for a comfortable experience.'],
-			"custom_cpu_name" : [
-				'Custom cpu model name in cpu percentage box.',
-				'',
-				'Empty string to disable.'],
-			"disks_filter" : [
-				'Optional filter for shown disks.',
-				'',
-				'Should be full path of a mountpoint,',
-				'"root" replaces "/", separate multiple values',
-				'with a comma ",".',
-				'Begin line with "exclude=" to change to exclude',
-				'filter.',
-				'Oterwise defaults to "most include" filter.',
-				'',
-				'Example: disks_filter="exclude=/boot, /home/user"'],
-			"mem_graphs" : [
-				'Show graphs for memory values.',
-				'',
-				'True or False.'],
-			"show_swap" : [
-				'If swap memory should be shown in memory box.',
-				'',
-				'True or False.'],
-			"swap_disk" : [
-				'Show swap as a disk.',
-				'',
-				'Ignores show_swap value above.',
-				'Inserts itself after first disk.'],
-			"show_disks" : [
-				'Split memory box to also show disks.',
-				'',
-				'True or False.'],
-			"use_fstab" : [
-				'Read disks list from /etc/fstab.',
-				'',
-				'True or False.'],
-			"net_download" : [
-				'Fixed network graph download value.',
-				'',
-				'Default "10M" = 10 MibiBytes.',
-				'Possible units:',
-				'"K" (KiB), "M" (MiB), "G" (GiB).',
-				'',
-				'Append "bit" for bits instead of bytes,',
-				'i.e "100Mbit"',
-				'',
-				'Can be toggled with auto button.'],
-			"net_upload" : [
-				'Fixed network graph upload value.',
-				'',
-				'Default "10M" = 10 MibiBytes.',
-				'Possible units:',
-				'"K" (KiB), "M" (MiB), "G" (GiB).',
-				'',
-				'Append "bit" for bits instead of bytes,',
-				'i.e "100Mbit"',
-				'',
-				'Can be toggled with auto button.'],
-			"net_auto" : [
-				'Start in network graphs auto rescaling mode.',
-				'',
-				'Ignores any values set above at start and',
-				'rescales down to 10KibiBytes at the lowest.',
-				'',
-				'True or False.'],
-			"net_sync" : [
-				'Network scale sync.',
-				'',
-				'Syncs the scaling for download and upload to',
-				'whichever currently has the highest scale.',
-				'',
-				'True or False.'],
-			"net_color_fixed" : [
-				'Set network graphs color gradient to fixed.',
-				'',
-				'If True the network graphs color is based',
-				'on the total bandwidth usage instead of',
-				'the current autoscaling.',
-				'',
-				'The bandwidth usage is based on the',
-				'"net_download" and "net_upload" values set',
-				'above.'],
-			"net_iface" : [
-				'Network Interface.',
-				'',
-				'Starts with the Network Interface specified here.',
-				''],
-			"show_battery" : [
-				'Show battery stats.',
-				'',
-				'Show battery stats in the top right corner',
-				'if a battery is present.'],
-			"show_init" : [
-				'Show init screen at startup.',
-				'',
-				'The init screen is purely cosmetical and',
-				'slows down start to show status messages.'],
-			"update_check" : [
-				'Check for updates at start.',
-				'',
-				'Checks for latest version from:',
-				'https://github.com/aristocratos/bpytop'],
-			"log_level" : [
-				'Set loglevel for error.log',
-				'',
-				'Levels are: "ERROR" "WARNING" "INFO" "DEBUG".',
-				'The level set includes all lower levels,',
-				'i.e. "DEBUG" will show all logging info.']
+		categories: Dict[str, Dict[str, List[str]]] = {
+			"system" : {
+				"color_theme" : [
+					'Set color theme.',
+					'',
+					'Choose from all theme files in',
+					'"/usr/[local/]share/bpytop/themes" and',
+					'"~/.config/bpytop/themes".',
+					'',
+					'"Default" for builtin default theme.',
+					'User themes are prefixed by a plus sign "+".',
+					'',
+					'For theme updates see:',
+					'https://github.com/aristocratos/bpytop'],
+				"theme_background" : [
+					'If the theme set background should be shown.',
+					'',
+					'Set to False if you want terminal background',
+					'transparency.'],
+				"shown_boxes" : [
+					'Manually set which boxes to show.',
+					'',
+					'Available values are "cpu mem net proc".',
+					'Seperate values with whitespace.',
+					'',
+					'Toggle between presets with mode key "m".'],
+				"update_ms" : [
+					'Update time in milliseconds.',
+					'',
+					'Recommended 2000 ms or above for better sample',
+					'times for graphs.',
+					'',
+					'Min value: 100 ms',
+					'Max value: 86400000 ms = 24 hours.'],
+				"draw_clock" : [
+					'Draw a clock at top of screen.',
+					'Only visible if cpu box is enabled.'
+					'',
+					'Formatting according to strftime, empty',
+					'string to disable.',
+					'',
+					'Custom formatting options:',
+					'"/host" = hostname',
+					'"/user" = username',
+					'',
+					'Examples of strftime formats:',
+					'"%X" = locale HH:MM:SS',
+					'"%H" = 24h hour, "%I" = 12h hour',
+					'"%M" = minute, "%S" = second',
+					'"%d" = day, "%m" = month, "%y" = year'],
+				"background_update" : [
+					'Update main ui when menus are showing.',
+					'',
+					'True or False.',
+					'',
+					'Set this to false if the menus is flickering',
+					'too much for a comfortable experience.'],
+				"show_battery" : [
+					'Show battery stats.',
+					'',
+					'Show battery stats in the top right corner',
+					'if a battery is present.'],
+				"show_init" : [
+					'Show init screen at startup.',
+					'',
+					'The init screen is purely cosmetical and',
+					'slows down start to show status messages.'],
+				"update_check" : [
+					'Check for updates at start.',
+					'',
+					'Checks for latest version from:',
+					'https://github.com/aristocratos/bpytop'],
+				"log_level" : [
+					'Set loglevel for error.log',
+					'',
+					'Levels are: "ERROR" "WARNING" "INFO" "DEBUG".',
+					'The level set includes all lower levels,',
+					'i.e. "DEBUG" will show all logging info.']
+			},
+			"cpu" : {
+				"check_temp" : [
+					'Enable cpu temperature reporting.',
+					'',
+					'True or False.'],
+				"cpu_sensor" : [
+					'Cpu temperature sensor',
+					'',
+					'Select the sensor that corresponds to',
+					'your cpu temperature.',
+					'Set to "Auto" for auto detection.'],
+				"show_coretemp" : [
+					'Show temperatures for cpu cores.',
+					'',
+					'Only works if check_temp is True and',
+					'the system is reporting core temps.'],
+
+				"custom_cpu_name" : [
+					'Custom cpu model name in cpu percentage box.',
+					'',
+					'Empty string to disable.'],
+			},
+			"mem" : {
+				"mem_graphs" : [
+					'Show graphs for memory values.',
+					'',
+					'True or False.'],
+				"show_disks" : [
+					'Split memory box to also show disks.',
+					'',
+					'True or False.'],
+				"show_swap" : [
+					'If swap memory should be shown in memory box.',
+					'',
+					'True or False.'],
+				"swap_disk" : [
+					'Show swap as a disk.',
+					'',
+					'Ignores show_swap value above.',
+					'Inserts itself after first disk.'],
+				"only_physical" : [
+					'Filter out non physical disks.',
+					'',
+					'Set this to False to include network disks,',
+					'RAM disks and similar.',
+					'',
+					'True or False.'],
+				"use_fstab" : [
+					'Read disks list from /etc/fstab.',
+					'(Has no effect on macOS X)',
+					'',
+					'This also disables only_physical.',
+					'',
+					'True or False.'],
+				"disks_filter" : [
+					'Optional filter for shown disks.',
+					'',
+					'Should be full path of a mountpoint,',
+					'"root" replaces "/", separate multiple values',
+					'with a comma ",".',
+					'Begin line with "exclude=" to change to exclude',
+					'filter.',
+					'Oterwise defaults to "most include" filter.',
+					'',
+					'Example: disks_filter="exclude=/boot, /home/user"'],
+			},
+			"net" : {
+				"net_download" : [
+					'Fixed network graph download value.',
+					'',
+					'Default "10M" = 10 MibiBytes.',
+					'Possible units:',
+					'"K" (KiB), "M" (MiB), "G" (GiB).',
+					'',
+					'Append "bit" for bits instead of bytes,',
+					'i.e "100Mbit"',
+					'',
+					'Can be toggled with auto button.'],
+				"net_upload" : [
+					'Fixed network graph upload value.',
+					'',
+					'Default "10M" = 10 MibiBytes.',
+					'Possible units:',
+					'"K" (KiB), "M" (MiB), "G" (GiB).',
+					'',
+					'Append "bit" for bits instead of bytes,',
+					'i.e "100Mbit"',
+					'',
+					'Can be toggled with auto button.'],
+				"net_auto" : [
+					'Start in network graphs auto rescaling mode.',
+					'',
+					'Ignores any values set above at start and',
+					'rescales down to 10KibiBytes at the lowest.',
+					'',
+					'True or False.'],
+				"net_sync" : [
+					'Network scale sync.',
+					'',
+					'Syncs the scaling for download and upload to',
+					'whichever currently has the highest scale.',
+					'',
+					'True or False.'],
+				"net_color_fixed" : [
+					'Set network graphs color gradient to fixed.',
+					'',
+					'If True the network graphs color is based',
+					'on the total bandwidth usage instead of',
+					'the current autoscaling.',
+					'',
+					'The bandwidth usage is based on the',
+					'"net_download" and "net_upload" values set',
+					'above.'],
+				"net_iface" : [
+					'Network Interface.',
+					'',
+					'Manually set the starting Network Interface.',
+					'Will otherwise automatically choose the NIC',
+					'with the highest total download since boot.'],
+			},
+			"proc" : {
+				"proc_update_mult" : [
+					'Processes update multiplier.',
+					'Sets how often the process list is updated as',
+					'a multiplier of "update_ms".',
+					'',
+					'Set to 2 or higher to greatly decrease bpytop',
+					'cpu usage. (Only integers)'],
+				"proc_sorting" : [
+					'Processes sorting option.',
+					'',
+					'Possible values: "pid", "program", "arguments",',
+					'"threads", "user", "memory", "cpu lazy" and',
+					'"cpu responsive".',
+					'',
+					'"cpu lazy" updates top process over time,',
+					'"cpu responsive" updates top process directly.'],
+				"proc_reversed" : [
+					'Reverse processes sorting order.',
+					'',
+					'True or False.'],
+				"proc_tree" : [
+					'Processes tree view.',
+					'',
+					'Set true to show processes grouped by parents,',
+					'with lines drawn between parent and child',
+					'process.'],
+				"tree_depth" : [
+					'Process tree auto collapse depth.',
+					'',
+					'Sets the depth were the tree view will auto',
+					'collapse processes at.'],
+				"proc_colors" : [
+					'Enable colors in process view.',
+					'',
+					'Uses the cpu graph gradient colors.'],
+				"proc_gradient" : [
+					'Enable process view gradient fade.',
+					'',
+					'Fades from top or current selection.',
+					'Max fade value is equal to current themes',
+					'"inactive_fg" color value.'],
+				"proc_per_core" : [
+					'Process usage per core.',
+					'',
+					'If process cpu usage should be of the core',
+					'it\'s running on or usage of the total',
+					'available cpu power.',
+					'',
+					'If true and process is multithreaded',
+					'cpu usage can reach over 100%.'],
+				"proc_mem_bytes" : [
+					'Show memory as bytes in process list.',
+					' ',
+					'True or False.'],
 			}
-		option_len: int = len(option_items) * 2
+		}
+
 		sorting_i: int = CONFIG.sorting_options.index(CONFIG.proc_sorting)
 		loglevel_i: int = CONFIG.log_levels.index(CONFIG.log_level)
 		cpu_sensor_i: int = CONFIG.cpu_sensors.index(CONFIG.cpu_sensor)
 		color_i: int
+		cat_list = list(categories)
 		while not cls.close:
 			key = ""
-			if cls.resized:
-				y = 9 if Term.height < option_len + 10 else Term.height // 2 - option_len // 2 + 4
-				out_misc = (f'{Banner.draw(y-7, center=True)}{Mv.d(1)}{Mv.l(46)}{Colors.black_bg}{Colors.default}{Fx.b}← esc'
+			if cls.resized or change_cat:
+				cls.resized = change_cat = False
+				selected_cat = list(categories)[cat_int]
+				option_items = categories[cat_list[cat_int]]
+				option_len: int = len(option_items) * 2
+				y = 12 if Term.height < option_len + 13 else Term.height // 2 - option_len // 2 + 7
+				out_misc = (f'{Banner.draw(y-10, center=True)}{Mv.d(1)}{Mv.l(46)}{Colors.black_bg}{Colors.default}{Fx.b}← esc'
 					f'{Mv.r(30)}{Fx.i}Version: {VERSION}{Fx.ui}{Fx.ub}{Term.bg}{Term.fg}')
 				x = Term.width//2-38
 				x2 = x + 27
-				h, w, w2 = Term.height-2-y, 26, 50
+				h, w, w2 = min(Term.height-1-y, option_len), 26, 50
 				h -= h % 2
 				color_i = list(Theme.themes).index(THEME.current)
+				out_misc += create_box(x, y - 3, w+w2+1, 3, f'tab{Symbol.right}', line_color=THEME.div_line)
+				out_misc += create_box(x, y, w, h+2, "options", line_color=THEME.div_line)
+				redraw = True
+
+				cat_width = floor((w+w2) / len(categories))
+				out_misc += f'{Fx.b}'
+				for cx, cat in enumerate(categories):
+					out_misc += f'{Mv.to(y-2, x + 1 + (cat_width * cx) + round(cat_width / 2 - len(cat) / 2 ))}'
+					if cat == selected_cat:
+						out_misc += f'{THEME.hi_fg}[{THEME.title}{Fx.u}{cat}{Fx.uu}{THEME.hi_fg}]'
+					else:
+						out_misc += f'{THEME.hi_fg}{SUPERSCRIPT[cx+1]}{THEME.title}{cat}'
+				out_misc += f'{Fx.ub}'
 				if option_len > h:
 					pages = ceil(option_len / h)
 				else:
 					h = option_len
 					pages = 0
-				page = 1
-				selected_int = 0
-				out_misc += create_box(x, y, w, h+2, "options", line_color=THEME.div_line)
-				redraw = True
-				cls.resized = False
-
+				page = pages if selected_int == -1 and pages > 0 else 1
+				selected_int = 0 if selected_int >= 0 else len(option_items) - 1
 			if redraw:
 				out = ""
 				cy = 0
@@ -4253,7 +4300,13 @@ class Menu:
 				has_sel = False
 				if key == "mouse_click" and not inputting:
 					mx, my = Key.get_mouse()
-					if x < mx < x + w and y < my < y + h + 2:
+					if x < mx < x + w + w2 and y - 4 < my < y:
+						# if my == y - 2:
+						for cx, cat in enumerate(categories):
+							ccx = x + (cat_width * cx) + round(cat_width / 2 - len(cat) / 2 )
+							if ccx - 2 < mx < ccx + 2 + len(cat):
+								key = str(cx+1)
+					elif x < mx < x + w and y < my < y + h + 2:
 						mouse_sel = ceil((my - y) / 2) - 1 + ceil((page-1) * (h / 2))
 						if pages and my == y+h+1 and x+11 < mx < x+16:
 							key = "page_up"
@@ -4329,6 +4382,22 @@ class Menu:
 				elif key in ["escape", "o", "M", "f2"]:
 					cls.close = True
 					break
+				elif key == "tab" or (key == "down" and selected_int == len(option_items) - 1 and (page == pages or pages == 0)):
+					if cat_int == len(categories) - 1:
+						cat_int = 0
+					else:
+						cat_int += 1
+					change_cat = True
+				elif key == "shift_tab" or (key == "up" and selected_int == 0 and page == 1):
+					if cat_int == 0:
+						cat_int = len(categories) - 1
+					else:
+						cat_int -= 1
+					change_cat = True
+					selected_int = -1 if key != "shift_tab" else 0
+				elif key in list(map(str, range(1, len(cat_list)+1))) and key != str(cat_int + 1):
+					cat_int = int(key) - 1
+					change_cat = True
 				elif key == "enter" and selected in ["update_ms", "disks_filter", "custom_cpu_name", "net_download",
 					 "net_upload", "draw_clock", "tree_depth", "proc_update_mult", "shown_boxes", "net_iface"]:
 					inputting = True
@@ -4407,22 +4476,28 @@ class Menu:
 						CpuCollector.get_sensors()
 						Term.refresh(force=True)
 						cls.resized = False
-				elif key == "up":
+				elif key in ["up", "mouse_scroll_up"]:
 					selected_int -= 1
 					if selected_int < 0: selected_int = len(option_items) - 1
 					page = floor(selected_int * 2 / h) + 1
-				elif key == "down":
+				elif key in ["down", "mouse_scroll_down"]:
 					selected_int += 1
 					if selected_int > len(option_items) - 1: selected_int = 0
 					page = floor(selected_int * 2 / h) + 1
-				elif key in ["mouse_scroll_up", "page_up"] and pages:
-					page -= 1
-					if page < 1: page = pages
+				elif key == "page_up":
+					if not pages or page == 1:
+						selected_int = 0
+					else:
+						page -= 1
+						if page < 1: page = pages
 					selected_int = (page-1) * ceil(h / 2)
-				elif key in ["mouse_scroll_down", "page_down"] and pages:
-					page += 1
-					if page > pages: page = 1
-					selected_int = (page-1) * ceil(h / 2)
+				elif key == "page_down":
+					if not pages or page == pages:
+						selected_int = len(option_items) - 1
+					else:
+						page += 1
+						if page > pages: page = 1
+						selected_int = (page-1) * ceil(h / 2)
 				elif has_sel:
 					pass
 				else:
@@ -4669,7 +4744,7 @@ def create_box(x: int = 0, y: int = 0, width: int = 0, height: int = 0, title: s
 
 	#* Draw titles if enabled
 	if title:
-		numbered: str = "" if not num else f'{THEME.hi_fg(SUBSCRIPT[num])}'
+		numbered: str = "" if not num else f'{THEME.hi_fg(SUPERSCRIPT[num])}'
 		out += f'{Mv.to(y, x + 2)}{Symbol.title_left}{Fx.b}{numbered}{title_color}{title}{Fx.ub}{line_color}{Symbol.title_right}'
 	if title2:
 		out += f'{Mv.to(hlines[1], x + 2)}{Symbol.title_left}{title_color}{Fx.b}{title2}{Fx.ub}{line_color}{Symbol.title_right}'
