@@ -16,7 +16,7 @@ def test_Theme():
 	bpytop.THEME = bpytop.Theme("Default")
 	assert str(bpytop.THEME.main_fg) == "\x1b[38;2;204;204;204m"
 	assert list(bpytop.THEME.main_fg) == [204, 204, 204]
-	assert len(bpytop.THEME.gradient["cpu"]) > 1
+	assert len(bpytop.THEME.gradient["cpu"]) == 101
 
 def test_Box_calc_sizes():
 	Box.calc_sizes()
