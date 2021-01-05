@@ -9,7 +9,7 @@ def test_get_cpu_core_mapping():
 	assert isinstance(get_cpu_core_mapping(), list)
 
 def test_create_box():
-	assert len(Fx.uncolor(create_box(x=1, y=1, width=10, height=10, title="", title2="", line_color=None, title_color=None, fill=True, box=None))) == 205
+	assert len(create_box(x=1, y=1, width=10, height=10, title="", title2="", line_color=None, title_color=None, fill=True, box=None)) > 1
 
 def test_floating_humanizer():
 	assert floating_humanizer(100) == "100 Byte"
