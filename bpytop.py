@@ -3393,7 +3393,7 @@ class ProcCollector(Collector):
 		sorting: str = CONFIG.proc_sorting
 		reverse: bool = not CONFIG.proc_reversed
 		proc_per_cpu: bool = CONFIG.proc_per_core
-		search: str = cls.search_filter
+		search: List[str] = [i.strip() for i in cls.search_filter.lower().split(",")] if cls.search_filter else []
 		err: float = 0.0
 		n: int = 0
 
@@ -3419,9 +3419,9 @@ class ProcCollector(Collector):
 				if search:
 					if cls.detailed and p.info["pid"] == cls.detailed_pid:
 						cls.det_cpu = p.info["cpu_percent"]
-					for value in [ p.info["name"], " ".join(p.info["cmdline"]), str(p.info["pid"]), p.info["username"] ]:
-						for s in search.split(","):
-							if s.strip() in value:
+					for value in [ p.info["name"].lower(), " ".join(p.info["cmdline"]).lower(), str(p.info["pid"]), p.info["username"].lower() ]:
+						for s in search:
+							if s in value:
 								break
 						else: continue
 						break
@@ -3533,7 +3533,7 @@ class ProcCollector(Collector):
 				if len(cls.details_mem) > ProcBox.width: del cls.details_mem[0]
 
 	@classmethod
-	def _tree(cls, sort_cmd, reverse: bool, proc_per_cpu: bool, search: str):
+	def _tree(cls, sort_cmd, reverse: bool, proc_per_cpu: bool, search: List[str]):
 		'''List all processess in a tree view with pid, name, threads, username, memory percent and cpu percent'''
 		out: Dict = {}
 		err: float = 0.0
@@ -3575,9 +3575,9 @@ class ProcCollector(Collector):
 						det_cpu = getinfo["cpu_percent"]
 				if "username" in getinfo and isinstance(getinfo["username"], float): getinfo["username"] = ""
 				if "cmdline" in getinfo and isinstance(getinfo["cmdline"], float): getinfo["cmdline"] = ""
-				for value in [ name, str(pid), getinfo.get("username", ""), " ".join(getinfo.get("cmdline", "")) ]:
-					for s in search.split(","):
-						if s.strip() in value:
+				for value in [ name.lower(), str(pid), getinfo.get("username", "").lower(), " ".join(getinfo.get("cmdline", "")).lower() ]:
+					for s in search:
+						if s in value:
 							found = True
 							break
 					else: continue
