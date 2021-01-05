@@ -4,6 +4,9 @@
 
 * Fixed: units_to_bytes returning 0 if input value <10 and in bits
 * Added: Testing for some functions and classes
+* Added: net_iface variable to set startup network interface, by @raTmole
+* Added: use_fstab variable to get the disk list from /etc/fstab, by @BrHal
+* Added: Categories in Options menu and only_physical option for disks
 
 ## v1.0.55
 
