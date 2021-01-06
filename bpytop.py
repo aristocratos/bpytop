@@ -4199,7 +4199,6 @@ class Menu:
 			}
 		}
 
-		sorting_i: int = CONFIG.sorting_options.index(CONFIG.proc_sorting)
 		loglevel_i: int = CONFIG.log_levels.index(CONFIG.log_level)
 		cpu_sensor_i: int = CONFIG.cpu_sensors.index(CONFIG.cpu_sensor)
 		color_i: int
@@ -4257,7 +4256,7 @@ class Menu:
 					if opt == "color_theme":
 						counter = f' {color_i + 1}/{len(Theme.themes)}'
 					elif opt == "proc_sorting":
-						counter = f' {sorting_i + 1}/{len(CONFIG.sorting_options)}'
+						counter = f' {CONFIG.sorting_options.index(CONFIG.proc_sorting) + 1}/{len(CONFIG.sorting_options)}'
 					elif opt == "log_level":
 						counter = f' {loglevel_i + 1}/{len(CONFIG.log_levels)}'
 					elif opt == "cpu_sensor":
