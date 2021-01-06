@@ -98,6 +98,7 @@ Upgrade psutil with `sudo pip3 install psutil --upgrade`
 For correct display, a terminal with support for:
 
 * 24-bit truecolor ([See list of terminals with truecolor support](https://gist.github.com/XVilka/8346728))
+* 256-color terminals are supported through 24-bit to 256-color conversion when setting "truecolor" to False in the options or with "-lc/--low-color" argument.
 * Wide characters (Are sometimes problematic in web-based terminals)
 
 Also needs a UTF8 locale and a font that covers:
@@ -346,14 +347,17 @@ Config files stored in "$HOME/.config/bpytop" folder
 "/etc/bpytop.conf" will be used as default seed for config file creation if it exists.
 
 ```bash
-#? Config file for bpytop v. 1.0.54
+#? Config file for bpytop v. 1.0.57
 
 #* Color theme, looks for a .theme file in "/usr/[local/]share/bpytop/themes" and "~/.config/bpytop/themes", "Default" for builtin default theme.
 #* Prefix name by a plus sign (+) for a theme located in user themes folder, i.e. color_theme="+monokai"
-color_theme="monokai"
+color_theme="Default"
 
 #* If the theme set background should be shown, set to False if you want terminal background transparency
-theme_background=True
+theme_background=False
+
+#* Sets if 24-bit truecolor should be used, will convert 24-bit colors to 256 color (6x6x6 color cube) if false.
+truecolor=True
 
 #* Manually set which boxes to show. Available values are "cpu mem net proc", seperate values with whitespace.
 shown_boxes="cpu mem net proc"
@@ -424,6 +428,12 @@ swap_disk=True
 #* If mem box should be split to also show disks info.
 show_disks=True
 
+#* Filter out non physical disks. Set this to False to include network disks, RAM disks and similar.
+only_physical=True
+
+#* Read disks list from /etc/fstab. This also disables only_physical.
+use_fstab=False
+
 #* Set fixed values for network graphs, default "10M" = 10 Mibibytes, possible units "K", "M", "G", append with "bit" for bits instead of bytes, i.e "100mbit"
 net_download="100Mbit"
 net_upload="100Mbit"
@@ -436,6 +446,9 @@ net_sync=True
 
 #* If the network graphs color gradient should scale to bandwith usage or auto scale, bandwith usage is based on "net_download" and "net_upload" values
 net_color_fixed=False
+
+#* Starts with the Network Interface specified here.
+net_iface=""
 
 #* Show battery stats in top right if battery is present
 show_battery=True
@@ -455,14 +468,15 @@ log_level=DEBUG
 #### Command line options:
 
 ``` text
-usage: bpytop.py [-h] [-b BOXES] [-v] [--debug]
+usage: bpytop.py [-h] [-b BOXES] [-lc] [-v] [--debug]
 
 optional arguments:
   -h, --help            show this help message and exit
   -b BOXES, --boxes BOXES
-                        Which boxes to show at start, example: -b "cpu mem net proc"
-  -v, --version         Show version info and exit
-  --debug               Start with loglevel set to DEBUG overriding value set in config
+                        which boxes to show at start, example: -b "cpu mem net proc"
+  -lc, --low-color      disable truecolor, converts 24-bit colors to 256-color
+  -v, --version         show version info and exit
+  --debug               start with loglevel set to DEBUG overriding value set in config
 ```
 
 ## TODO

@@ -59,9 +59,10 @@ VERSION: str = "1.0.56"
 
 #? Argument parser ------------------------------------------------------------------------------->
 args = argparse.ArgumentParser()
-args.add_argument("-b", "--boxes",		action="store",	dest="boxes", help ="Which boxes to show at start, example: -b \"cpu mem net proc\"")
-args.add_argument("-v", "--version",	action="store_true" ,help ="Show version info and exit")
-args.add_argument("--debug",			action="store_true" ,help ="Start with loglevel set to DEBUG overriding value set in config")
+args.add_argument("-b", "--boxes",		action="store",	dest="boxes", 	help = "which boxes to show at start, example: -b \"cpu mem net proc\"")
+args.add_argument("-lc", "--low-color", action="store_true", 			help = "disable truecolor, converts 24-bit colors to 256-color")
+args.add_argument("-v", "--version",	action="store_true", 			help = "show version info and exit")
+args.add_argument("--debug",			action="store_true", 			help = "start with loglevel set to DEBUG overriding value set in config")
 stdargs = args.parse_args()
 
 if stdargs.version:
@@ -70,8 +71,8 @@ if stdargs.version:
 	raise SystemExit(0)
 
 ARG_BOXES: str = stdargs.boxes
-
-DEBUG = stdargs.debug
+LOW_COLOR: bool = stdargs.low_color
+DEBUG: bool = stdargs.debug
 
 #? Variables ------------------------------------------------------------------------------------->
 
@@ -93,6 +94,9 @@ color_theme="$color_theme"
 
 #* If the theme set background should be shown, set to False if you want terminal background transparency
 theme_background=$theme_background
+
+#* Sets if 24-bit truecolor should be used, will convert 24-bit colors to 256 color (6x6x6 color cube) if false.
+truecolor=$truecolor
 
 #* Manually set which boxes to show. Available values are "cpu mem net proc", seperate values with whitespace.
 shown_boxes="$shown_boxes"
@@ -183,7 +187,7 @@ net_sync=$net_sync
 net_color_fixed=$net_color_fixed
 
 #* Starts with the Network Interface specified here.
-net_iface=$net_iface
+net_iface="$net_iface"
 
 #* Show battery stats in top right if battery is present
 show_battery=$show_battery
@@ -367,10 +371,12 @@ class Config:
 	keys: List[str] = ["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name",
 						"proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes", "disks_filter", "update_check", "log_level", "mem_graphs", "show_swap",
 						"swap_disk", "show_disks", "use_fstab", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "theme_background",
-						"net_sync", "show_battery", "tree_depth", "cpu_sensor", "show_coretemp", "proc_update_mult", "shown_boxes", "net_iface", "only_physical"]
+						"net_sync", "show_battery", "tree_depth", "cpu_sensor", "show_coretemp", "proc_update_mult", "shown_boxes", "net_iface", "only_physical",
+						"truecolor"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	theme_background: bool = True
+	truecolor: bool = True
 	shown_boxes: str = "cpu mem net proc"
 	update_ms: int = 2000
 	proc_update_mult: int = 2
@@ -1067,6 +1073,9 @@ class Color:
 			self.red, self.green, self.blue = self.dec
 			self.escape = f'\033[{38 if self.depth == "fg" else 48};2;{";".join(str(c) for c in self.dec)}m'
 
+		if not CONFIG.truecolor or LOW_COLOR:
+			self.escape = f'{self.truecolor_to_256(rgb=self.dec, depth=self.depth)}'
+
 	def __str__(self) -> str:
 		return self.escape
 
@@ -1081,6 +1090,19 @@ class Color:
 		return f'{self.escape}{"".join(args)}{getattr(Term, self.depth)}'
 
 	@staticmethod
+	def truecolor_to_256(rgb: Tuple[int, int, int], depth: str="fg") -> str:
+		out: str = ""
+		pre: str = f'\033[{"38" if depth == "fg" else "48"};5;'
+
+		greyscale: Tuple[int, int, int] = ( rgb[0] // 11, rgb[1] // 11, rgb[2] // 11 )
+		if greyscale[0] == greyscale[1] == greyscale[2]:
+			out = f'{pre}{232 + greyscale[0]}m'
+		else:
+			out = f'{pre}{round(rgb[0] / 51) * 36 + round(rgb[1] / 51) * 6 + round(rgb[2] / 51) + 16}m'
+
+		return out
+
+	@staticmethod
 	def escape_color(hexa: str = "", r: int = 0, g: int = 0, b: int = 0, depth: str = "fg") -> str:
 		"""Returns escape sequence to set color
 		* accepts either 6 digit hexadecimal hexa="#RRGGBB", 2 digit hexadecimal: hexa="#FF"
@@ -1093,13 +1115,22 @@ class Color:
 			try:
 				if len(hexa) == 3:
 					c = int(hexa[1:], base=16)
-					color = f'\033[{dint};2;{c};{c};{c}m'
+					if CONFIG.truecolor and not LOW_COLOR:
+						color = f'\033[{dint};2;{c};{c};{c}m'
+					else:
+						color = f'{Color.truecolor_to_256(rgb=(c, c, c), depth=depth)}'
 				elif len(hexa) == 7:
-					color = f'\033[{dint};2;{int(hexa[1:3], base=16)};{int(hexa[3:5], base=16)};{int(hexa[5:7], base=16)}m'
+					if CONFIG.truecolor and not LOW_COLOR:
+						color = f'\033[{dint};2;{int(hexa[1:3], base=16)};{int(hexa[3:5], base=16)};{int(hexa[5:7], base=16)}m'
+					else:
+						color = f'{Color.truecolor_to_256(rgb=(int(hexa[1:3], base=16), int(hexa[3:5], base=16), int(hexa[5:7], base=16)), depth=depth)}'
 			except ValueError as e:
 				errlog.exception(f'{e}')
 		else:
-			color = f'\033[{dint};2;{r};{g};{b}m'
+			if CONFIG.truecolor and not LOW_COLOR:
+				color = f'\033[{dint};2;{r};{g};{b}m'
+			else:
+				color = f'{Color.truecolor_to_256(rgb=(r, g, b), depth=depth)}'
 		return color
 
 	@classmethod
@@ -3961,6 +3992,16 @@ class Menu:
 					'',
 					'Set to False if you want terminal background',
 					'transparency.'],
+				"truecolor" : [
+					'Sets if 24-bit truecolor should be used.',
+					'(Requires restart to take effect!)',
+					'',
+					'Will convert 24-bit colors to 256 color',
+					'(6x6x6 color cube) if False.',
+					'',
+					'Set to False if your terminal doesn\'t have',
+					'truecolor support and can\'t convert to',
+					'256-color.'],
 				"shown_boxes" : [
 					'Manually set which boxes to show.',
 					'',
@@ -3978,7 +4019,7 @@ class Menu:
 					'Max value: 86400000 ms = 24 hours.'],
 				"draw_clock" : [
 					'Draw a clock at top of screen.',
-					'Only visible if cpu box is enabled.'
+					'(Only visible if cpu box is enabled!)',
 					'',
 					'Formatting according to strftime, empty',
 					'string to disable.',
@@ -4001,6 +4042,7 @@ class Menu:
 					'too much for a comfortable experience.'],
 				"show_battery" : [
 					'Show battery stats.',
+					'(Only visible if cpu box is enabled!)',
 					'',
 					'Show battery stats in the top right corner',
 					'if a battery is present.'],
