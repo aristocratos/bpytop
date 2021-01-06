@@ -2441,7 +2441,7 @@ class ProcBox(Box):
 				if not "delete" in Key.mouse: Key.mouse["delete"] = [[x+12 + len(proc.search_filter[-10:]) + i, y-1] for i in range(3)]
 			elif "delete" in Key.mouse:
 				del Key.mouse["delete"]
-			out_misc += (f'{Mv.to(y-1, x + 8)}{THEME.proc_box(Symbol.title_left)}{Fx.b if cls.filtering or proc.search_filter else ""}{THEME.hi_fg("f")}{THEME.title}' +
+			out_misc += (f'{Mv.to(y-1, x + 8)}{THEME.proc_box(Symbol.title_left)}{Fx.b if cls.filtering or proc.search_filter else ""}{THEME.hi_fg("F" if cls.filtering and proc.case_sensitive else "f")}{THEME.title}' +
 				("ilter" if not proc.search_filter and not cls.filtering else f' {proc.search_filter[-(10 if w < 83 else w - 74):]}{(Fx.bl + "█" + Fx.ubl) if cls.filtering else THEME.hi_fg(" del")}') +
 				f'{THEME.proc_box(Symbol.title_right)}')
 
@@ -3362,6 +3362,7 @@ class ProcCollector(Collector):
 	'''Collects process stats'''
 	buffer: str = ProcBox.buffer
 	search_filter: str = ""
+	case_sensitive: bool = False
 	processes: Dict = {}
 	num_procs: int = 0
 	det_cpu: float = 0.0
@@ -3393,7 +3394,12 @@ class ProcCollector(Collector):
 		sorting: str = CONFIG.proc_sorting
 		reverse: bool = not CONFIG.proc_reversed
 		proc_per_cpu: bool = CONFIG.proc_per_core
-		search: List[str] = [i.strip() for i in cls.search_filter.lower().split(",")] if cls.search_filter else []
+		search: List[str] = []
+		if cls.search_filter:
+			if cls.case_sensitive:
+				search = [i.strip() for i in cls.search_filter.split(",")]
+			else:
+				search = [i.strip() for i in cls.search_filter.lower().split(",")]
 		err: float = 0.0
 		n: int = 0
 
@@ -3419,7 +3425,11 @@ class ProcCollector(Collector):
 				if search:
 					if cls.detailed and p.info["pid"] == cls.detailed_pid:
 						cls.det_cpu = p.info["cpu_percent"]
-					for value in [ p.info["name"].lower(), " ".join(p.info["cmdline"]).lower(), str(p.info["pid"]), p.info["username"].lower() ]:
+					if cls.case_sensitive:
+						process_info = [ p.info["name"], " ".join(p.info["cmdline"]), str(p.info["pid"]), p.info["username"] ]
+					else:
+						process_info = [ p.info["name"].lower(), " ".join(p.info["cmdline"]).lower(), str(p.info["pid"]), p.info["username"].lower() ]
+					for value in process_info:
 						for s in search:
 							if s in value:
 								break
@@ -3575,7 +3585,11 @@ class ProcCollector(Collector):
 						det_cpu = getinfo["cpu_percent"]
 				if "username" in getinfo and isinstance(getinfo["username"], float): getinfo["username"] = ""
 				if "cmdline" in getinfo and isinstance(getinfo["cmdline"], float): getinfo["cmdline"] = ""
-				for value in [ name.lower(), str(pid), getinfo.get("username", "").lower(), " ".join(getinfo.get("cmdline", "")).lower() ]:
+				if cls.case_sensitive:
+					process_info = [ name, str(pid), getinfo.get("username", ""), " ".join(getinfo.get("cmdline", "")) ]
+				else:
+					process_info = [ name.lower(), str(pid), getinfo.get("username", "").lower(), " ".join(getinfo.get("cmdline", "")).lower() ]
+				for value in process_info:
 					for s in search:
 						if s in value:
 							found = True
@@ -4979,6 +4993,12 @@ def process_keys():
 				Collector.collect(ProcCollector, interrupt=True, redraw=True)
 			elif key == "f":
 				ProcBox.filtering = True
+				ProcCollector.case_sensitive = False
+				if not ProcCollector.search_filter: ProcBox.start = 0
+				Collector.collect(ProcCollector, redraw=True, only_draw=True)
+			elif key == "F":
+				ProcBox.filtering = True
+				ProcCollector.case_sensitive = True
 				if not ProcCollector.search_filter: ProcBox.start = 0
 				Collector.collect(ProcCollector, redraw=True, only_draw=True)
 			elif key.lower() in ["t", "k", "i"] and (ProcBox.selected > 0 or ProcCollector.detailed):
