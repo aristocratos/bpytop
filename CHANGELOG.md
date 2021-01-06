@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.57
+
+* Fixed: proc_sorting option counter not updating in menu, by @UmarJ
+* Added: Support for non truecolor terminals through 24-bit to 256-color conversion
+	* Activate by setting "truecolor" variable to False or starting with "-lc/--low-color" argument
+
 ## v1.0.56
 
 * Fixed: units_to_bytes returning 0 if input value <10 and in bits
