@@ -3425,11 +3425,9 @@ class ProcCollector(Collector):
 				if search:
 					if cls.detailed and p.info["pid"] == cls.detailed_pid:
 						cls.det_cpu = p.info["cpu_percent"]
-					if cls.case_sensitive:
-						process_info = [ p.info["name"], " ".join(p.info["cmdline"]), str(p.info["pid"]), p.info["username"] ]
-					else:
-						process_info = [ p.info["name"].lower(), " ".join(p.info["cmdline"]).lower(), str(p.info["pid"]), p.info["username"].lower() ]
-					for value in process_info:
+					for value in [ p.info["name"], " ".join(p.info["cmdline"]), str(p.info["pid"]), p.info["username"] ]:
+						if not cls.case_sensitive:
+							value = value.lower()
 						for s in search:
 							if s in value:
 								break
@@ -3585,11 +3583,9 @@ class ProcCollector(Collector):
 						det_cpu = getinfo["cpu_percent"]
 				if "username" in getinfo and isinstance(getinfo["username"], float): getinfo["username"] = ""
 				if "cmdline" in getinfo and isinstance(getinfo["cmdline"], float): getinfo["cmdline"] = ""
-				if cls.case_sensitive:
-					process_info = [ name, str(pid), getinfo.get("username", ""), " ".join(getinfo.get("cmdline", "")) ]
-				else:
-					process_info = [ name.lower(), str(pid), getinfo.get("username", "").lower(), " ".join(getinfo.get("cmdline", "")).lower() ]
-				for value in process_info:
+				for value in [ name, str(pid), getinfo.get("username", ""), " ".join(getinfo.get("cmdline", "")) ]:
+					if not cls.case_sensitive:
+						value = value.lower()
 					for s in search:
 						if s in value:
 							found = True
@@ -4991,14 +4987,9 @@ def process_keys():
 			elif key == "c":
 				CONFIG.proc_per_core = not CONFIG.proc_per_core
 				Collector.collect(ProcCollector, interrupt=True, redraw=True)
-			elif key == "f":
+			elif key in ["f", "F"]:
 				ProcBox.filtering = True
-				ProcCollector.case_sensitive = False
-				if not ProcCollector.search_filter: ProcBox.start = 0
-				Collector.collect(ProcCollector, redraw=True, only_draw=True)
-			elif key == "F":
-				ProcBox.filtering = True
-				ProcCollector.case_sensitive = True
+				ProcCollector.case_sensitive = key == "F"
 				if not ProcCollector.search_filter: ProcBox.start = 0
 				Collector.collect(ProcCollector, redraw=True, only_draw=True)
 			elif key.lower() in ["t", "k", "i"] and (ProcBox.selected > 0 or ProcCollector.detailed):
