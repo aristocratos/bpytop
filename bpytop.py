@@ -4347,6 +4347,7 @@ class Menu:
 							ccx = x + (cat_width * cx) + round(cat_width / 2 - len(cat) / 2 )
 							if ccx - 2 < mx < ccx + 2 + len(cat):
 								key = str(cx+1)
+								break
 					elif x < mx < x + w and y < my < y + h + 2:
 						mouse_sel = ceil((my - y) / 2) - 1 + ceil((page-1) * (h / 2))
 						if pages and my == y+h+1 and x+11 < mx < x+16:
