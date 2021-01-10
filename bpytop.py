@@ -173,6 +173,16 @@ only_physical=$only_physical
 #* Read disks list from /etc/fstab. This also disables only_physical.
 use_fstab=$use_fstab
 
+#* Toggles io mode for disks, showing only big graphs for disk read/write speeds.
+io_mode=$io_mode
+
+#* Set to True to show combined read/write io graphs in io mode.
+io_graph_combined=$io_graph_combined
+
+#* Set the top speed for the io graphs in MiB/s (10 by default), use format "device:speed" seperate disks with a comma ",".
+#* Example: "/dev/sda:100, /dev/sdb:20"
+io_graph_speeds="$io_graph_speeds"
+
 #* Set fixed values for network graphs, default "10M" = 10 Mibibytes, possible units "K", "M", "G", append with "bit" for bits instead of bytes, i.e "100mbit"
 net_download="$net_download"
 net_upload="$net_upload"
@@ -372,7 +382,7 @@ class Config:
 						"proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes", "disks_filter", "update_check", "log_level", "mem_graphs", "show_swap",
 						"swap_disk", "show_disks", "use_fstab", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "theme_background",
 						"net_sync", "show_battery", "tree_depth", "cpu_sensor", "show_coretemp", "proc_update_mult", "shown_boxes", "net_iface", "only_physical",
-						"truecolor"]
+						"truecolor", "io_mode", "io_graph_combined", "io_graph_speeds"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	theme_background: bool = True
@@ -402,6 +412,9 @@ class Config:
 	show_disks: bool = True
 	only_physical: bool = True
 	use_fstab: bool = False
+	io_mode: bool = False
+	io_graph_combined: bool = False
+	io_graph_speeds: str = ""
 	net_download: str = "10M"
 	net_upload: str = "10M"
 	net_color_fixed: bool = False
@@ -1363,17 +1376,19 @@ class Graph:
 	max_value: int
 	color_max_value: int
 	offset: int
+	no_zero: bool
 	current: bool
 	last: int
 	symbol: Dict[float, str]
 
-	def __init__(self, width: int, height: int, color: Union[List[str], Color, None], data: List[int], invert: bool = False, max_value: int = 0, offset: int = 0, color_max_value: Union[int, None] = None):
+	def __init__(self, width: int, height: int, color: Union[List[str], Color, None], data: List[int], invert: bool = False, max_value: int = 0, offset: int = 0, color_max_value: Union[int, None] = None, no_zero: bool = False):
 		self.graphs: Dict[bool, List[str]] = {False : [], True : []}
 		self.current: bool = True
 		self.width = width
 		self.height = height
 		self.invert = invert
 		self.offset = offset
+		self.no_zero = no_zero
 		if not data: data = [0]
 		if max_value:
 			self.max_value = max_value
@@ -1436,13 +1451,14 @@ class Graph:
 					else:
 						if self.height == 1: value[side] = round(val * 4 / 100 + 0.5)
 						else: value[side] = round((val - h_low) * 4 / (h_high - h_low) + 0.1)
+					if self.no_zero and not (new and v == 0 and side == "left") and h == self.height - 1 and value[side] < 1: value[side] = 1
 				if new: self.last = data[v]
 				self.graphs[self.current][h] += self.symbol[float(value["left"] + value["right"] / 10)]
 		if data: self.last = data[-1]
 		self.out = ""
 
 		if self.height == 1:
-			self.out += f'{"" if not self.colors else self.colors[self.last]}{self.graphs[self.current][0]}'
+			self.out += f'{"" if not self.colors else (THEME.inactive_fg if self.last < 5 else self.colors[self.last])}{self.graphs[self.current][0]}'
 		elif self.height > 1:
 			for h in range(self.height):
 				if h > 0: self.out += f'{Mv.d(1)}{Mv.l(self.width)}'
@@ -1483,6 +1499,7 @@ class Graphs:
 	detailed_cpu: Graph = NotImplemented
 	detailed_mem: Graph = NotImplemented
 	pid_cpu: Dict[int, Graph] = {}
+	disk_io: Dict[str, Dict[str, Graph]] = {}
 
 class Meter:
 	'''Creates a percentage meter
@@ -1907,6 +1924,9 @@ class MemBox(Box):
 	divider: int = 0
 	mem_width: int = 0
 	disks_width: int = 0
+	disks_io_h: int = 0
+	disks_io_order: List[str] = []
+	graph_speeds: Dict[str, int] = {}
 	graph_height: int
 	resized: bool = True
 	redraw: bool = False
@@ -1997,6 +2017,7 @@ class MemBox(Box):
 		gli: str = ""
 		x, y, w, h = cls.x + 1, cls.y + 1, cls.width - 2, cls.height - 2
 		if cls.resized or cls.redraw:
+			cls.redraw = True
 			cls._calc_size()
 			out_misc += cls._draw_bg()
 			Meters.mem = {}
@@ -2017,6 +2038,37 @@ class MemBox(Box):
 							Meters.swap[name] = Graph(cls.mem_meter, cls.graph_height, THEME.gradient[name], mem.swap_vlist[name])
 						else:
 							Meters.swap[name] = Meter(mem.swap_percent[name], cls.mem_meter, name)
+
+			d_graph: List[str] = []
+			d_no_graph: List[str] = []
+			l_vals: List[Tuple[str, int, str, bool]] = []
+			if CONFIG.io_mode:
+				cls.disks_io_h = (cls.height - 2 - len(MemCollector.disks)) // max(1, len(MemCollector.disks_io_dict))
+				if cls.disks_io_h < 2: cls.disks_io_h = 1 if CONFIG.io_graph_combined else 2
+			else:
+				cls.disks_io_h = 1
+
+			if CONFIG.io_graph_speeds and not cls.graph_speeds:
+				try:
+					cls.graph_speeds = { spds.split(":")[0] : int(spds.split(":")[1]) for spds in list(i.strip() for i in CONFIG.io_graph_speeds.split(","))}
+				except (KeyError, ValueError):
+					errlog.error("Wrong formatting in io_graph_speeds variable. Using defaults.")
+			for name in mem.disks.keys():
+				if name in mem.disks_io_dict:
+					d_graph.append(name)
+				else:
+					d_no_graph.append(name)
+					continue
+				if CONFIG.io_graph_combined or not CONFIG.io_mode:
+					l_vals = [("rw", cls.disks_io_h, "available", False)]
+				else:
+					l_vals = [("read", cls.disks_io_h // 2, "free", False), ("write", cls.disks_io_h // 2, "used", True)]
+
+				Graphs.disk_io[name] = {_name : Graph(width=cls.disks_width - (6 if not CONFIG.io_mode else 0), height=_height, color=THEME.gradient[_gradient],
+										data=mem.disks_io_dict[name][_name], invert=_invert, max_value=cls.graph_speeds.get(name, 10), no_zero=True)
+										for _name, _height, _gradient, _invert in l_vals}
+			cls.disks_io_order = d_graph + d_no_graph
+
 			if cls.disk_meter > 0:
 				for n, name in enumerate(mem.disks.keys()):
 					if n * 2 > h: break
@@ -2032,6 +2084,10 @@ class MemBox(Box):
 					Key.mouse["s"] = [[x + w - 6 + i, y-1] for i in range(4)]
 				out_misc += (f'{Mv.to(y-1, x + w - 7)}{THEME.mem_box(Symbol.title_left)}{Fx.b if CONFIG.swap_disk else ""}'
 				f'{THEME.hi_fg("s")}{THEME.title("wap")}{Fx.ub}{THEME.mem_box(Symbol.title_right)}')
+				if not "i" in Key.mouse:
+					Key.mouse["i"] = [[x + w - 10 + i, y-1] for i in range(2)]
+				out_misc += (f'{Mv.to(y-1, x + w - 11)}{THEME.mem_box(Symbol.title_left)}{Fx.b if CONFIG.io_mode else ""}'
+				f'{THEME.title("i")}{THEME.hi_fg("o")}{Fx.ub}{THEME.mem_box(Symbol.title_right)}')
 
 			if Collector.collect_interrupt: return
 			Draw.buffer("mem_misc", out_misc, only_save=True)
@@ -2080,24 +2136,62 @@ class MemBox(Box):
 				cx = x + cls.mem_width - 1; cy = 0
 				big_disk: bool = cls.disks_width >= 25
 				gli = f'{Mv.l(2)}{THEME.div_line}{Symbol.title_right}{Symbol.h_line * cls.disks_width}{THEME.mem_box}{Symbol.title_left}{Mv.l(cls.disks_width - 1)}'
-				for name, item in mem.disks.items():
-					if Collector.collect_interrupt: return
-					if not name in Meters.disks_used:
-						continue
-					if cy > h - 2: break
-					out += Fx.trans(f'{Mv.to(y+cy, x+cx)}{gli}{THEME.title}{Fx.b}{item["name"]:{cls.disks_width - 2}.12}{Mv.to(y+cy, x + cx + cls.disks_width - 11)}{item["total"][:None if big_disk else -2]:>9}')
-					out += f'{Mv.to(y+cy, x + cx + (cls.disks_width // 2) - (len(item["io"]) // 2) - 2)}{Fx.ub}{THEME.main_fg}{item["io"]}{Fx.ub}{THEME.main_fg}{Mv.to(y+cy+1, x+cx)}'
-					out += f'Used:{str(item["used_percent"]) + "%":>4} ' if big_disk else "U "
-					out += f'{Meters.disks_used[name](None if cls.resized else mem.disks[name]["used_percent"])}{item["used"][:None if big_disk else -2]:>{9 if big_disk else 7}}'
-					cy += 2
-
-					if len(mem.disks) * 3 <= h + 1:
+				if CONFIG.io_mode:
+					for name in cls.disks_io_order:
+						item = mem.disks[name]
+						io_item = mem.disks_io_dict.get(name, {})
+						if Collector.collect_interrupt: return
 						if cy > h - 1: break
-						out += Mv.to(y+cy, x+cx)
-						out += f'Free:{str(item["free_percent"]) + "%":>4} ' if big_disk else f'{"F "}'
-						out += f'{Meters.disks_free[name](None if cls.resized else mem.disks[name]["free_percent"])}{item["free"][:None if big_disk else -2]:>{9 if big_disk else 7}}'
+						out += Fx.trans(f'{Mv.to(y+cy, x+cx)}{gli}{THEME.title}{Fx.b}{item["name"]:{cls.disks_width - 2}.12}{Mv.to(y+cy, x + cx + cls.disks_width - 11)}{item["total"][:None if big_disk else -2]:>9}')
+						if big_disk:
+							out += Fx.trans(f'{Mv.to(y+cy, x + cx + (cls.disks_width // 2) - (len(str(item["used_percent"])) // 2) - 2)}{Fx.ub}{THEME.main_fg}{item["used_percent"]}%')
 						cy += 1
-						if len(mem.disks) * 4 <= h + 1: cy += 1
+
+						if io_item:
+							if cy > h - 1: break
+							if CONFIG.io_graph_combined:
+								if cls.disks_io_h <= 1:
+									out += f'{Mv.to(y+cy, x+cx-1)}{" " * 5}'
+								out += (f'{Mv.to(y+cy, x+cx-1)}{Fx.ub}{Graphs.disk_io[name]["rw"](None if cls.redraw else mem.disks_io_dict[name]["rw"][-1])}'
+										f'{Mv.to(y+cy, x+cx-1)}{THEME.main_fg}{item["io"] or "RW"}')
+								cy += cls.disks_io_h
+							else:
+								if cls.disks_io_h <= 3:
+									out += f'{Mv.to(y+cy, x+cx-1)}{" " * 5}{Mv.to(y+cy+1, x+cx-1)}{" " * 5}'
+								out += (f'{Mv.to(y+cy, x+cx-1)}{Fx.ub}{Graphs.disk_io[name]["read"](None if cls.redraw else mem.disks_io_dict[name]["read"][-1])}'
+										f'{Mv.to(y+cy, x+cx-1)}{THEME.main_fg}{item["io_r"] or "R"}')
+								cy += cls.disks_io_h // 2
+								out += f'{Mv.to(y+cy, x+cx-1)}{Graphs.disk_io[name]["write"](None if cls.redraw else mem.disks_io_dict[name]["write"][-1])}'
+								cy += cls.disks_io_h // 2
+								out += f'{Mv.to(y+cy-1, x+cx-1)}{THEME.main_fg}{item["io_w"] or "W"}'
+				else:
+					for name, item in mem.disks.items():
+						if Collector.collect_interrupt: return
+						if not name in Meters.disks_used:
+							continue
+						if cy > h - 1: break
+						out += Fx.trans(f'{Mv.to(y+cy, x+cx)}{gli}{THEME.title}{Fx.b}{item["name"]:{cls.disks_width - 2}.12}{Mv.to(y+cy, x + cx + cls.disks_width - 11)}{item["total"][:None if big_disk else -2]:>9}')
+						if big_disk:
+							out += f'{Mv.to(y+cy, x + cx + (cls.disks_width // 2) - (len(item["io"]) // 2) - 2)}{Fx.ub}{THEME.main_fg}{item["io"]}'
+						cy += 1
+						if cy > h - 1: break
+						if name in Graphs.disk_io:
+							out += f'{Mv.to(y+cy, x+cx-1)}{THEME.main_fg}{Fx.ub}{" IO: " if big_disk else " IO   " + Mv.l(2)}{Fx.ub}{Graphs.disk_io[name]["rw"](None if cls.redraw else mem.disks_io_dict[name]["rw"][-1])}'
+							if not big_disk and item["io"]:
+								out += f'{Mv.to(y+cy, x+cx-1)}{Fx.ub}{THEME.main_fg}{item["io"]}'
+							cy += 1
+							if cy > h - 1: break
+						out += Mv.to(y+cy, x+cx) + (f'Used:{str(item["used_percent"]) + "%":>4} ' if big_disk else "U ")
+						out += f'{Meters.disks_used[name](None if cls.resized else mem.disks[name]["used_percent"])}{item["used"][:None if big_disk else -2]:>{9 if big_disk else 7}}'
+						cy += 1
+
+						if len(mem.disks) * 3 + len(mem.disks_io_dict) <= h + 1:
+							if cy > h - 1: break
+							out += Mv.to(y+cy, x+cx)
+							out += f'Free:{str(item["free_percent"]) + "%":>4} ' if big_disk else f'{"F "}'
+							out += f'{Meters.disks_free[name](None if cls.resized else mem.disks[name]["free_percent"])}{item["free"][:None if big_disk else -2]:>{9 if big_disk else 7}}'
+							cy += 1
+							if len(mem.disks) * 4 + len(mem.disks_io_dict) <= h + 1: cy += 1
 		except (KeyError, TypeError):
 			return
 		Draw.buffer(cls.buffer, f'{out_misc}{out}{Term.fg}', only_save=Menu.active)
@@ -2412,16 +2506,16 @@ class ProcBox(Box):
 				if cls.selected == 0:
 					Key.mouse["enter"] = [[dx+dw-10 + i, dy-1] for i in range(7)]
 				if cls.selected == 0 and not killed:
-					Key.mouse["t"] = [[dx+2 + i, dy-1] for i in range(9)]
+					Key.mouse["T"] = [[dx+2 + i, dy-1] for i in range(9)]
 
 				out_misc += (f'{Mv.to(dy-1, dx+dw - 11)}{THEME.proc_box(Symbol.title_left)}{Fx.b}{title if cls.selected > 0 else THEME.title}close{Fx.ub} {main if cls.selected > 0 else THEME.main_fg}{Symbol.enter}{THEME.proc_box(Symbol.title_right)}'
-					f'{Mv.to(dy-1, dx+1)}{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}t{title}erminate{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
+					f'{Mv.to(dy-1, dx+1)}{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}T{title}erminate{Fx.ub}{THEME.proc_box(Symbol.title_right)}')
 				if dw > 28:
-					if cls.selected == 0 and not killed and not "k" in Key.mouse: Key.mouse["k"] = [[dx + 13 + i, dy-1] for i in range(4)]
-					out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}k{title}ill{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
+					if cls.selected == 0 and not killed and not "K" in Key.mouse: Key.mouse["K"] = [[dx + 13 + i, dy-1] for i in range(4)]
+					out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}K{title}ill{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
 				if dw > 39:
-					if cls.selected == 0 and not killed and not "i" in Key.mouse: Key.mouse["i"] = [[dx + 19 + i, dy-1] for i in range(9)]
-					out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}i{title}nterrupt{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
+					if cls.selected == 0 and not killed and not "I" in Key.mouse: Key.mouse["I"] = [[dx + 19 + i, dy-1] for i in range(9)]
+					out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}I{title}nterrupt{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
 
 				if Graphs.detailed_cpu is NotImplemented or cls.resized:
 					Graphs.detailed_cpu = Graph(dgw+1, 7, THEME.gradient["cpu"], proc.details_cpu)
@@ -2485,14 +2579,14 @@ class ProcBox(Box):
 					f'{THEME.proc_box(Symbol.title_left)}{title}{Fx.b}info {Fx.ub}{main}{Symbol.enter}{THEME.proc_box(Symbol.title_right)}')
 			if not "enter" in Key.mouse: Key.mouse["enter"] = [[x + 14 + i, y+h] for i in range(6)]
 			if w - len(loc_string) > 34:
-				if not "t" in Key.mouse: Key.mouse["t"] = [[x + 22 + i, y+h] for i in range(9)]
-				out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}t{title}erminate{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
+				if not "t" in Key.mouse: Key.mouse["T"] = [[x + 22 + i, y+h] for i in range(9)]
+				out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}T{title}erminate{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
 			if w - len(loc_string) > 40:
-				if not "k" in Key.mouse: Key.mouse["k"] = [[x + 33 + i, y+h] for i in range(4)]
-				out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}k{title}ill{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
+				if not "k" in Key.mouse: Key.mouse["K"] = [[x + 33 + i, y+h] for i in range(4)]
+				out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}K{title}ill{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
 			if w - len(loc_string) > 51:
-				if not "i" in Key.mouse: Key.mouse["i"] = [[x + 39 + i, y+h] for i in range(9)]
-				out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}i{title}nterrupt{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
+				if not "i" in Key.mouse: Key.mouse["I"] = [[x + 39 + i, y+h] for i in range(9)]
+				out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}I{title}nterrupt{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
 			if CONFIG.proc_tree and w - len(loc_string) > 65:
 				if not " " in Key.mouse: Key.mouse[" "] = [[x + 50 + i, y+h] for i in range(12)]
 				out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}spc {title}collapse{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
@@ -3025,10 +3119,14 @@ class MemCollector(Collector):
 	disks: Dict[str, Dict]
 	disk_hist: Dict[str, Tuple] = {}
 	timestamp: float = time()
+	disks_io_dict: Dict[str, Dict[str, List[int]]] = {}
+	recheck_diskutil: bool = True
+	diskutil_map: Dict[str, str] = {}
 
 	io_error: bool = False
 
 	old_disks: List[str] = []
+	old_io_disks: List[str] = []
 
 	fstab_filter: List[str] = []
 
@@ -3093,9 +3191,9 @@ class MemCollector(Collector):
 		disk_name: str
 		filtering: Tuple = ()
 		filter_exclude: bool = False
-		io_string: str
+		io_string_r: str
+		io_string_w: str
 		u_percent: int
-		disk_list: List[str] = []
 		cls.disks = {}
 
 		if CONFIG.disks_filter:
@@ -3104,9 +3202,8 @@ class MemCollector(Collector):
 				filtering = tuple(v.strip() for v in CONFIG.disks_filter.replace("exclude=", "").strip().split(","))
 			else:
 				filtering = tuple(v.strip() for v in CONFIG.disks_filter.strip().split(","))
-
 		try:
-			io_counters = psutil.disk_io_counters(perdisk=SYSTEM == "Linux", nowrap=True)
+			io_counters = psutil.disk_io_counters(perdisk=SYSTEM != "BSD", nowrap=True)
 		except ValueError as e:
 			if not cls.io_error:
 				cls.io_error = True
@@ -3115,6 +3212,22 @@ class MemCollector(Collector):
 					errlog.error(f'Caused by outdated psutil version.')
 				errlog.exception(f'{e}')
 			io_counters = None
+
+		if SYSTEM == "MacOS" and cls.recheck_diskutil:
+			cls.recheck_diskutil = False
+			try:
+				dutil_out = subprocess.check_output(["diskutil", "list", "physical"], universal_newlines=True)
+				for line in dutil_out.split("\n"):
+					line = line.replace("\u2068", "").replace("\u2069", "")
+					if line.startswith("/dev/"):
+						xdisk = line.split()[0].replace("/dev/", "")
+					elif "Container" in line:
+						ydisk = line.split()[3]
+						if xdisk and ydisk:
+							cls.diskutil_map[xdisk] = ydisk
+							xdisk = ydisk = ""
+			except:
+				pass
 
 		if CONFIG.use_fstab and SYSTEM != "MacOS" and not cls.fstab_filter:
 			try:
@@ -3128,24 +3241,21 @@ class MemCollector(Collector):
 				errlog.debug(f'new fstab_filter set : {cls.fstab_filter}')
 			except IOError:
 				CONFIG.use_fstab = False
-				errlog.debug(f'Error reading fstab, use_fstab flag reset to {CONFIG.use_fstab}')
+				errlog.warning(f'Error reading fstab, use_fstab flag reset to {CONFIG.use_fstab}')
 		if not CONFIG.use_fstab and cls.fstab_filter:
 			cls.fstab_filter = []
 			errlog.debug(f'use_fstab flag has been turned to {CONFIG.use_fstab}, fstab_filter cleared')
 
 		for disk in psutil.disk_partitions(all=CONFIG.use_fstab or not CONFIG.only_physical):
 			disk_io = None
-			io_string = ""
+			io_string_r = io_string_w = ""
 			if CONFIG.use_fstab and disk.mountpoint not in cls.fstab_filter:
 				continue
 			disk_name = disk.mountpoint.rsplit('/', 1)[-1] if not disk.mountpoint == "/" else "root"
-			#while disk_name in disk_list: disk_name += "_"
-			disk_list += [disk_name]
 			if cls.excludes and disk.fstype in cls.excludes:
 				continue
 			if filtering and ((not filter_exclude and not disk.mountpoint in filtering) or (filter_exclude and disk.mountpoint in filtering)):
 				continue
-			#elif filtering and disk_name.endswith(filtering)
 			if SYSTEM == "MacOS" and disk.mountpoint == "/private/var/vm":
 				continue
 			try:
@@ -3161,20 +3271,35 @@ class MemCollector(Collector):
 			#* Collect disk io
 			if io_counters:
 				try:
-					if SYSTEM == "Linux":
+					if SYSTEM != "BSD":
 						dev_name = os.path.realpath(disk.device).rsplit('/', 1)[-1]
-						if dev_name.startswith("md"):
-							try:
-								dev_name = dev_name[:dev_name.index("p")]
-							except:
-								pass
-						disk_io = io_counters[dev_name]
+						if not dev_name in io_counters:
+							for names in io_counters:
+								if names in dev_name:
+									disk_io = io_counters[names]
+									break
+							else:
+								if cls.diskutil_map:
+									for names, items in cls.diskutil_map.items():
+										if items in dev_name and names in io_counters:
+											disk_io = io_counters[names]
+						else:
+							disk_io = io_counters[dev_name]
 					elif disk.mountpoint == "/":
 						disk_io = io_counters
 					else:
 						raise Exception
-					disk_read = round((disk_io.read_bytes - cls.disk_hist[disk.device][0]) / (time() - cls.timestamp))
-					disk_write = round((disk_io.write_bytes - cls.disk_hist[disk.device][1]) / (time() - cls.timestamp))
+					disk_read = round((disk_io.read_bytes - cls.disk_hist[disk.device][0]) / (time() - cls.timestamp)) #type: ignore
+					disk_write = round((disk_io.write_bytes - cls.disk_hist[disk.device][1]) / (time() - cls.timestamp)) #type: ignore
+					if not disk.device in cls.disks_io_dict:
+						cls.disks_io_dict[disk.device] = {"read" : [], "write" : [], "rw" : []}
+					cls.disks_io_dict[disk.device]["read"].append(disk_read >> 20)
+					cls.disks_io_dict[disk.device]["write"].append(disk_write >> 20)
+					cls.disks_io_dict[disk.device]["rw"].append((disk_read + disk_write) >> 20)
+
+					if len(cls.disks_io_dict[disk.device]["read"]) > MemBox.width:
+						del cls.disks_io_dict[disk.device]["read"][0], cls.disks_io_dict[disk.device]["write"][0], cls.disks_io_dict[disk.device]["rw"][0]
+
 				except:
 					disk_read = disk_write = 0
 			else:
@@ -3182,15 +3307,18 @@ class MemCollector(Collector):
 
 			if disk_io:
 				cls.disk_hist[disk.device] = (disk_io.read_bytes, disk_io.write_bytes)
-				if MemBox.disks_width > 30:
+				if CONFIG.io_mode or MemBox.disks_width > 30:
 					if disk_read > 0:
-						io_string += f'▲{floating_humanizer(disk_read, short=True)} '
+						io_string_r = f'▲{floating_humanizer(disk_read, short=True)}'
 					if disk_write > 0:
-						io_string += f'▼{floating_humanizer(disk_write, short=True)}'
+						io_string_w = f'▼{floating_humanizer(disk_write, short=True)}'
+					if CONFIG.io_mode:
+						cls.disks[disk.device]["io_r"] = io_string_r
+						cls.disks[disk.device]["io_w"] = io_string_w
 				elif disk_read + disk_write > 0:
-					io_string += f'▼▲{floating_humanizer(disk_read + disk_write, short=True)}'
+					io_string_r += f'▼▲{floating_humanizer(disk_read + disk_write, short=True)}'
 
-			cls.disks[disk.device]["io"] = io_string
+			cls.disks[disk.device]["io"] = io_string_r + (" " if io_string_w and io_string_r else "") + io_string_w
 
 		if CONFIG.swap_disk and MemBox.swap_on:
 			cls.disks["__swap"] = { "name" : "swap", "used_percent" : cls.swap_percent["used"], "free_percent" : cls.swap_percent["free"], "io" : "" }
@@ -3205,9 +3333,11 @@ class MemCollector(Collector):
 				except:
 					pass
 
-		if disk_list != cls.old_disks:
+		if cls.old_disks != list(cls.disks) or cls.old_io_disks != list(cls.disks_io_dict):
 			MemBox.redraw = True
-			cls.old_disks = disk_list.copy()
+			cls.recheck_diskutil = True
+			cls.old_disks = list(cls.disks)
+			cls.old_io_disks = list(cls.disks_io_dict)
 
 		cls.timestamp = time()
 
@@ -3852,6 +3982,8 @@ class Menu:
 			"(Home) (End)" : "Jump to first or last page in process list.",
 			"(Left) (Right)" : "Select previous/next sorting column.",
 			"(b) (n)" : "Select previous/next network device.",
+			"(s)" : "Toggle showing swap as a disk.",
+			"(i)" : "Toggle disks io mode with big graphs.",
 			"(z)" : "Toggle totals reset for current network device",
 			"(a)" : "Toggle auto scaling for the network graphs.",
 			"(y)" : "Toggle synced scaling mode for network graphs.",
@@ -3860,9 +3992,9 @@ class Menu:
 			"(r)" : "Reverse sorting order in processes box.",
 			"(e)" : "Toggle processes tree view.",
 			"(delete)" : "Clear any entered filter.",
-			"Selected (T, t)" : "Terminate selected process with SIGTERM - 15.",
-			"Selected (K, k)" : "Kill selected process with SIGKILL - 9.",
-			"Selected (I, i)" : "Interrupt selected process with SIGINT - 2.",
+			"Selected (T)" : "Terminate selected process with SIGTERM - 15.",
+			"Selected (K)" : "Kill selected process with SIGKILL - 9.",
+			"Selected (I)" : "Interrupt selected process with SIGINT - 2.",
 			"_1" : " ",
 			"_2" : "For bug reporting and project updates, visit:",
 			"_3" : "https://github.com/aristocratos/bpytop",
@@ -4094,6 +4226,30 @@ class Menu:
 					'Split memory box to also show disks.',
 					'',
 					'True or False.'],
+				"io_mode" : [
+					'Toggles io mode for disks.',
+					'',
+					'Shows big graphs for disk read/write speeds',
+					'instead of used/free percentage meters.',
+					'',
+					'True or False.'],
+				"io_graph_combined" : [
+					'Toggle combined read and write graphs.',
+					'',
+					'Only has effect if "io mode" is True.',
+					'',
+					'True or False.'],
+				"io_graph_speeds" : [
+					'Set top speeds for the io graphs.',
+					'',
+					'Manually set which speed in MiB/s that equals',
+					'100 percent in the io graphs.',
+					'(10 MiB/s by default).',
+					'',
+					'Format: "device:speed" seperate disks with a',
+					'comma ",".',
+					'',
+					'Example: "/dev/sda:100, /dev/sdb:20".'],
 				"show_swap" : [
 					'If swap memory should be shown in memory box.',
 					'',
@@ -4244,6 +4400,7 @@ class Menu:
 		loglevel_i: int = CONFIG.log_levels.index(CONFIG.log_level)
 		cpu_sensor_i: int = CONFIG.cpu_sensors.index(CONFIG.cpu_sensor)
 		color_i: int
+		max_opt_len: int = max([len(categories[x]) for x in categories]) * 2
 		cat_list = list(categories)
 		while not cls.close:
 			key = ""
@@ -4252,7 +4409,7 @@ class Menu:
 				selected_cat = list(categories)[cat_int]
 				option_items = categories[cat_list[cat_int]]
 				option_len: int = len(option_items) * 2
-				y = 12 if Term.height < option_len + 13 else Term.height // 2 - option_len // 2 + 7
+				y = 12 if Term.height < max_opt_len + 13 else Term.height // 2 - max_opt_len // 2 + 7
 				out_misc = (f'{Banner.draw(y-10, center=True)}{Mv.d(1)}{Mv.l(46)}{Colors.black_bg}{Colors.default}{Fx.b}← esc'
 					f'{Mv.r(30)}{Fx.i}Version: {VERSION}{Fx.ui}{Fx.ub}{Term.bg}{Term.fg}')
 				x = Term.width//2-38
@@ -4409,6 +4566,8 @@ class Menu:
 								elif selected == "draw_clock":
 									Box.clock_on = len(CONFIG.draw_clock) > 0
 									if not Box.clock_on: Draw.clear("clock", saved=True)
+								elif selected == "io_graph_speeds":
+									MemBox.graph_speeds = {}
 							Term.refresh(force=True)
 							cls.resized = False
 					elif key == "backspace" and len(input_val):
@@ -4441,7 +4600,7 @@ class Menu:
 					cat_int = int(key) - 1
 					change_cat = True
 				elif key == "enter" and selected in ["update_ms", "disks_filter", "custom_cpu_name", "net_download",
-					 "net_upload", "draw_clock", "tree_depth", "proc_update_mult", "shown_boxes", "net_iface"]:
+					 "net_upload", "draw_clock", "tree_depth", "proc_update_mult", "shown_boxes", "net_iface", "io_graph_speeds"]:
 					inputting = True
 					input_val = str(getattr(CONFIG, selected))
 				elif key == "left" and selected == "update_ms" and CONFIG.update_ms - 100 >= 100:
@@ -5023,12 +5182,12 @@ def process_keys():
 				ProcBox.filtering = True
 				if not ProcCollector.search_filter: ProcBox.start = 0
 				Collector.collect(ProcCollector, redraw=True, only_draw=True)
-			elif key.lower() in ["t", "k", "i"] and (ProcBox.selected > 0 or ProcCollector.detailed):
+			elif key in ["T", "K", "I"] and (ProcBox.selected > 0 or ProcCollector.detailed):
 				pid: int = ProcBox.selected_pid if ProcBox.selected > 0 else ProcCollector.detailed_pid # type: ignore
 				if psutil.pid_exists(pid):
-					if key.lower() == "t": sig = signal.SIGTERM
-					elif key.lower() == "k": sig = signal.SIGKILL
-					elif key.lower() == "i": sig = signal.SIGINT
+					if key == "T": sig = signal.SIGTERM
+					elif key == "K": sig = signal.SIGKILL
+					elif key == "I": sig = signal.SIGINT
 					try:
 						os.kill(pid, sig)
 					except Exception as e:
@@ -5088,6 +5247,10 @@ def process_keys():
 			elif key == "d":
 				Collector.collect_idle.wait()
 				CONFIG.show_disks = not CONFIG.show_disks
+				Collector.collect(MemCollector, interrupt=True, redraw=True)
+			elif key == "i":
+				Collector.collect_idle.wait()
+				CONFIG.io_mode = not CONFIG.io_mode
 				Collector.collect(MemCollector, interrupt=True, redraw=True)
 
 
