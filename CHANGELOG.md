@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.0.58
+
+* Added: Disks io stat graphs and a dedicated io mode for disks box
+* Fixed: Better detection for disk io stats including multiple disks for OsX
+* Changed: Terminate, Kill, Interrupt shortcuts now only uses uppercase T, K, I
+* Changed: Process filtering changed to non case-sensitive, patch by @UmarJ
+	* Case-sensitive proc filtering using uppercase F
+* Changed: Get CPU load average from psutil module instead of os module, patch by @araczkowski
+* Fixed: Misc bugs
+
 ## v1.0.57
 
 * Fixed: proc_sorting option counter not updating in menu, by @UmarJ
