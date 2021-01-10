@@ -85,7 +85,7 @@ Any support is greatly appreciated!
 
 #### Mac Os X
 
-Will not display correctly in the standard terminal!
+Will not display correctly in the standard terminal (unless truecolor is set to False)!
 Recommended alternative [iTerm2](https://www.iterm2.com/)
 
 Will also need to be run as superuser to display stats for processes not owned by user.
@@ -347,11 +347,11 @@ Config files stored in "$HOME/.config/bpytop" folder
 "/etc/bpytop.conf" will be used as default seed for config file creation if it exists.
 
 ```bash
-#? Config file for bpytop v. 1.0.57
+#? Config file for bpytop v. 1.0.58
 
 #* Color theme, looks for a .theme file in "/usr/[local/]share/bpytop/themes" and "~/.config/bpytop/themes", "Default" for builtin default theme.
 #* Prefix name by a plus sign (+) for a theme located in user themes folder, i.e. color_theme="+monokai"
-color_theme="Default"
+color_theme="monokai"
 
 #* If the theme set background should be shown, set to False if you want terminal background transparency
 theme_background=False
@@ -432,7 +432,17 @@ show_disks=True
 only_physical=True
 
 #* Read disks list from /etc/fstab. This also disables only_physical.
-use_fstab=False
+use_fstab=True
+
+#* Toggles io mode for disks, showing only big graphs for disk read/write speeds.
+io_mode=False
+
+#* Set to True to show combined read/write io graphs in io mode.
+io_graph_combined=False
+
+#* Set the top speed for the io graphs in MiB/s (10 by default), use format "device:speed" seperate disks with a comma ",".
+#* Example: "/dev/sda:100, /dev/sdb:20"
+io_graph_speeds=""
 
 #* Set fixed values for network graphs, default "10M" = 10 Mibibytes, possible units "K", "M", "G", append with "bit" for bits instead of bytes, i.e "100mbit"
 net_download="100Mbit"
