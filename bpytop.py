@@ -2940,7 +2940,7 @@ class CpuCollector(Collector):
 				errlog.exception(f'{e}')
 			else:
 				pass
-		cls.load_avg = [round(lavg, 2) for lavg in os.getloadavg()]
+		cls.load_avg = [round(lavg, 2) for lavg in psutil.getloadavg()]
 		cls.uptime = str(timedelta(seconds=round(time()-psutil.boot_time(),0)))[:-3]
 
 		if CONFIG.check_temp and cls.got_sensors:
