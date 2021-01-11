@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.59
+
+* Fixed: Crash on missing disks
+* Fixed: IO stats text transparency
+
 ## v1.0.58
 
 * Added: Disks io stat graphs and a dedicated io mode for disks box
