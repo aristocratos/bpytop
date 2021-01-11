@@ -2039,42 +2039,43 @@ class MemBox(Box):
 						else:
 							Meters.swap[name] = Meter(mem.swap_percent[name], cls.mem_meter, name)
 
-			d_graph: List[str] = []
-			d_no_graph: List[str] = []
-			l_vals: List[Tuple[str, int, str, bool]] = []
-			if CONFIG.io_mode:
-				cls.disks_io_h = (cls.height - 2 - len(MemCollector.disks)) // max(1, len(MemCollector.disks_io_dict))
-				if cls.disks_io_h < 2: cls.disks_io_h = 1 if CONFIG.io_graph_combined else 2
-			else:
-				cls.disks_io_h = 1
-
-			if CONFIG.io_graph_speeds and not cls.graph_speeds:
-				try:
-					cls.graph_speeds = { spds.split(":")[0] : int(spds.split(":")[1]) for spds in list(i.strip() for i in CONFIG.io_graph_speeds.split(","))}
-				except (KeyError, ValueError):
-					errlog.error("Wrong formatting in io_graph_speeds variable. Using defaults.")
-			for name in mem.disks.keys():
-				if name in mem.disks_io_dict:
-					d_graph.append(name)
+			if CONFIG.show_disks and mem.disks:
+				d_graph: List[str] = []
+				d_no_graph: List[str] = []
+				l_vals: List[Tuple[str, int, str, bool]] = []
+				if CONFIG.io_mode:
+					cls.disks_io_h = (cls.height - 2 - len(mem.disks)) // max(1, len(mem.disks_io_dict))
+					if cls.disks_io_h < 2: cls.disks_io_h = 1 if CONFIG.io_graph_combined else 2
 				else:
-					d_no_graph.append(name)
-					continue
-				if CONFIG.io_graph_combined or not CONFIG.io_mode:
-					l_vals = [("rw", cls.disks_io_h, "available", False)]
-				else:
-					l_vals = [("read", cls.disks_io_h // 2, "free", False), ("write", cls.disks_io_h // 2, "used", True)]
+					cls.disks_io_h = 1
 
-				Graphs.disk_io[name] = {_name : Graph(width=cls.disks_width - (6 if not CONFIG.io_mode else 0), height=_height, color=THEME.gradient[_gradient],
-										data=mem.disks_io_dict[name][_name], invert=_invert, max_value=cls.graph_speeds.get(name, 10), no_zero=True)
-										for _name, _height, _gradient, _invert in l_vals}
-			cls.disks_io_order = d_graph + d_no_graph
+				if CONFIG.io_graph_speeds and not cls.graph_speeds:
+					try:
+						cls.graph_speeds = { spds.split(":")[0] : int(spds.split(":")[1]) for spds in list(i.strip() for i in CONFIG.io_graph_speeds.split(","))}
+					except (KeyError, ValueError):
+						errlog.error("Wrong formatting in io_graph_speeds variable. Using defaults.")
+				for name in mem.disks.keys():
+					if name in mem.disks_io_dict:
+						d_graph.append(name)
+					else:
+						d_no_graph.append(name)
+						continue
+					if CONFIG.io_graph_combined or not CONFIG.io_mode:
+						l_vals = [("rw", cls.disks_io_h, "available", False)]
+					else:
+						l_vals = [("read", cls.disks_io_h // 2, "free", False), ("write", cls.disks_io_h // 2, "used", True)]
 
-			if cls.disk_meter > 0:
-				for n, name in enumerate(mem.disks.keys()):
-					if n * 2 > h: break
-					Meters.disks_used[name] = Meter(mem.disks[name]["used_percent"], cls.disk_meter, "used")
-					if len(mem.disks) * 3 <= h + 1:
-						Meters.disks_free[name] = Meter(mem.disks[name]["free_percent"], cls.disk_meter, "free")
+					Graphs.disk_io[name] = {_name : Graph(width=cls.disks_width - (6 if not CONFIG.io_mode else 0), height=_height, color=THEME.gradient[_gradient],
+											data=mem.disks_io_dict[name][_name], invert=_invert, max_value=cls.graph_speeds.get(name, 10), no_zero=True)
+											for _name, _height, _gradient, _invert in l_vals}
+				cls.disks_io_order = d_graph + d_no_graph
+
+				if cls.disk_meter > 0:
+					for n, name in enumerate(mem.disks.keys()):
+						if n * 2 > h: break
+						Meters.disks_used[name] = Meter(mem.disks[name]["used_percent"], cls.disk_meter, "used")
+						if len(mem.disks) * 3 <= h + 1:
+							Meters.disks_free[name] = Meter(mem.disks[name]["free_percent"], cls.disk_meter, "free")
 			if not "g" in Key.mouse:
 				Key.mouse["g"] = [[x + 8 + i, y-1] for i in range(5)]
 			out_misc += (f'{Mv.to(y-1, x + 7)}{THEME.mem_box(Symbol.title_left)}{Fx.b if CONFIG.mem_graphs else ""}'
