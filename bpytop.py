@@ -17,7 +17,7 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-import os, sys, threading, signal, re, subprocess, logging, logging.handlers, argparse
+import os, sys, io, threading, signal, re, subprocess, logging, logging.handlers, argparse
 import urllib.request
 from time import time, sleep, strftime, localtime
 from datetime import timedelta
@@ -5339,6 +5339,8 @@ def main():
 	if CONFIG.show_init:
 		Draw.buffer("+init!", f'{Mv.restore}{Fx.trans("Starting input reader thread... ")}{Mv.save}')
 	try:
+		if isinstance(sys.stdin, io.TextIOWrapper) and sys.version_info >= (3, 7):
+			sys.stdin.reconfigure(errors="ignore")  # type: ignore
 		Key.start()
 	except Exception as e:
 		Init.fail(e)
