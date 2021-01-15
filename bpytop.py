@@ -2088,7 +2088,7 @@ class MemBox(Box):
 				if not "i" in Key.mouse:
 					Key.mouse["i"] = [[x + w - 10 + i, y-1] for i in range(2)]
 				out_misc += (f'{Mv.to(y-1, x + w - 11)}{THEME.mem_box(Symbol.title_left)}{Fx.b if CONFIG.io_mode else ""}'
-				f'{THEME.title("i")}{THEME.hi_fg("o")}{Fx.ub}{THEME.mem_box(Symbol.title_right)}')
+				f'{THEME.hi_fg("i")}{THEME.title("o")}{Fx.ub}{THEME.mem_box(Symbol.title_right)}')
 
 			if Collector.collect_interrupt: return
 			Draw.buffer("mem_misc", out_misc, only_save=True)
