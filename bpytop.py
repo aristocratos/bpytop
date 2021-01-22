@@ -173,6 +173,9 @@ only_physical=$only_physical
 #* Read disks list from /etc/fstab. This also disables only_physical.
 use_fstab=$use_fstab
 
+#* Toggles if io stats should be shown in regular disk usage view
+show_io_stat=$show_io_stat
+
 #* Toggles io mode for disks, showing only big graphs for disk read/write speeds.
 io_mode=$io_mode
 
@@ -382,7 +385,7 @@ class Config:
 						"proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes", "disks_filter", "update_check", "log_level", "mem_graphs", "show_swap",
 						"swap_disk", "show_disks", "use_fstab", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "theme_background",
 						"net_sync", "show_battery", "tree_depth", "cpu_sensor", "show_coretemp", "proc_update_mult", "shown_boxes", "net_iface", "only_physical",
-						"truecolor", "io_mode", "io_graph_combined", "io_graph_speeds"]
+						"truecolor", "io_mode", "io_graph_combined", "io_graph_speeds", "show_io_stat"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	theme_background: bool = True
@@ -412,6 +415,7 @@ class Config:
 	show_disks: bool = True
 	only_physical: bool = True
 	use_fstab: bool = False
+	show_io_stat: bool = True
 	io_mode: bool = False
 	io_graph_combined: bool = False
 	io_graph_speeds: str = ""
@@ -2040,35 +2044,36 @@ class MemBox(Box):
 							Meters.swap[name] = Meter(mem.swap_percent[name], cls.mem_meter, name)
 
 			if CONFIG.show_disks and mem.disks:
-				d_graph: List[str] = []
-				d_no_graph: List[str] = []
-				l_vals: List[Tuple[str, int, str, bool]] = []
-				if CONFIG.io_mode:
-					cls.disks_io_h = (cls.height - 2 - len(mem.disks)) // max(1, len(mem.disks_io_dict))
-					if cls.disks_io_h < 2: cls.disks_io_h = 1 if CONFIG.io_graph_combined else 2
-				else:
-					cls.disks_io_h = 1
-
-				if CONFIG.io_graph_speeds and not cls.graph_speeds:
-					try:
-						cls.graph_speeds = { spds.split(":")[0] : int(spds.split(":")[1]) for spds in list(i.strip() for i in CONFIG.io_graph_speeds.split(","))}
-					except (KeyError, ValueError):
-						errlog.error("Wrong formatting in io_graph_speeds variable. Using defaults.")
-				for name in mem.disks.keys():
-					if name in mem.disks_io_dict:
-						d_graph.append(name)
+				if CONFIG.show_io_stat or CONFIG.io_mode:
+					d_graph: List[str] = []
+					d_no_graph: List[str] = []
+					l_vals: List[Tuple[str, int, str, bool]] = []
+					if CONFIG.io_mode:
+						cls.disks_io_h = (cls.height - 2 - len(mem.disks)) // max(1, len(mem.disks_io_dict))
+						if cls.disks_io_h < 2: cls.disks_io_h = 1 if CONFIG.io_graph_combined else 2
 					else:
-						d_no_graph.append(name)
-						continue
-					if CONFIG.io_graph_combined or not CONFIG.io_mode:
-						l_vals = [("rw", cls.disks_io_h, "available", False)]
-					else:
-						l_vals = [("read", cls.disks_io_h // 2, "free", False), ("write", cls.disks_io_h // 2, "used", True)]
+						cls.disks_io_h = 1
 
-					Graphs.disk_io[name] = {_name : Graph(width=cls.disks_width - (6 if not CONFIG.io_mode else 0), height=_height, color=THEME.gradient[_gradient],
-											data=mem.disks_io_dict[name][_name], invert=_invert, max_value=cls.graph_speeds.get(name, 10), no_zero=True)
-											for _name, _height, _gradient, _invert in l_vals}
-				cls.disks_io_order = d_graph + d_no_graph
+					if CONFIG.io_graph_speeds and not cls.graph_speeds:
+						try:
+							cls.graph_speeds = { spds.split(":")[0] : int(spds.split(":")[1]) for spds in list(i.strip() for i in CONFIG.io_graph_speeds.split(","))}
+						except (KeyError, ValueError):
+							errlog.error("Wrong formatting in io_graph_speeds variable. Using defaults.")
+					for name in mem.disks.keys():
+						if name in mem.disks_io_dict:
+							d_graph.append(name)
+						else:
+							d_no_graph.append(name)
+							continue
+						if CONFIG.io_graph_combined or not CONFIG.io_mode:
+							l_vals = [("rw", cls.disks_io_h, "available", False)]
+						else:
+							l_vals = [("read", cls.disks_io_h // 2, "free", False), ("write", cls.disks_io_h // 2, "used", True)]
+
+						Graphs.disk_io[name] = {_name : Graph(width=cls.disks_width - (6 if not CONFIG.io_mode else 0), height=_height, color=THEME.gradient[_gradient],
+												data=mem.disks_io_dict[name][_name], invert=_invert, max_value=cls.graph_speeds.get(name, 10), no_zero=True)
+												for _name, _height, _gradient, _invert in l_vals}
+					cls.disks_io_order = d_graph + d_no_graph
 
 				if cls.disk_meter > 0:
 					for n, name in enumerate(mem.disks.keys()):
@@ -2176,7 +2181,7 @@ class MemBox(Box):
 							out += f'{Mv.to(y+cy, x + cx + (cls.disks_width // 2) - (len(item["io"]) // 2) - 2)}{Fx.ub}{THEME.main_fg}{Fx.trans(item["io"])}'
 						cy += 1
 						if cy > h - 1: break
-						if name in Graphs.disk_io:
+						if CONFIG.show_io_stat and name in Graphs.disk_io:
 							out += f'{Mv.to(y+cy, x+cx-1)}{THEME.main_fg}{Fx.ub}{" IO: " if big_disk else " IO   " + Mv.l(2)}{Fx.ub}{Graphs.disk_io[name]["rw"](None if cls.redraw else mem.disks_io_dict[name]["rw"][-1])}'
 							if not big_disk and item["io"]:
 								out += f'{Mv.to(y+cy, x+cx-1)}{Fx.ub}{THEME.main_fg}{item["io"]}'
@@ -2186,13 +2191,13 @@ class MemBox(Box):
 						out += f'{Meters.disks_used[name](None if cls.resized else mem.disks[name]["used_percent"])}{item["used"][:None if big_disk else -2]:>{9 if big_disk else 7}}'
 						cy += 1
 
-						if len(mem.disks) * 3 + len(mem.disks_io_dict) <= h + 1:
+						if len(mem.disks) * 3 + (len(mem.disks_io_dict) if CONFIG.show_io_stat else 0) <= h + 1:
 							if cy > h - 1: break
 							out += Mv.to(y+cy, x+cx)
 							out += f'Free:{str(item["free_percent"]) + "%":>4} ' if big_disk else f'{"F "}'
 							out += f'{Meters.disks_free[name](None if cls.resized else mem.disks[name]["free_percent"])}{item["free"][:None if big_disk else -2]:>{9 if big_disk else 7}}'
 							cy += 1
-							if len(mem.disks) * 4 + len(mem.disks_io_dict) <= h + 1: cy += 1
+							if len(mem.disks) * 4 + (len(mem.disks_io_dict) if CONFIG.show_io_stat else 0) <= h + 1: cy += 1
 		except (KeyError, TypeError):
 			return
 		Draw.buffer(cls.buffer, f'{out_misc}{out}{Term.fg}', only_save=Menu.active)
@@ -4236,6 +4241,13 @@ class Menu:
 					'True or False.'],
 				"show_disks" : [
 					'Split memory box to also show disks.',
+					'',
+					'True or False.'],
+				"show_io_stat" : [
+					'Toggle small IO stat graphs.',
+					'',
+					'Toggles the small IO graphs for the regular',
+					'disk usage view.',
 					'',
 					'True or False.'],
 				"io_mode" : [
