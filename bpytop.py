@@ -3264,7 +3264,7 @@ class MemCollector(Collector):
 			except:
 				pass
 
-			u_percent = round(disk_u.percent)
+			u_percent = round(getattr(disk_u, "percent", 0))
 			cls.disks[disk.device] = { "name" : disk_name, "used_percent" : u_percent, "free_percent" : 100 - u_percent }
 			for name in ["total", "used", "free"]:
 				cls.disks[disk.device][name] = floating_humanizer(getattr(disk_u, name, 0))
