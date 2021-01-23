@@ -133,6 +133,25 @@ proc_per_core=$proc_per_core
 #* Show process memory as bytes instead of percent
 proc_mem_bytes=$proc_mem_bytes
 
+#* Sets the CPU stat shown in upper half of the CPU graph, "total" is always available, see:
+#* https://psutil.readthedocs.io/en/latest/#psutil.cpu_times for attributes available on specific platforms.
+#* Select from a list of detected attributes from the options menu
+cpu_graph_upper="$cpu_graph_upper"
+
+#* Sets the CPU stat shown in lower half of the CPU graph, "total" is always available, see:
+#* https://psutil.readthedocs.io/en/latest/#psutil.cpu_times for attributes available on specific platforms.
+#* Select from a list of detected attributes from the options menu
+cpu_graph_lower="$cpu_graph_lower"
+
+#* Toggles if the lower CPU graph should be inverted.
+cpu_invert_lower=$cpu_invert_lower
+
+#* Set to True to completely disable the lower CPU graph.
+cpu_single_graph=$cpu_single_graph
+
+#* Shows the system uptime in the CPU box.
+show_uptime=$show_uptime
+
 #* Check cpu temperature, needs "osx-cpu-temp" on MacOS X.
 check_temp=$check_temp
 
@@ -385,7 +404,8 @@ class Config:
 						"proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes", "disks_filter", "update_check", "log_level", "mem_graphs", "show_swap",
 						"swap_disk", "show_disks", "use_fstab", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "theme_background",
 						"net_sync", "show_battery", "tree_depth", "cpu_sensor", "show_coretemp", "proc_update_mult", "shown_boxes", "net_iface", "only_physical",
-						"truecolor", "io_mode", "io_graph_combined", "io_graph_speeds", "show_io_stat"]
+						"truecolor", "io_mode", "io_graph_combined", "io_graph_speeds", "show_io_stat", "cpu_graph_upper", "cpu_graph_lower", "cpu_invert_lower",
+						"cpu_single_graph", "show_uptime"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	theme_background: bool = True
@@ -401,6 +421,11 @@ class Config:
 	proc_gradient: bool = True
 	proc_per_core: bool = False
 	proc_mem_bytes: bool = True
+	cpu_graph_upper: str = "total"
+	cpu_graph_lower: str = "total"
+	cpu_invert_lower: bool = True
+	cpu_single_graph: bool = False
+	show_uptime: bool = True
 	check_temp: bool = True
 	cpu_sensor: str = "Auto"
 	show_coretemp: bool = True
@@ -434,6 +459,8 @@ class Config:
 
 	sorting_options: List[str] = ["pid", "program", "arguments", "threads", "user", "memory", "cpu lazy", "cpu responsive"]
 	log_levels: List[str] = ["ERROR", "WARNING", "INFO", "DEBUG"]
+	cpu_percent_fields: List = ["total"]
+	cpu_percent_fields.extend(getattr(psutil.cpu_times_percent(), "_fields", []))
 
 	cpu_sensors: List[str] = [ "Auto" ]
 
@@ -536,6 +563,10 @@ class Config:
 					new_config["shown_boxes"] = "_error_"
 					self.warnings.append(f'Config key "shown_boxes" contains invalid box names!')
 					break
+		for cpu_graph in ["cpu_graph_upper", "cpu_graph_lower"]:
+			if cpu_graph in new_config and not new_config[cpu_graph] in self.cpu_percent_fields:
+				new_config[cpu_graph] = "_error_"
+				self.warnings.append(f'Config key "{cpu_graph}" does not contain an available cpu stat attribute!')
 		return new_config
 
 	def save_config(self):
@@ -1600,6 +1631,7 @@ class Box:
 	clock_custom_format: Dict[str, Any] = {
 		"/host" : os.uname()[1],
 		"/user" : os.environ.get("USER") or pwd.getpwuid(os.getuid())[0],
+		"/uptime" : "",
 		}
 	if clock_custom_format["/host"].endswith(".local"):
 		clock_custom_format["/host"] = clock_custom_format["/host"].replace(".local", "")
@@ -1637,6 +1669,7 @@ class Box:
 		clock_string = cls.clock = strftime(CONFIG.draw_clock)
 		for custom in cls.clock_custom_format:
 			if custom in clock_string:
+				if custom == "/uptime": cls.clock_custom_format["/uptime"] = CpuCollector.uptime
 				clock_string = clock_string.replace(custom, cls.clock_custom_format[custom])
 		clock_len = len(clock_string[:(CpuBox.width-56)])
 		if cls.clock_len != clock_len and not CpuBox.resized:
@@ -1805,6 +1838,13 @@ class CpuBox(Box, SubBox):
 		x, y, w, h = cls.x + 1, cls.y + 1, cls.width - 2, cls.height - 2
 		bx, by, bw, bh = cls.box_x + 1, cls.box_y + 1, cls.box_width - 2, cls.box_height - 2
 		hh: int = ceil(h / 2)
+		hh2: int = h - hh
+		mid_line: bool = False
+		if not CONFIG.cpu_single_graph and CONFIG.cpu_graph_upper != CONFIG.cpu_graph_lower:
+			mid_line = True
+			if h % 2: hh = floor(h / 2)
+			else: hh2 -= 1
+
 		hide_cores: bool = (cpu.cpu_temp_only or not CONFIG.show_coretemp) and cpu.got_sensors
 		ct_width: int = (max(6, 6 * cls.column_size)) * hide_cores
 
@@ -1812,8 +1852,9 @@ class CpuBox(Box, SubBox):
 			if not "m" in Key.mouse:
 				Key.mouse["m"] = [[cls.x + 16 + i, cls.y] for i in range(12)]
 			out_misc += f'{Mv.to(cls.y, cls.x + 16)}{THEME.cpu_box(Symbol.title_left)}{Fx.b}{THEME.hi_fg("m")}{THEME.title}ode:{Box.view_mode}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}'
-			Graphs.cpu["up"] = Graph(w - bw - 3, hh, THEME.gradient["cpu"], cpu.cpu_usage[0])
-			Graphs.cpu["down"] = Graph(w - bw - 3, h - hh, THEME.gradient["cpu"], cpu.cpu_usage[0], invert=True)
+			Graphs.cpu["up"] = Graph(w - bw - 3, (h if CONFIG.cpu_single_graph else hh), THEME.gradient["cpu"], cpu.cpu_upper)
+			if not CONFIG.cpu_single_graph:
+				Graphs.cpu["down"] = Graph(w - bw - 3, hh2, THEME.gradient["cpu"], cpu.cpu_lower, invert=CONFIG.cpu_invert_lower)
 			Meters.cpu = Meter(cpu.cpu_usage[0][-1], bw - (21 if cpu.got_sensors else 9), "cpu")
 			if cls.column_size > 0 or ct_width > 0:
 				for n in range(THREADS):
@@ -1861,8 +1902,13 @@ class CpuBox(Box, SubBox):
 		if cpu.cpu_freq:
 			freq: str = f'{cpu.cpu_freq} Mhz' if cpu.cpu_freq < 1000 else f'{float(cpu.cpu_freq / 1000):.1f} GHz'
 			out += f'{Mv.to(by - 1, bx + bw - 9)}{THEME.div_line(Symbol.title_left)}{Fx.b}{THEME.title(freq)}{Fx.ub}{THEME.div_line(Symbol.title_right)}'
-		out += (f'{Mv.to(y, x)}{Graphs.cpu["up"](None if cls.resized else cpu.cpu_usage[0][-1])}{Mv.to(y + hh, x)}{Graphs.cpu["down"](None if cls.resized else cpu.cpu_usage[0][-1])}'
-				f'{THEME.main_fg}{Mv.to(by + cy, bx + cx)}{Fx.b}{"CPU "}{Fx.ub}{Meters.cpu(cpu.cpu_usage[0][-1])}'
+		out += f'{Mv.to(y, x)}{Graphs.cpu["up"](None if cls.resized else cpu.cpu_upper[-1])}'
+		if mid_line:
+			out += (f'{Mv.to(y+hh, x-1)}{THEME.cpu_box(Symbol.title_right)}{THEME.div_line}{Symbol.h_line * (w - bw - 3)}{THEME.div_line(Symbol.title_left)}'
+					f'{Mv.to(y+hh, x+((w-bw)//2)-((len(CONFIG.cpu_graph_upper)+len(CONFIG.cpu_graph_lower))//2))}{THEME.main_fg}{CONFIG.cpu_graph_upper}{Mv.r(1)}▲▼{Mv.r(1)}{CONFIG.cpu_graph_lower}')
+		if not CONFIG.cpu_single_graph and Graphs.cpu.get("down"):
+			out += f'{Mv.to(y + hh + (1 * mid_line), x)}{Graphs.cpu["down"](None if cls.resized else cpu.cpu_lower[-1])}'
+		out += (f'{THEME.main_fg}{Mv.to(by + cy, bx + cx)}{Fx.b}{"CPU "}{Fx.ub}{Meters.cpu(cpu.cpu_usage[0][-1])}'
 				f'{THEME.gradient["cpu"][cpu.cpu_usage[0][-1]]}{cpu.cpu_usage[0][-1]:>4}{THEME.main_fg}%')
 		if cpu.got_sensors:
 			try:
@@ -1909,7 +1955,8 @@ class CpuBox(Box, SubBox):
 				lavg = f'{" ".join(str(round(l, 1)) for l in cpu.load_avg[:2]):^7.7}'
 			out += f'{Mv.to(by + cy, bx + cx)}{THEME.main_fg}{lavg}{THEME.div_line(Symbol.v_line)}'
 
-		out += f'{Mv.to(y + h - 1, x + 1)}{THEME.graph_text}up {cpu.uptime}'
+		if CONFIG.show_uptime:
+			out += f'{Mv.to(y + (0 if not CONFIG.cpu_invert_lower or CONFIG.cpu_single_graph else h - 1), x + 1)}{THEME.graph_text}{Fx.trans("up " + cpu.uptime)}'
 
 
 		Draw.buffer(cls.buffer, f'{out_misc}{out}{Term.fg}', only_save=Menu.active)
@@ -2877,6 +2924,8 @@ class Collector:
 class CpuCollector(Collector):
 	'''Collects cpu usage for cpu and cores, cpu frequency, load_avg, uptime and cpu temps'''
 	cpu_usage: List[List[int]] = []
+	cpu_upper: List[int] = []
+	cpu_lower: List[int] = []
 	cpu_temp: List[List[int]] = []
 	cpu_temp_high: int = 0
 	cpu_temp_crit: int = 0
@@ -2932,6 +2981,15 @@ class CpuCollector(Collector):
 		if len(cls.cpu_usage[0]) > Term.width * 4:
 			del cls.cpu_usage[0][0]
 
+		cpu_times_percent = psutil.cpu_times_percent()
+		for x in ["upper", "lower"]:
+			if getattr(CONFIG, "cpu_graph_" + x) == "total":
+				setattr(cls, "cpu_" + x, cls.cpu_usage[0])
+			else:
+				getattr(cls, "cpu_" + x).append(round(getattr(cpu_times_percent, getattr(CONFIG, "cpu_graph_" + x))))
+			if len(getattr(cls, "cpu_" + x)) > Term.width * 4:
+				del getattr(cls, "cpu_" + x)[0]
+
 		for n, thread in enumerate(psutil.cpu_percent(percpu=True), start=1):
 			cls.cpu_usage[n].append(round(thread))
 			if len(cls.cpu_usage[n]) > Term.width * 2:
@@ -2947,7 +3005,7 @@ class CpuCollector(Collector):
 			else:
 				pass
 		cls.load_avg = [round(lavg, 2) for lavg in psutil.getloadavg()]
-		cls.uptime = str(timedelta(seconds=round(time()-psutil.boot_time(),0)))[:-3]
+		cls.uptime = str(timedelta(seconds=round(time()-psutil.boot_time(),0)))[:-3].replace(" days,", "d").replace(" day,", "d")
 
 		if CONFIG.check_temp and cls.got_sensors:
 			cls._collect_temps()
@@ -4176,6 +4234,7 @@ class Menu:
 					'Custom formatting options:',
 					'"/host" = hostname',
 					'"/user" = username',
+					'"/uptime" = system uptime',
 					'',
 					'Examples of strftime formats:',
 					'"%X" = locale HH:MM:SS',
@@ -4213,6 +4272,39 @@ class Menu:
 					'i.e. "DEBUG" will show all logging info.']
 			},
 			"cpu" : {
+				"cpu_graph_upper" : [
+					'Sets the CPU stat shown in upper half of',
+					'the CPU graph.',
+					'',
+					'"total" = Total cpu usage.',
+					'"user" = User mode cpu usage.',
+					'"system" = Kernel mode cpu usage.',
+					'See:',
+					'https://psutil.readthedocs.io/en/latest/',
+					'#psutil.cpu_times',
+					'for attributes available on specific platforms.'],
+				"cpu_graph_lower" : [
+					'Sets the CPU stat shown in lower half of',
+					'the CPU graph.',
+					'',
+					'"total" = Total cpu usage.',
+					'"user" = User mode cpu usage.',
+					'"system" = Kernel mode cpu usage.',
+					'See:',
+					'https://psutil.readthedocs.io/en/latest/',
+					'#psutil.cpu_times',
+					'for attributes available on specific platforms.'],
+				"cpu_invert_lower" : [
+						'Toggles orientation of the lower CPU graph.',
+						'',
+						'True or False.'],
+				"cpu_single_graph" : [
+						'Completely disable the lower CPU graph.',
+						'',
+						'Shows only upper CPU graph and resizes it',
+						'to fit to box height.',
+						'',
+						'True or False.'],
 				"check_temp" : [
 					'Enable cpu temperature reporting.',
 					'',
@@ -4233,6 +4325,13 @@ class Menu:
 					'Custom cpu model name in cpu percentage box.',
 					'',
 					'Empty string to disable.'],
+				"show_uptime" : [
+					'Shows the system uptime in the CPU box.',
+					'',
+					'Can also be shown in the clock by using',
+					'"/uptime" in the formatting.',
+					'',
+					'True or False.'],
 			},
 			"mem" : {
 				"mem_graphs" : [
@@ -4423,6 +4522,8 @@ class Menu:
 
 		loglevel_i: int = CONFIG.log_levels.index(CONFIG.log_level)
 		cpu_sensor_i: int = CONFIG.cpu_sensors.index(CONFIG.cpu_sensor)
+		cpu_graph_i: Dict[str, int] = { "cpu_graph_upper" : CONFIG.cpu_percent_fields.index(CONFIG.cpu_graph_upper),
+										"cpu_graph_lower" : CONFIG.cpu_percent_fields.index(CONFIG.cpu_graph_lower)}
 		color_i: int
 		max_opt_len: int = max([len(categories[x]) for x in categories]) * 2
 		cat_list = list(categories)
@@ -4484,11 +4585,13 @@ class Menu:
 						counter = f' {loglevel_i + 1}/{len(CONFIG.log_levels)}'
 					elif opt == "cpu_sensor":
 						counter = f' {cpu_sensor_i + 1}/{len(CONFIG.cpu_sensors)}'
+					elif opt in ["cpu_graph_upper", "cpu_graph_lower"]:
+						counter = f' {cpu_graph_i[opt] + 1}/{len(CONFIG.cpu_percent_fields)}'
 					else:
 						counter = ""
 					out += f'{Mv.to(y+1+cy, x+1)}{t_color}{Fx.b}{opt.replace("_", " ").capitalize() + counter:^24.24}{Fx.ub}{Mv.to(y+2+cy, x+1)}{v_color}'
 					if opt == selected:
-						if isinstance(value, bool) or opt in ["color_theme", "proc_sorting", "log_level", "cpu_sensor"]:
+						if isinstance(value, bool) or opt in ["color_theme", "proc_sorting", "log_level", "cpu_sensor", "cpu_graph_upper", "cpu_graph_lower"]:
 							out += f'{t_color} {Symbol.left}{v_color}{d_quote + str(value) + d_quote:^20.20}{t_color}{Symbol.right} '
 						elif inputting:
 							out += f'{str(input_val)[-17:] + Fx.bl + "█" + Fx.ubl + "" + Symbol.enter:^33.33}'
@@ -4687,6 +4790,17 @@ class Menu:
 					CONFIG.log_level = CONFIG.log_levels[loglevel_i]
 					errlog.setLevel(getattr(logging, CONFIG.log_level))
 					errlog.info(f'Loglevel set to {CONFIG.log_level}')
+				elif key in ["left", "right"] and selected in ["cpu_graph_upper", "cpu_graph_lower"]:
+					if key == "left":
+						cpu_graph_i[selected] -= 1
+						if cpu_graph_i[selected] < 0: cpu_graph_i[selected] = len(CONFIG.cpu_percent_fields) - 1
+					if key == "right":
+						cpu_graph_i[selected] += 1
+						if cpu_graph_i[selected] > len(CONFIG.cpu_percent_fields) - 1: cpu_graph_i[selected] = 0
+					setattr(CONFIG, selected, CONFIG.cpu_percent_fields[cpu_graph_i[selected]])
+					setattr(CpuCollector, selected.replace("_graph", ""), [])
+					Term.refresh(force=True)
+					cls.resized = False
 				elif key in ["left", "right"] and selected == "cpu_sensor" and len(CONFIG.cpu_sensors) > 1:
 					if key == "left":
 						cpu_sensor_i -= 1
