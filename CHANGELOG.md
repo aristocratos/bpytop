@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.0.60
+
+* Added: Ignore input unicode decode errors
+* Fixed: Wrong letter in "io" highlighted
+* Fixed: Crash on missing psutil.disk_usage
+* Added: Toggle for IO graphs in regular disk usage mode
+* Added: Toggle for uptime and uptime added as a option for the clock formatting
+* Added: Ability choose cpu graph attributes and split up upper and lower part
+* Added: Ability to toggle one big CPU graph instead of two combined graphs
+* Added: IP address to net box
+
 ## v1.0.59
 
 * Fixed: Crash on missing disks
