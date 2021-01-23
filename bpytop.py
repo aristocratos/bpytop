@@ -2420,14 +2420,14 @@ class ProcBox(Box):
 	def selector(cls, key: str, mouse_pos: Tuple[int, int] = (0, 0)):
 		old: Tuple[int, int] = (cls.start, cls.selected)
 		new_sel: int
-		if key == "up":
+		if key in ["up", "k"]:
 			if cls.selected == 1 and cls.start > 1:
 				cls.start -= 1
 			elif cls.selected == 1:
 				cls.selected = 0
 			elif cls.selected > 1:
 				cls.selected -= 1
-		elif key == "down":
+		elif key in ["down", "j"]:
 			if cls.selected == 0 and ProcCollector.detailed and cls.last_selection:
 				cls.selected = cls.last_selection
 				cls.last_selection = 0
@@ -2537,7 +2537,7 @@ class ProcBox(Box):
 			s_len += len(CONFIG.proc_sorting)
 			if cls.resized or s_len != cls.s_len or proc.detailed:
 				cls.s_len = s_len
-				for k in ["e", "r", "c", "t", "k", "i", "enter", "left", " ", "f", "delete"]:
+				for k in ["e", "r", "c", "T", "K", "I", "enter", "left", " ", "f", "delete"]:
 					if k in Key.mouse: del Key.mouse[k]
 			if proc.detailed:
 				killed = proc.details.get("killed", False)
@@ -2634,13 +2634,13 @@ class ProcBox(Box):
 					f'{THEME.proc_box(Symbol.title_left)}{title}{Fx.b}info {Fx.ub}{main}{Symbol.enter}{THEME.proc_box(Symbol.title_right)}')
 			if not "enter" in Key.mouse: Key.mouse["enter"] = [[x + 14 + i, y+h] for i in range(6)]
 			if w - len(loc_string) > 34:
-				if not "t" in Key.mouse: Key.mouse["T"] = [[x + 22 + i, y+h] for i in range(9)]
+				if not "T" in Key.mouse: Key.mouse["T"] = [[x + 22 + i, y+h] for i in range(9)]
 				out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}T{title}erminate{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
 			if w - len(loc_string) > 40:
-				if not "k" in Key.mouse: Key.mouse["K"] = [[x + 33 + i, y+h] for i in range(4)]
+				if not "K" in Key.mouse: Key.mouse["K"] = [[x + 33 + i, y+h] for i in range(4)]
 				out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}K{title}ill{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
 			if w - len(loc_string) > 51:
-				if not "i" in Key.mouse: Key.mouse["I"] = [[x + 39 + i, y+h] for i in range(9)]
+				if not "I" in Key.mouse: Key.mouse["I"] = [[x + 39 + i, y+h] for i in range(9)]
 				out_misc += f'{THEME.proc_box(Symbol.title_left)}{Fx.b}{hi}I{title}nterrupt{Fx.ub}{THEME.proc_box(Symbol.title_right)}'
 			if CONFIG.proc_tree and w - len(loc_string) > 65:
 				if not " " in Key.mouse: Key.mouse[" "] = [[x + 50 + i, y+h] for i in range(12)]
@@ -3895,7 +3895,7 @@ class ProcCollector(Collector):
 
 	@classmethod
 	def sorting(cls, key: str):
-		index: int = CONFIG.sorting_options.index(CONFIG.proc_sorting) + (1 if key == "right" else -1)
+		index: int = CONFIG.sorting_options.index(CONFIG.proc_sorting) + (1 if key in ["right", "l"] else -1)
 		if index >= len(CONFIG.sorting_options): index = 0
 		elif index < 0: index = len(CONFIG.sorting_options) - 1
 		CONFIG.proc_sorting = CONFIG.sorting_options[index]
@@ -4050,16 +4050,16 @@ class Menu:
 			"(4)" : "Toggle PROC box.",
 			"(d)" : "Toggle disks view in MEM box.",
 			"(F2, o)" : "Shows options.",
-			"(F1, h)" : "Shows this window.",
+			"(F1, shift+h)" : "Shows this window.",
 			"(ctrl+z)" : "Sleep program and put in background.",
 			"(ctrl+c, q)" : "Quits program.",
 			"(+) / (-)" : "Add/Subtract 100ms to/from update timer.",
-			"(Up) (Down)" : "Select in process list.",
+			"(Up, k) (Down, j)" : "Select in process list.",
 			"(Enter)" : "Show detailed information for selected process.",
 			"(Spacebar)" : "Expand/collapse the selected process in tree view.",
 			"(Pg Up) (Pg Down)" : "Jump 1 page in process list.",
 			"(Home) (End)" : "Jump to first or last page in process list.",
-			"(Left) (Right)" : "Select previous/next sorting column.",
+			"(Left, h) (Right, l)" : "Select previous/next sorting column.",
 			"(b) (n)" : "Select previous/next network device.",
 			"(s)" : "Toggle showing swap as a disk.",
 			"(i)" : "Toggle disks io mode with big graphs.",
@@ -4067,14 +4067,14 @@ class Menu:
 			"(a)" : "Toggle auto scaling for the network graphs.",
 			"(y)" : "Toggle synced scaling mode for network graphs.",
 			"(f)" : "Input a NON case-sensitive process filter.",
-			"(F)" : "Input a case-sensitive process filter.",
+			"(shift+f)" : "Input a case-sensitive process filter.",
 			"(c)" : "Toggle per-core cpu usage of processes.",
 			"(r)" : "Reverse sorting order in processes box.",
 			"(e)" : "Toggle processes tree view.",
 			"(delete)" : "Clear any entered filter.",
-			"Selected (T)" : "Terminate selected process with SIGTERM - 15.",
-			"Selected (K)" : "Kill selected process with SIGKILL - 9.",
-			"Selected (I)" : "Interrupt selected process with SIGINT - 2.",
+			"Selected (shift+t)" : "Terminate selected process with SIGTERM - 15.",
+			"Selected (shift+k)" : "Kill selected process with SIGKILL - 9.",
+			"Selected (shift+i)" : "Interrupt selected process with SIGINT - 2.",
 			"_1" : " ",
 			"_2" : "For bug reporting and project updates, visit:",
 			"_3" : "https://github.com/aristocratos/bpytop",
@@ -4135,7 +4135,7 @@ class Menu:
 
 				if key == "q":
 					clean_quit()
-				elif key in ["escape", "M", "enter", "backspace", "h", "f1"]:
+				elif key in ["escape", "M", "enter", "backspace", "H", "f1"]:
 					cls.close = True
 					break
 				elif key in ["up", "mouse_scroll_up", "page_up"] and pages:
@@ -5279,7 +5279,7 @@ def process_keys():
 			Menu.main()
 		elif key in ["o", "f2"]:
 			Menu.options()
-		elif key in ["h", "f1"]:
+		elif key in ["H", "f1"]:
 			Menu.help()
 		elif key == "m":
 			if list(Box.view_modes).index(Box.view_mode) + 1 > len(list(Box.view_modes)) - 1:
@@ -5306,7 +5306,7 @@ def process_keys():
 		if found: continue
 
 		if "proc" in Box.boxes:
-			if key in ["left", "right"]:
+			if key in ["left", "right", "h", "l"]:
 				ProcCollector.sorting(key)
 			elif key == " " and CONFIG.proc_tree and ProcBox.selected > 0:
 				if ProcBox.selected_pid in ProcCollector.collapsed:
@@ -5363,7 +5363,7 @@ def process_keys():
 				Graphs.detailed_cpu = NotImplemented
 				Graphs.detailed_mem = NotImplemented
 				Collector.collect(ProcCollector, proc_interrupt=True, redraw=True)
-			elif key in ["up", "down", "mouse_scroll_up", "mouse_scroll_down", "page_up", "page_down", "home", "end", "mouse_click", "mouse_unselect"]:
+			elif key in ["up", "down", "mouse_scroll_up", "mouse_scroll_down", "page_up", "page_down", "home", "end", "mouse_click", "mouse_unselect", "j", "k"]:
 				ProcBox.selector(key, mouse_pos)
 
 		if "net" in Box.boxes:
