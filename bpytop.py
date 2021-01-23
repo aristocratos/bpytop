@@ -2323,6 +2323,8 @@ class NetBox(Box, SubBox):
 				if not "y" in Key.mouse: Key.mouse["y"] = [[x+w - 26 - len(net.nic[:10]) + i, y-1] for i in range(4)]
 				out_misc += (f'{Mv.to(y-1, x+w - 27 - len(net.nic[:10]))}{THEME.net_box(Symbol.title_left)}{Fx.b if CONFIG.net_sync else ""}{THEME.title("s")}{THEME.hi_fg("y")}{THEME.title("nc")}'
 				f'{Fx.ub}{THEME.net_box(Symbol.title_right)}{Term.fg}')
+			if net.address and w - len(net.nic[:10]) - len(net.address) - 20 > 15:
+				out_misc += (f'{Mv.to(y-1, x+7)}{THEME.net_box(Symbol.title_left)}{Fx.b}{THEME.title(net.address)}{Fx.ub}{THEME.net_box(Symbol.title_right)}{Term.fg}')
 			Draw.buffer("net_misc", out_misc, only_save=True)
 
 		cy = 0
@@ -3432,6 +3434,7 @@ class NetCollector(Collector):
 	net_iface: str = CONFIG.net_iface
 	sync_top: int = 0
 	sync_string: str = ""
+	address: str = ""
 
 	@classmethod
 	def _get_nics(cls):
@@ -3511,6 +3514,8 @@ class NetCollector(Collector):
 
 		cls.stats[cls.nic]["download"]["total"] = io_all.bytes_recv
 		cls.stats[cls.nic]["upload"]["total"] = io_all.bytes_sent
+		if cls.nic in psutil.net_if_addrs():
+			cls.address = getattr(psutil.net_if_addrs()[cls.nic][0], "address", "")
 
 		for direction in ["download", "upload"]:
 			stat = cls.stats[cls.nic][direction]
