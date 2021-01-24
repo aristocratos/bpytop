@@ -639,30 +639,49 @@ class Term:
 	mouse_direct_on		= "\033[?1003h"							#* Enable reporting of mouse position at any movement
 	mouse_direct_off	= "\033[?1003l"							#* Disable direct mouse reporting
 	winch = threading.Event()
+	old_boxes: List = []
+	min_width: int = 0
+	min_height: int = 0
 
 	@classmethod
 	def refresh(cls, *args, force: bool = False):
 		"""Update width, height and set resized flag if terminal has been resized"""
+		if Init.running: cls.resized = False; return
 		if cls.resized: cls.winch.set(); return
 		cls._w, cls._h = os.get_terminal_size()
-		if (cls._w, cls._h) == (cls.width, cls.height) and not force: return
+		if (cls._w, cls._h) == (cls.width, cls.height) and cls.old_boxes == Box.boxes and not force: return
 		if force: Collector.collect_interrupt = True
-		while (cls._w, cls._h) != (cls.width, cls.height) or (cls._w < 80 or cls._h < 24):
+		if cls.old_boxes != Box.boxes:
+			w_p = h_p = 0
+			cls.min_width = cls.min_height = 0
+			cls.old_boxes = Box.boxes.copy()
+			for box_class in Box.__subclasses__():
+				for box_name in Box.boxes:
+					if box_name in str(box_class).capitalize():
+						if not (box_name == "cpu" and "proc" in Box.boxes) and not (box_name == "net" and "mem" in Box.boxes) and w_p + box_class.width_p <= 100:
+							w_p += box_class.width_p
+							cls.min_width += getattr(box_class, "min_w", 0)
+						if not (box_name in ["mem", "net"] and "proc" in Box.boxes) and h_p + box_class.height_p <= 100:
+							h_p += box_class.height_p
+							cls.min_height += getattr(box_class, "min_h", 0)
+		while (cls._w, cls._h) != (cls.width, cls.height) or (cls._w < cls.min_width or cls._h < cls.min_height):
 			if Init.running: Init.resized = True
 			CpuBox.clock_block = True
 			cls.resized = True
 			Collector.collect_interrupt = True
 			cls.width, cls.height = cls._w, cls._h
 			Draw.now(Term.clear)
-			Draw.now(f'{create_box(cls._w // 2 - 25, cls._h // 2 - 2, 50, 3, "resizing", line_color=Colors.green, title_color=Colors.white)}',
-				f'{Mv.r(12)}{Colors.default}{Colors.black_bg}{Fx.b}Width : {cls._w}   Height: {cls._h}{Fx.ub}{Term.bg}{Term.fg}')
+			box_width = min(50, cls._w - 2)
+			Draw.now(f'{create_box(cls._w // 2 - box_width // 2, cls._h // 2 - 2, 50, 3, "resizing", line_color=Colors.green, title_color=Colors.white)}',
+				f'{Mv.r(box_width // 4)}{Colors.default}{Colors.black_bg}{Fx.b}Width : {cls._w}   Height: {cls._h}{Fx.ub}{Term.bg}{Term.fg}')
 			if cls._w < 80 or cls._h < 24:
-				while cls._w < 80 or cls._h < 24:
+				while cls._w < cls.min_width or cls._h < cls.min_height:
 					Draw.now(Term.clear)
-					Draw.now(f'{create_box(cls._w // 2 - 25, cls._h // 2 - 2, 50, 4, "warning", line_color=Colors.red, title_color=Colors.white)}',
-						f'{Mv.r(12)}{Colors.default}{Colors.black_bg}{Fx.b}Width: {Colors.red if cls._w < 80 else Colors.green}{cls._w}   ',
-						f'{Colors.default}Height: {Colors.red if cls._h < 24 else Colors.green}{cls._h}{Term.bg}{Term.fg}',
-						f'{Mv.to(cls._h // 2, cls._w // 2 - 23)}{Colors.default}{Colors.black_bg}Width and Height needs to be at least 80 x 24 !{Fx.ub}{Term.bg}{Term.fg}')
+					box_width = min(50, cls._w - 2)
+					Draw.now(f'{create_box(cls._w // 2 - box_width // 2, cls._h // 2 - 2, box_width, 4, "warning", line_color=Colors.red, title_color=Colors.white)}',
+						f'{Mv.r(box_width // 4)}{Colors.default}{Colors.black_bg}{Fx.b}Width: {Colors.red if cls._w < cls.min_width else Colors.green}{cls._w}   ',
+						f'{Colors.default}Height: {Colors.red if cls._h < cls.min_height else Colors.green}{cls._h}{Term.bg}{Term.fg}',
+						f'{Mv.d(1)}{Mv.l(25)}{Colors.default}{Colors.black_bg}Current config need: {cls.min_width} x {cls.min_height}{Fx.ub}{Term.bg}{Term.fg}')
 					cls.winch.wait(0.3)
 					cls.winch.clear()
 					cls._w, cls._h = os.get_terminal_size()
@@ -674,7 +693,6 @@ class Term:
 		Key.mouse = {}
 		Box.calc_sizes()
 		Collector.proc_counter = 1
-		if Init.running: cls.resized = False; return
 		if Menu.active: Menu.resized = True
 		Box.draw_bg(now=False)
 		cls.resized = False
@@ -1685,9 +1703,10 @@ class Box:
 
 	@classmethod
 	def empty_bg(cls) -> str:
-		return (f'{Term.clear}{Banner.draw(Term.height // 2 - 10, center=True)}'
+		return (f'{Term.clear}' +
+				(f'{Banner.draw(Term.height // 2 - 10, center=True)}'
 				f'{Mv.d(1)}{Mv.l(46)}{Colors.black_bg}{Colors.default}{Fx.b}[esc] Menu'
-				f'{Mv.r(25)}{Fx.i}Version: {VERSION}{Fx.ui}'
+				f'{Mv.r(25)}{Fx.i}Version: {VERSION}{Fx.ui}' if Term.height > 22 else "") +
 				f'{Mv.d(1)}{Mv.l(34)}{Fx.b}All boxes hidden!'
 				f'{Mv.d(1)}{Mv.l(17)}{Fx.b}[1] {Fx.ub}Toggle CPU box'
 				f'{Mv.d(1)}{Mv.l(18)}{Fx.b}[2] {Fx.ub}Toggle MEM box'
@@ -1723,6 +1742,8 @@ class CpuBox(Box, SubBox):
 	y = 1
 	height_p = 32
 	width_p = 100
+	min_w: int = 60
+	min_h: int = 8
 	resized: bool = True
 	redraw: bool = False
 	buffer: str = "cpu"
@@ -1905,7 +1926,7 @@ class CpuBox(Box, SubBox):
 		out += f'{Mv.to(y, x)}{Graphs.cpu["up"](None if cls.resized else cpu.cpu_upper[-1])}'
 		if mid_line:
 			out += (f'{Mv.to(y+hh, x-1)}{THEME.cpu_box(Symbol.title_right)}{THEME.div_line}{Symbol.h_line * (w - bw - 3)}{THEME.div_line(Symbol.title_left)}'
-					f'{Mv.to(y+hh, x+((w-bw)//2)-((len(CONFIG.cpu_graph_upper)+len(CONFIG.cpu_graph_lower))//2))}{THEME.main_fg}{CONFIG.cpu_graph_upper}{Mv.r(1)}▲▼{Mv.r(1)}{CONFIG.cpu_graph_lower}')
+					f'{Mv.to(y+hh, x+((w-bw)//2)-((len(CONFIG.cpu_graph_upper)+len(CONFIG.cpu_graph_lower))//2)-4)}{THEME.main_fg}{CONFIG.cpu_graph_upper}{Mv.r(1)}▲▼{Mv.r(1)}{CONFIG.cpu_graph_lower}')
 		if not CONFIG.cpu_single_graph and Graphs.cpu.get("down"):
 			out += f'{Mv.to(y + hh + (1 * mid_line), x)}{Graphs.cpu["down"](None if cls.resized else cpu.cpu_lower[-1])}'
 		out += (f'{THEME.main_fg}{Mv.to(by + cy, bx + cx)}{Fx.b}{"CPU "}{Fx.ub}{Meters.cpu(cpu.cpu_usage[0][-1])}'
@@ -1967,6 +1988,8 @@ class MemBox(Box):
 	num = 2
 	height_p = 38
 	width_p = 45
+	min_w: int = 36
+	min_h: int = 10
 	x = 1
 	y = 1
 	mem_meter: int = 0
@@ -2008,6 +2031,7 @@ class MemBox(Box):
 
 		cls.width = round(Term.width * width_p / 100)
 		cls.height = round(Term.height * height_p / 100) + 1
+		if cls.height + Box._b_cpu_h > Term.height: cls.height = Term.height - Box._b_cpu_h
 		Box._b_mem_h = cls.height
 		cls.y = Box._b_cpu_h + 1
 		if CONFIG.show_disks:
@@ -2157,6 +2181,7 @@ class MemBox(Box):
 
 			big_mem: bool = cls.mem_width > 21
 			for name in cls.mem_names:
+				if cy > h - 1: break
 				if Collector.collect_interrupt: return
 				if cls.mem_size > 2:
 					out += (f'{Mv.to(y+cy, x+cx)}{gli}{name.capitalize()[:None if big_mem else 5]+":":<{1 if big_mem else 6.6}}{Mv.to(y+cy, x+cx + cls.mem_width - 3 - (len(mem.string[name])))}{Fx.trans(mem.string[name])}'
@@ -2174,6 +2199,7 @@ class MemBox(Box):
 				out += f'{Mv.to(y+cy, x+cx)}{THEME.title}{Fx.b}Swap:{mem.swap_string["total"]:>{cls.mem_width - 8}}{Fx.ub}{THEME.main_fg}'
 				cy += 1
 				for name in cls.swap_names:
+					if cy > h - 1: break
 					if Collector.collect_interrupt: return
 					if cls.mem_size > 2:
 						out += (f'{Mv.to(y+cy, x+cx)}{gli}{name.capitalize()[:None if big_mem else 5]+":":<{1 if big_mem else 6.6}}{Mv.to(y+cy, x+cx + cls.mem_width - 3 - (len(mem.swap_string[name])))}{Fx.trans(mem.swap_string[name])}'
@@ -2255,6 +2281,8 @@ class NetBox(Box, SubBox):
 	num = 3
 	height_p = 30
 	width_p = 45
+	min_w: int = 36
+	min_h: int = 6
 	x = 1
 	y = 1
 	resized: bool = True
@@ -2360,6 +2388,8 @@ class ProcBox(Box):
 	num = 4
 	height_p = 68
 	width_p = 55
+	min_w: int = 44
+	min_h: int = 16
 	x = 1
 	y = 1
 	current_y: int = 0
@@ -3925,6 +3955,9 @@ class Menu:
 
 	@classmethod
 	def main(cls):
+		if Term.width < 80 or Term.height < 24:
+			errlog.warning(f'The menu system only works on a terminal size of 80x24 or above!')
+			return
 		out: str = ""
 		banner: str = ""
 		redraw: bool = True
@@ -4028,6 +4061,9 @@ class Menu:
 
 	@classmethod
 	def help(cls):
+		if Term.width < 80 or Term.height < 24:
+			errlog.warning(f'The menu system only works on a terminal size of 80x24 or above!')
+			return
 		out: str = ""
 		out_misc : str = ""
 		redraw: bool = True
@@ -4165,6 +4201,9 @@ class Menu:
 
 	@classmethod
 	def options(cls):
+		if Term.width < 80 or Term.height < 24:
+			errlog.warning(f'The menu system only works on a terminal size of 80x24 or above!')
+			return
 		out: str = ""
 		out_misc : str = ""
 		redraw: bool = True
@@ -5422,7 +5461,7 @@ def main():
 	#? Switch to alternate screen, clear screen, hide cursor, enable mouse reporting and disable input echo
 	Draw.now(Term.alt_screen, Term.clear, Term.hide_cursor, Term.mouse_on, Term.title("BpyTOP"))
 	Term.echo(False)
-	Term.refresh(force=True)
+	#Term.refresh(force=True)
 
 	#? Start a thread checking for updates while running init
 	if CONFIG.update_check: UpdateChecker.run()
