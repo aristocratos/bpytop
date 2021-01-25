@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.61
+
+* Added: Vim keys (h, j, k, l) for browsing and moved help to shift+h
+* Changed: Size constraints now adapts to currently shown boxes
+
 ## v1.0.60
 
 * Added: Ignore input unicode decode errors
