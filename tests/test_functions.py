@@ -1,12 +1,21 @@
+from more_itertools import divide
+
 import bpytop
-from bpytop import get_cpu_name, get_cpu_core_mapping, create_box, floating_humanizer, units_to_bytes
-from bpytop import Fx, SYSTEM
+from bpytop import (CORES, SYSTEM, THREADS, Fx, create_box, floating_humanizer,
+                    get_cpu_core_mapping, get_cpu_name, units_to_bytes)
+
 
 def test_get_cpu_name():
 	assert isinstance(get_cpu_name(), str)
 
 def test_get_cpu_core_mapping():
-	assert isinstance(get_cpu_core_mapping(), list)
+	cpu_core_mapping = get_cpu_core_mapping()
+	assert isinstance(cpu_core_mapping, list)
+	# Assert cpu submappings are sequential
+	for submapping in divide(THREADS//CORES, cpu_core_mapping):
+		submapping = list(submapping)
+		for a, b in zip(submapping[:-1], submapping[1:]):
+			assert b - a == 1
 
 def test_create_box():
 	assert len(create_box(x=1, y=1, width=10, height=10, title="", title2="", line_color=None, title_color=None, fill=True, box=None)) > 1

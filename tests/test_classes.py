@@ -58,7 +58,9 @@ def test_CpuCollector_collect_temps():
 		pytest.skip("Not testing temperature collection if no sensors was detected!")
 	CpuCollector._collect_temps()
 	assert len(CpuCollector.cpu_temp) == bpytop.THREADS + 1
-	assert isinstance(CpuCollector.cpu_temp[0][0], int)
+	for temp_instance in CpuCollector.cpu_temp:
+		assert temp_instance
+		assert isinstance(temp_instance[0], int)
 	assert isinstance(CpuCollector.cpu_temp_high, int)
 	assert isinstance(CpuCollector.cpu_temp_crit, int)
 

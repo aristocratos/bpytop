@@ -5067,6 +5067,7 @@ def get_cpu_name() -> str:
 
 def get_cpu_core_mapping() -> List[int]:
 	mapping: List[int] = []
+	core_ids: List[int] = []
 
 	if SYSTEM == "Linux" and os.path.isfile("/proc/cpuinfo"):
 		try:
@@ -5079,7 +5080,10 @@ def get_cpu_core_mapping() -> List[int]:
 						if num > THREADS - 1:
 							break
 					elif line.startswith("core id"):
-						mapping[num] = int(line.strip()[(line.index(": ")+2):])
+						core_id = int(line.strip()[(line.index(": ")+2):])
+						if core_id not in core_ids:
+							core_ids.append(core_id)
+						mapping[num] = core_ids.index(core_id)
 			if num < THREADS - 1:
 				raise Exception
 		except:
