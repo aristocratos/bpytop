@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.62
+
+* Fixed: Support cpus with non-sequential core ids, patch by @ErwinJunge
+* Added: New theme Adapta, by @olokelo
+* Changed: Net graphs will now round up any value above 0 to register on graph
+
 ## v1.0.61
 
 * Added: Vim keys (h, j, k, l) for browsing and moved help to shift+h
