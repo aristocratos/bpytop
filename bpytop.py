@@ -1430,22 +1430,26 @@ class Graph:
 	color_max_value: int
 	offset: int
 	no_zero: bool
+	round_up_low: bool
 	current: bool
 	last: int
+	lowest: int = 0
 	symbol: Dict[float, str]
 
-	def __init__(self, width: int, height: int, color: Union[List[str], Color, None], data: List[int], invert: bool = False, max_value: int = 0, offset: int = 0, color_max_value: Union[int, None] = None, no_zero: bool = False):
+	def __init__(self, width: int, height: int, color: Union[List[str], Color, None], data: List[int], invert: bool = False, max_value: int = 0, offset: int = 0, color_max_value: Union[int, None] = None, no_zero: bool = False, round_up_low: bool = False):
 		self.graphs: Dict[bool, List[str]] = {False : [], True : []}
 		self.current: bool = True
 		self.width = width
 		self.height = height
 		self.invert = invert
 		self.offset = offset
-		self.no_zero = no_zero
+		self.round_up_low = round_up_low
+		self.no_zero = no_zero or round_up_low
 		if not data: data = [0]
 		if max_value:
+			self.lowest = 1 if self.round_up_low else 0
 			self.max_value = max_value
-			data = [ min(100, (v + offset) * 100 // (max_value + offset)) for v in data ] #* Convert values to percentage values of max_value with max_value as ceiling
+			data = [ min_max((v + offset) * 100 // (max_value + offset), self.lowest, 100) for v in data ] #* Convert values to percentage values of max_value with max_value as ceiling
 		else:
 			self.max_value = 0
 		if color_max_value:
@@ -1504,7 +1508,7 @@ class Graph:
 					else:
 						if self.height == 1: value[side] = round(val * 4 / 100 + 0.5)
 						else: value[side] = round((val - h_low) * 4 / (h_high - h_low) + 0.1)
-					if self.no_zero and not (new and v == 0 and side == "left") and h == self.height - 1 and value[side] < 1: value[side] = 1
+					if self.no_zero and not (new and v == 0 and side == "left") and h == self.height - 1 and value[side] < 1 and not (self.round_up_low and val == 0): value[side] = 1
 				if new: self.last = data[v]
 				self.graphs[self.current][h] += self.symbol[float(value["left"] + value["right"] / 10)]
 		if data: self.last = data[-1]
@@ -1529,7 +1533,7 @@ class Graph:
 		else:
 			for n in range(self.height):
 				self.graphs[self.current][n] = self.graphs[self.current][n][1:]
-		if self.max_value: value = (value + self.offset) * 100 // (self.max_value + self.offset) if value < self.max_value else 100
+		if self.max_value: value = min_max((value + self.offset) * 100 // (self.max_value + self.offset), self.lowest, 100)
 		self._create([value])
 		return self.out
 
@@ -2362,7 +2366,7 @@ class NetBox(Box, SubBox):
 			if cls.redraw: stats["redraw"] = True
 			if stats["redraw"] or cls.resized:
 				Graphs.net[direction] = Graph(w - bw - 3, cls.graph_height[direction], THEME.gradient[direction], stats["speed"], max_value=net.sync_top if CONFIG.net_sync else stats["graph_top"],
-					invert=direction != "download", color_max_value=net.net_min.get(direction) if CONFIG.net_color_fixed else None)
+					invert=direction != "download", color_max_value=net.net_min.get(direction) if CONFIG.net_color_fixed else None, round_up_low=True)
 			out += f'{Mv.to(y if direction == "download" else y + cls.graph_height["download"], x)}{Graphs.net[direction](None if stats["redraw"] else stats["speed"][-1])}'
 
 			out += (f'{Mv.to(by+cy, bx)}{THEME.main_fg}{cls.symbols[direction]} {strings["byte_ps"]:<10.10}' +
