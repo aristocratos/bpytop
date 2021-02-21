@@ -1887,9 +1887,9 @@ class CpuBox(Box, SubBox):
 			if not "m" in Key.mouse:
 				Key.mouse["m"] = [[cls.x + 16 + i, cls.y] for i in range(12)]
 			out_misc += f'{Mv.to(cls.y, cls.x + 16)}{THEME.cpu_box(Symbol.title_left)}{Fx.b}{THEME.hi_fg("m")}{THEME.title}ode:{Box.view_mode}{Fx.ub}{THEME.cpu_box(Symbol.title_right)}'
-			Graphs.cpu["up"] = Graph(w - bw - 3, (h if CONFIG.cpu_single_graph else hh), THEME.gradient["cpu"], cpu.cpu_upper)
+			Graphs.cpu["up"] = Graph(w - bw - 3, (h if CONFIG.cpu_single_graph else hh), THEME.gradient["cpu"], cpu.cpu_upper, round_up_low=True)
 			if not CONFIG.cpu_single_graph:
-				Graphs.cpu["down"] = Graph(w - bw - 3, hh2, THEME.gradient["cpu"], cpu.cpu_lower, invert=CONFIG.cpu_invert_lower)
+				Graphs.cpu["down"] = Graph(w - bw - 3, hh2, THEME.gradient["cpu"], cpu.cpu_lower, invert=CONFIG.cpu_invert_lower, round_up_low=True)
 			Meters.cpu = Meter(cpu.cpu_usage[0][-1], bw - (21 if cpu.got_sensors else 9), "cpu")
 			if cls.column_size > 0 or ct_width > 0:
 				for n in range(THREADS):
@@ -3025,7 +3025,7 @@ class CpuCollector(Collector):
 
 	@classmethod
 	def _collect(cls):
-		cls.cpu_usage[0].append(round(psutil.cpu_percent(percpu=False)))
+		cls.cpu_usage[0].append(ceil(psutil.cpu_percent(percpu=False)))
 		if len(cls.cpu_usage[0]) > Term.width * 4:
 			del cls.cpu_usage[0][0]
 
@@ -3034,12 +3034,12 @@ class CpuCollector(Collector):
 			if getattr(CONFIG, "cpu_graph_" + x) == "total":
 				setattr(cls, "cpu_" + x, cls.cpu_usage[0])
 			else:
-				getattr(cls, "cpu_" + x).append(round(getattr(cpu_times_percent, getattr(CONFIG, "cpu_graph_" + x))))
+				getattr(cls, "cpu_" + x).append(ceil(getattr(cpu_times_percent, getattr(CONFIG, "cpu_graph_" + x))))
 			if len(getattr(cls, "cpu_" + x)) > Term.width * 4:
 				del getattr(cls, "cpu_" + x)[0]
 
 		for n, thread in enumerate(psutil.cpu_percent(percpu=True), start=1):
-			cls.cpu_usage[n].append(round(thread))
+			cls.cpu_usage[n].append(ceil(thread))
 			if len(cls.cpu_usage[n]) > Term.width * 2:
 				del cls.cpu_usage[n][0]
 		try:
