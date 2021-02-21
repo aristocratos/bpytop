@@ -161,6 +161,9 @@ cpu_sensor=$cpu_sensor
 #* Show temperatures for cpu cores also if check_temp is True and sensors has been found
 show_coretemp=$show_coretemp
 
+#* Which temperature scale to use, available values: "celsius", "fahrenheit", "kelvin" and "rankine"
+temp_scale="$temp_scale"
+
 #* Draw a clock at top of screen, formatting according to strftime, empty string to disable.
 draw_clock="$draw_clock"
 
@@ -405,7 +408,7 @@ class Config:
 						"swap_disk", "show_disks", "use_fstab", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "theme_background",
 						"net_sync", "show_battery", "tree_depth", "cpu_sensor", "show_coretemp", "proc_update_mult", "shown_boxes", "net_iface", "only_physical",
 						"truecolor", "io_mode", "io_graph_combined", "io_graph_speeds", "show_io_stat", "cpu_graph_upper", "cpu_graph_lower", "cpu_invert_lower",
-						"cpu_single_graph", "show_uptime"]
+						"cpu_single_graph", "show_uptime", "temp_scale"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	theme_background: bool = True
@@ -429,6 +432,7 @@ class Config:
 	check_temp: bool = True
 	cpu_sensor: str = "Auto"
 	show_coretemp: bool = True
+	temp_scale: str = "celsius"
 	draw_clock: str = "%X"
 	background_update: bool = True
 	custom_cpu_name: str = ""
@@ -461,6 +465,7 @@ class Config:
 	log_levels: List[str] = ["ERROR", "WARNING", "INFO", "DEBUG"]
 	cpu_percent_fields: List = ["total"]
 	cpu_percent_fields.extend(getattr(psutil.cpu_times_percent(), "_fields", []))
+	temp_scales: List[str] = ["celsius", "fahrenheit", "kelvin", "rankine"]
 
 	cpu_sensors: List[str] = [ "Auto" ]
 
@@ -567,6 +572,9 @@ class Config:
 			if cpu_graph in new_config and not new_config[cpu_graph] in self.cpu_percent_fields:
 				new_config[cpu_graph] = "_error_"
 				self.warnings.append(f'Config key "{cpu_graph}" does not contain an available cpu stat attribute!')
+		if "temp_scale" in new_config and not new_config["temp_scale"] in self.temp_scales:
+			new_config["temp_scale"] = "_error_"
+			self.warnings.append(f'Config key "temp_scale" does not contain a recognized temperature scale!')
 		return new_config
 
 	def save_config(self):
@@ -1449,7 +1457,7 @@ class Graph:
 		if max_value:
 			self.lowest = 1 if self.round_up_low else 0
 			self.max_value = max_value
-			data = [ min_max((v + offset) * 100 // (max_value + offset), self.lowest, 100) for v in data ] #* Convert values to percentage values of max_value with max_value as ceiling
+			data = [ min_max((v + offset) * 100 // (max_value + offset), min_max(v + offset, 0, self.lowest), 100) for v in data ] #* Convert values to percentage values of max_value with max_value as ceiling
 		else:
 			self.max_value = 0
 		if color_max_value:
@@ -1533,7 +1541,7 @@ class Graph:
 		else:
 			for n in range(self.height):
 				self.graphs[self.current][n] = self.graphs[self.current][n][1:]
-		if self.max_value: value = min_max((value + self.offset) * 100 // (self.max_value + self.offset), self.lowest, 100)
+		if self.max_value: value = min_max((value + self.offset) * 100 // (self.max_value + self.offset), min_max(value + self.offset, 0, self.lowest), 100)
 		self._create([value])
 		return self.out
 
@@ -1865,6 +1873,8 @@ class CpuBox(Box, SubBox):
 		hh: int = ceil(h / 2)
 		hh2: int = h - hh
 		mid_line: bool = False
+		temp: int = 0
+		unit: str = ""
 		if not CONFIG.cpu_single_graph and CONFIG.cpu_graph_upper != CONFIG.cpu_graph_lower:
 			mid_line = True
 			if h % 2: hh = floor(h / 2)
@@ -1937,8 +1947,9 @@ class CpuBox(Box, SubBox):
 				f'{THEME.gradient["cpu"][cpu.cpu_usage[0][-1]]}{cpu.cpu_usage[0][-1]:>4}{THEME.main_fg}%')
 		if cpu.got_sensors:
 			try:
+				temp, unit = temperature(cpu.cpu_temp[0][-1], CONFIG.temp_scale)
 				out += (f'{THEME.inactive_fg} ⡀⡀⡀⡀⡀{Mv.l(5)}{THEME.gradient["temp"][min_max(cpu.cpu_temp[0][-1], 0, cpu.cpu_temp_crit) * 100 // cpu.cpu_temp_crit]}{Graphs.temps[0](None if cls.resized else cpu.cpu_temp[0][-1])}'
-						f'{cpu.cpu_temp[0][-1]:>4}{THEME.main_fg}°C')
+						f'{temp:>4}{THEME.main_fg}{unit}')
 			except:
 				cpu.got_sensors = False
 
@@ -1952,11 +1963,12 @@ class CpuBox(Box, SubBox):
 			out += f'{cpu.cpu_usage[n][-1]:>{3 if cls.column_size < 2 else 4}}{THEME.main_fg}%'
 			if cpu.got_sensors and cpu.cpu_temp[n] and not hide_cores:
 				try:
+					temp, unit = temperature(cpu.cpu_temp[n][-1], CONFIG.temp_scale)
 					if cls.column_size > 1:
-						out += f'{THEME.inactive_fg} ⡀⡀⡀⡀⡀{Mv.l(5)}{THEME.gradient["temp"][100 if cpu.cpu_temp[n][-1] >= cpu.cpu_temp_crit else (cpu.cpu_temp[n][-1] * 100 // cpu.cpu_temp_crit)]}{Graphs.temps[n](None if cls.resized else cpu.cpu_temp[n][-1])}'
+						out += f'{THEME.inactive_fg} ⡀⡀⡀⡀⡀{Mv.l(5)}{THEME.gradient["temp"][min_max(cpu.cpu_temp[n][-1], 0, cpu.cpu_temp_crit) * 100 // cpu.cpu_temp_crit]}{Graphs.temps[n](None if cls.resized else cpu.cpu_temp[n][-1])}'
 					else:
-						out += f'{THEME.gradient["temp"][100 if cpu.cpu_temp[n][-1] >= cpu.cpu_temp_crit else (cpu.cpu_temp[n][-1] * 100 // cpu.cpu_temp_crit)]}'
-					out += f'{cpu.cpu_temp[n][-1]:>4}{THEME.main_fg}°C'
+						out += f'{THEME.gradient["temp"][min_max(temp, 0, cpu.cpu_temp_crit) * 100 // cpu.cpu_temp_crit]}'
+					out += f'{temp:>4}{THEME.main_fg}{unit}'
 				except:
 					cpu.got_sensors = False
 			elif cpu.got_sensors and not hide_cores:
@@ -3062,7 +3074,7 @@ class CpuCollector(Collector):
 					s_name, s_label = CONFIG.cpu_sensor.split(":", 1)
 				for name, entries in psutil.sensors_temperatures().items():
 					for num, entry in enumerate(entries, 1):
-						if name == s_name and (entry.label == s_label or str(num) == s_label) and round(entry.current) > 0:
+						if name == s_name and (entry.label == s_label or str(num) == s_label):
 							if entry.label.startswith("Package"):
 								cpu_type = "intel"
 							elif entry.label.startswith("Tdie"):
@@ -3074,7 +3086,7 @@ class CpuCollector(Collector):
 							if getattr(entry, "critical", None) != None and entry.critical > 1: cls.cpu_temp_crit = round(entry.critical)
 							else: cls.cpu_temp_crit = 95
 							temp = round(entry.current)
-						elif entry.label.startswith(("Package", "Tdie")) and cpu_type in ["", "other"] and s_name == "_-_" and hasattr(entry, "current") and round(entry.current) > 0:
+						elif entry.label.startswith(("Package", "Tdie")) and cpu_type in ["", "other"] and s_name == "_-_" and hasattr(entry, "current"):
 							if not cls.cpu_temp_high or cls.sensor_swap or cpu_type == "other":
 								cls.sensor_swap = False
 								if getattr(entry, "high", None) != None and entry.high > 1: cls.cpu_temp_high = round(entry.high)
@@ -3083,7 +3095,7 @@ class CpuCollector(Collector):
 								else: cls.cpu_temp_crit = 95
 							cpu_type = "intel" if entry.label.startswith("Package") else "ryzen"
 							temp = round(entry.current)
-						elif (entry.label.startswith(("Core", "Tccd", "CPU")) or (name.lower().startswith("cpu") and not entry.label)) and hasattr(entry, "current") and round(entry.current) > 0:
+						elif (entry.label.startswith(("Core", "Tccd", "CPU")) or (name.lower().startswith("cpu") and not entry.label)) and hasattr(entry, "current"):
 							if entry.label.startswith(("Core", "Tccd")):
 								entry_int = int(entry.label.replace("Core", "").replace("Tccd", ""))
 								if entry_int in core_dict and cpu_type != "ryzen":
@@ -4368,7 +4380,18 @@ class Menu:
 					'',
 					'Only works if check_temp is True and',
 					'the system is reporting core temps.'],
-
+				"temp_scale" : [
+					'Which temperature scale to use.',
+					'',
+					'Celsius, default scale.',
+					'',
+					'Fahrenheit, the american one.',
+					'',
+					'Kelvin, 0 = absolute zero, 1 degree change',
+					'equals 1 degree change in Celsius.',
+					'',
+					'Rankine, 0 = abosulte zero, 1 degree change',
+					'equals 1 degree change in Fahrenheit.'],
 				"custom_cpu_name" : [
 					'Custom cpu model name in cpu percentage box.',
 					'',
@@ -4572,6 +4595,7 @@ class Menu:
 		cpu_sensor_i: int = CONFIG.cpu_sensors.index(CONFIG.cpu_sensor)
 		cpu_graph_i: Dict[str, int] = { "cpu_graph_upper" : CONFIG.cpu_percent_fields.index(CONFIG.cpu_graph_upper),
 										"cpu_graph_lower" : CONFIG.cpu_percent_fields.index(CONFIG.cpu_graph_lower)}
+		temp_scale_i: int = CONFIG.temp_scales.index(CONFIG.temp_scale)
 		color_i: int
 		max_opt_len: int = max([len(categories[x]) for x in categories]) * 2
 		cat_list = list(categories)
@@ -4635,11 +4659,13 @@ class Menu:
 						counter = f' {cpu_sensor_i + 1}/{len(CONFIG.cpu_sensors)}'
 					elif opt in ["cpu_graph_upper", "cpu_graph_lower"]:
 						counter = f' {cpu_graph_i[opt] + 1}/{len(CONFIG.cpu_percent_fields)}'
+					elif opt == "temp_scale":
+						counter = f' {temp_scale_i + 1}/{len(CONFIG.temp_scales)}'
 					else:
 						counter = ""
 					out += f'{Mv.to(y+1+cy, x+1)}{t_color}{Fx.b}{opt.replace("_", " ").capitalize() + counter:^24.24}{Fx.ub}{Mv.to(y+2+cy, x+1)}{v_color}'
 					if opt == selected:
-						if isinstance(value, bool) or opt in ["color_theme", "proc_sorting", "log_level", "cpu_sensor", "cpu_graph_upper", "cpu_graph_lower"]:
+						if isinstance(value, bool) or opt in ["color_theme", "proc_sorting", "log_level", "cpu_sensor", "cpu_graph_upper", "cpu_graph_lower", "temp_scale"]:
 							out += f'{t_color} {Symbol.left}{v_color}{d_quote + str(value) + d_quote:^20.20}{t_color}{Symbol.right} '
 						elif inputting:
 							out += f'{str(input_val)[-17:] + Fx.bl + "█" + Fx.ubl + "" + Symbol.enter:^33.33}'
@@ -4847,6 +4873,16 @@ class Menu:
 						if cpu_graph_i[selected] > len(CONFIG.cpu_percent_fields) - 1: cpu_graph_i[selected] = 0
 					setattr(CONFIG, selected, CONFIG.cpu_percent_fields[cpu_graph_i[selected]])
 					setattr(CpuCollector, selected.replace("_graph", ""), [])
+					Term.refresh(force=True)
+					cls.resized = False
+				elif key in ["left", "right"] and selected == "temp_scale":
+					if key == "left":
+						temp_scale_i -= 1
+						if temp_scale_i < 0: temp_scale_i = len(CONFIG.temp_scales) - 1
+					if key == "right":
+						temp_scale_i += 1
+						if temp_scale_i > len(CONFIG.temp_scales) - 1: temp_scale_i = 0
+					CONFIG.temp_scale = CONFIG.temp_scales[temp_scale_i]
 					Term.refresh(force=True)
 					cls.resized = False
 				elif key in ["left", "right"] and selected == "cpu_sensor" and len(CONFIG.cpu_sensors) > 1:
@@ -5276,6 +5312,19 @@ def readfile(file: str, default: str = "") -> str:
 		except:
 			pass
 	return default if out is None else out
+
+def temperature(value: int, scale: str = "celsius") -> Tuple[int, str]:
+	"""Returns a tuple with integer value and string unit converted from an integer in celsius to: celsius, fahrenheit, kelvin or rankine."""
+	if scale == "celsius":
+		return (value, "°C")
+	elif scale == "fahrenheit":
+		return (round(value * 1.8 + 32), "°F")
+	elif scale == "kelvin":
+		return (round(value + 273.15), "°K")
+	elif scale == "rankine":
+		return (round(value * 1.8 + 491.67), "°R")
+	else:
+		return (0, "")
 
 def process_keys():
 	mouse_pos: Tuple[int, int] = (0, 0)
