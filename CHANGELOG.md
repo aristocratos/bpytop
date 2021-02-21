@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.63
+
+* Added: Options for choosing temperature scale and readded support for negative celsius temps
+* Changed: Cpu values above 0 will always register on the graphs
+
 ## v1.0.62
 
 * Fixed: Support cpus with non-sequential core ids, patch by @ErwinJunge
