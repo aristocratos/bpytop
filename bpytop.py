@@ -455,7 +455,7 @@ class Config:
 	net_sync: bool = False
 	net_iface: str = ""
 	show_battery: bool = True
-	show_init: bool = True
+	show_init: bool = False
 	log_level: str = "WARNING"
 
 	warnings: List[str] = []
