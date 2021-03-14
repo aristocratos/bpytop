@@ -4563,7 +4563,7 @@ class Menu:
 				"tree_depth" : [
 					'Process tree auto collapse depth.',
 					'',
-					'Sets the depth were the tree view will auto',
+					'Sets the depth where the tree view will auto',
 					'collapse processes at.'],
 				"proc_colors" : [
 					'Enable colors in process view.',
