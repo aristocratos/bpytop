@@ -187,6 +187,15 @@ Available in the Arch Linux [community] repository as `bpytop`
 ```bash
 sudo pacman -S bpytop
 ```
+### WSL2 Linux Ubuntu
+
+>Installation
+
+```bash
+$ sudo apt install python3-pip
+$ pip3 install bpytop --upgrade
+```
+
 
 ### Debian based
 
