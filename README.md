@@ -16,8 +16,6 @@
 [![Sponsor](https://img.shields.io/badge/-Sponsor-red?logo=github)](https://github.com/sponsors/aristocratos)
 [![Coffee](https://img.shields.io/badge/-Buy%20me%20a%20Coffee-grey?logo=Ko-fi)](https://ko-fi.com/aristocratos)
 
-[![bpytop](https://img.shields.io/badge/-snapcraft.io-black)](https://snapcraft.io/bpytop)[![bpytop](https://snapcraft.io//bpytop/badge.svg)](https://snapcraft.io/bpytop)
-
 ## Index
 
 * [Documents](#documents)
@@ -45,7 +43,7 @@
 
 Resource monitor that shows usage and stats for processor, memory, disks, network and processes.
 
-Python port of [bashtop](https://github.com/aristocratos/bashtop).
+Python port and continuation of [bashtop](https://github.com/aristocratos/bashtop).
 
 ## Features
 
@@ -151,6 +149,8 @@ Options menu.
 
 ## Installation
 
+I only maintain the PyPi package, so will not take responsibility for issues caused by any other install method!
+
 ### PyPi (will always have latest version)
 
 > Install or update to latest version
@@ -250,6 +250,8 @@ http://mxrepo.com/mx/testrepo/pool/test/b/bpytop/
 
 ### Snap package
 
+(Not recommended due to multiple issues caused by snap sandboxing)
+
 by @kz6fittycent
 
 https://github.com/kz6fittycent/bpytop-snap
@@ -344,7 +346,7 @@ Config files stored in "$HOME/.config/bpytop" folder
 
 #### bpytop.cfg: (auto generated if not found)
 
-"/etc/bpytop.conf" will be used as default seed for config file creation if it exists.
+"/etc/bpytop.conf" will be used as default seed for config file creation if it exists. ("/usr/local/etc/bpytop.conf" on BSD)
 
 ```bash
 #? Config file for bpytop v. 1.0.58
