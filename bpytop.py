@@ -164,6 +164,9 @@ show_coretemp=$show_coretemp
 #* Which temperature scale to use, available values: "celsius", "fahrenheit", "kelvin" and "rankine"
 temp_scale="$temp_scale"
 
+#* Show CPU frequency, can cause slowdowns on certain systems with some versions of psutil
+show_cpu_freq=$show_cpu_freq
+
 #* Draw a clock at top of screen, formatting according to strftime, empty string to disable.
 draw_clock="$draw_clock"
 
@@ -408,7 +411,7 @@ class Config:
 						"swap_disk", "show_disks", "use_fstab", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "theme_background",
 						"net_sync", "show_battery", "tree_depth", "cpu_sensor", "show_coretemp", "proc_update_mult", "shown_boxes", "net_iface", "only_physical",
 						"truecolor", "io_mode", "io_graph_combined", "io_graph_speeds", "show_io_stat", "cpu_graph_upper", "cpu_graph_lower", "cpu_invert_lower",
-						"cpu_single_graph", "show_uptime", "temp_scale"]
+						"cpu_single_graph", "show_uptime", "temp_scale", "show_cpu_freq"]
 	conf_dict: Dict[str, Union[str, int, bool]] = {}
 	color_theme: str = "Default"
 	theme_background: bool = True
@@ -433,6 +436,7 @@ class Config:
 	cpu_sensor: str = "Auto"
 	show_coretemp: bool = True
 	temp_scale: str = "celsius"
+	show_cpu_freq: bool = True
 	draw_clock: str = "%X"
 	background_update: bool = True
 	custom_cpu_name: str = ""
@@ -3043,9 +3047,11 @@ class CpuCollector(Collector):
 			if len(cls.cpu_usage[n]) > Term.width * 2:
 				del cls.cpu_usage[n][0]
 		try:
-			if hasattr(psutil.cpu_freq(), "current"):
+			if CONFIG.show_cpu_freq and hasattr(psutil.cpu_freq(), "current"):
 				freq: float = psutil.cpu_freq().current
 				cls.cpu_freq = round(freq * (1 if freq > 10 else 1000))
+			elif cls.cpu_freq > 0:
+				cls.cpu_freq = 0
 		except Exception as e:
 			if not cls.freq_error:
 				cls.freq_error = True
@@ -4393,6 +4399,11 @@ class Menu:
 					'',
 					'Rankine, 0 = abosulte zero, 1 degree change',
 					'equals 1 degree change in Fahrenheit.'],
+				"show_cpu_freq" : [
+					'Show CPU frequency',
+					'',
+					'Can cause slowdowns on systems with many',
+					'cores and psutil versions below 5.8.1'],
 				"custom_cpu_name" : [
 					'Custom cpu model name in cpu percentage box.',
 					'',
