@@ -520,7 +520,9 @@ class Config:
 		conf_file: str = ""
 		if os.path.isfile(self.config_file):
 			conf_file = self.config_file
-		elif os.path.isfile("/etc/bpytop.conf"):
+		elif SYSTEM == "BSD" and os.path.isfile("/usr/local/etc/bpytop.conf"):
+			conf_file = "/usr/local/etc/bpytop.conf"
+		elif SYSTEM != "BSD" and os.path.isfile("/etc/bpytop.conf"):
 			conf_file = "/etc/bpytop.conf"
 		else:
 			return new_config
