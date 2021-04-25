@@ -2852,7 +2852,7 @@ class ProcBox(Box):
 		#* Clean up dead processes graphs and counters
 		cls.count += 1
 		if cls.count == 100:
-			cls.count == 0
+			cls.count = 0
 			for p in list(cls.pid_counter):
 				if not psutil.pid_exists(p):
 					del cls.pid_counter[p], Graphs.pid_cpu[p]
