@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.64
+
+* Changed: Init screen not shown by default
+* Fixed: Broken cleanup in ProcBox class
+* Fixed: cpu frequency type change in psutil 5.8.1
+* Added: Option to toggle CPU frequency
+* Fixed: Check for config in /usr/local/etc instead of /etc on BSD
+
 ## v1.0.63
 
 * Added: Options for choosing temperature scale and readded support for negative celsius temps

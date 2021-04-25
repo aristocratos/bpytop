@@ -3,7 +3,7 @@
 # indent = tab
 # tab-size = 4
 
-# Copyright 2020 Aristocratos (jakob@qvantnet.com)
+# Copyright 2021 Aristocratos (jakob@qvantnet.com)
 
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ if errors:
 		print("\nInstall required modules!\n")
 	raise SystemExit(1)
 
-VERSION: str = "1.0.63"
+VERSION: str = "1.0.64"
 
 #? Argument parser ------------------------------------------------------------------------------->
 args = argparse.ArgumentParser()
