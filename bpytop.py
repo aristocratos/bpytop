@@ -3044,7 +3044,8 @@ class CpuCollector(Collector):
 				del cls.cpu_usage[n][0]
 		try:
 			if hasattr(psutil.cpu_freq(), "current"):
-				cls.cpu_freq = round(psutil.cpu_freq().current)
+				freq: float = psutil.cpu_freq().current
+				cls.cpu_freq = round(freq * (1 if freq > 10 else 1000))
 		except Exception as e:
 			if not cls.freq_error:
 				cls.freq_error = True
