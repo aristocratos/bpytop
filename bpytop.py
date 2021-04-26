@@ -5334,7 +5334,7 @@ def temperature(value: int, scale: str = "celsius") -> Tuple[int, str]:
 	elif scale == "fahrenheit":
 		return (round(value * 1.8 + 32), "°F")
 	elif scale == "kelvin":
-		return (round(value + 273.15), "°K")
+		return (round(value + 273.15), "K")
 	elif scale == "rankine":
 		return (round(value * 1.8 + 491.67), "°R")
 	else:
