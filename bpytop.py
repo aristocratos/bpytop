@@ -98,7 +98,7 @@ theme_background=$theme_background
 #* Sets if 24-bit truecolor should be used, will convert 24-bit colors to 256 color (6x6x6 color cube) if false.
 truecolor=$truecolor
 
-#* Manually set which boxes to show. Available values are "cpu mem net proc", seperate values with whitespace.
+#* Manually set which boxes to show. Available values are "cpu mem net proc", separate values with whitespace.
 shown_boxes="$shown_boxes"
 
 #* Update time in milliseconds, increases automatically if set below internal loops processing time, recommended 2000 ms or above for better sample times for graphs.
@@ -177,7 +177,7 @@ background_update=$background_update
 custom_cpu_name="$custom_cpu_name"
 
 #* Optional filter for shown disks, should be full path of a mountpoint, separate multiple values with a comma ",".
-#* Begin line with "exclude=" to change to exclude filter, oterwise defaults to "most include" filter. Example: disks_filter="exclude=/boot, /home/user"
+#* Begin line with "exclude=" to change to exclude filter, otherwise defaults to "most include" filter. Example: disks_filter="exclude=/boot, /home/user"
 disks_filter="$disks_filter"
 
 #* Show graphs instead of meters for memory values.
@@ -207,7 +207,7 @@ io_mode=$io_mode
 #* Set to True to show combined read/write io graphs in io mode.
 io_graph_combined=$io_graph_combined
 
-#* Set the top speed for the io graphs in MiB/s (10 by default), use format "device:speed" seperate disks with a comma ",".
+#* Set the top speed for the io graphs in MiB/s (10 by default), use format "device:speed" separate disks with a comma ",".
 #* Example: "/dev/sda:100, /dev/sdb:20"
 io_graph_speeds="$io_graph_speeds"
 
@@ -221,7 +221,7 @@ net_auto=$net_auto
 #* Sync the scaling for download and upload to whichever currently has the highest scale
 net_sync=$net_sync
 
-#* If the network graphs color gradient should scale to bandwith usage or auto scale, bandwith usage is based on "net_download" and "net_upload" values
+#* If the network graphs color gradient should scale to bandwidth usage or auto scale, bandwidth usage is based on "net_download" and "net_upload" values
 net_color_fixed=$net_color_fixed
 
 #* Starts with the Network Interface specified here.
