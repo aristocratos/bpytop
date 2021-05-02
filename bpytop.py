@@ -697,6 +697,8 @@ class Term:
 						f'{Colors.default}Height: {Colors.red if cls._h < cls.min_height else Colors.green}{cls._h}{Term.bg}{Term.fg}',
 						f'{Mv.d(1)}{Mv.l(25)}{Colors.default}{Colors.black_bg}Current config need: {cls.min_width} x {cls.min_height}{Fx.ub}{Term.bg}{Term.fg}')
 					cls.winch.wait(0.3)
+					while Key.has_key():
+						if Key.last() == "q": clean_quit()
 					cls.winch.clear()
 					cls._w, cls._h = os.get_terminal_size()
 			else:
