@@ -16,8 +16,11 @@
 [![Sponsor](https://img.shields.io/badge/-Sponsor-red?logo=github)](https://github.com/sponsors/aristocratos)
 [![Coffee](https://img.shields.io/badge/-Buy%20me%20a%20Coffee-grey?logo=Ko-fi)](https://ko-fi.com/aristocratos)
 
+[![bpytop](https://img.shields.io/badge/-snapcraft.io-black)](https://snapcraft.io/bpytop)[![bpytop](https://snapcraft.io//bpytop/badge.svg)](https://snapcraft.io/bpytop)
+
 ## Index
 
+* [News](#news)
 * [Documents](#documents)
 * [Description](#description)
 * [Features](#features)
@@ -28,8 +31,24 @@
 * [Screenshots](#screenshots)
 * [Installation](#installation)
 * [Configurability](#configurability)
-* [TODO](#todo)
 * [License](#license)
+
+## News
+
+### C++ Version
+##### 2 May 2021
+
+I've started work on the third iteration of bashtop->bpytop.
+It's being written in C++ and will simply be called `btop`.
+
+I'm aiming at releasing a beta version around August this year and will publish the repo when I've got the core functionality and structure ready for anybody that wanna help out.
+
+This project is gonna take some time until it has complete feature parity with bpytop, since all system information gathering will likely have to be written from scratch without any external libraries.
+And will need some help in the form of code contributions to get complete support for BSD and OSX.
+
+If you got suggestions of C++ libraries that are multi-platform and are as extensive as [psutil](https://github.com/giampaolo/psutil) are for python, feel free to open up a new thread in Discussions, it could help speed up the development a lot.
+
+Will post any updates about this project here until the repo is made available.
 
 ## Documents
 
@@ -250,7 +269,7 @@ http://mxrepo.com/mx/testrepo/pool/test/b/bpytop/
 
 ### Snap package
 
-(Not recommended due to multiple issues caused by snap sandboxing)
+(Note! There is some issues caused by the snap sandboxing)
 
 by @kz6fittycent
 
@@ -259,16 +278,6 @@ https://github.com/kz6fittycent/bpytop-snap
 >Install the package
 ``` bash
 sudo snap install bpytop
-```
-
->Give permissions
-``` bash
-sudo snap connect bpytop:mount-observe
-sudo snap connect bpytop:network-control
-sudo snap connect bpytop:hardware-observe
-sudo snap connect bpytop:system-observe
-sudo snap connect bpytop:process-control
-sudo snap connect bpytop:physical-memory-observe
 ```
 
 The config folder will be located in `~/snap/bpytop/current/.config/bpytop`
@@ -349,7 +358,7 @@ Config files stored in "$HOME/.config/bpytop" folder
 "/etc/bpytop.conf" will be used as default seed for config file creation if it exists. ("/usr/local/etc/bpytop.conf" on BSD)
 
 ```bash
-#? Config file for bpytop v. 1.0.58
+#? Config file for bpytop v. 1.0.64
 
 #* Color theme, looks for a .theme file in "/usr/[local/]share/bpytop/themes" and "~/.config/bpytop/themes", "Default" for builtin default theme.
 #* Prefix name by a plus sign (+) for a theme located in user themes folder, i.e. color_theme="+monokai"
@@ -361,7 +370,7 @@ theme_background=False
 #* Sets if 24-bit truecolor should be used, will convert 24-bit colors to 256 color (6x6x6 color cube) if false.
 truecolor=True
 
-#* Manually set which boxes to show. Available values are "cpu mem net proc", seperate values with whitespace.
+#* Manually set which boxes to show. Available values are "cpu mem net proc", separate values with whitespace.
 shown_boxes="cpu mem net proc"
 
 #* Update time in milliseconds, increases automatically if set below internal loops processing time, recommended 2000 ms or above for better sample times for graphs.
@@ -396,6 +405,25 @@ proc_per_core=False
 #* Show process memory as bytes instead of percent
 proc_mem_bytes=True
 
+#* Sets the CPU stat shown in upper half of the CPU graph, "total" is always available, see:
+#* https://psutil.readthedocs.io/en/latest/#psutil.cpu_times for attributes available on specific platforms.
+#* Select from a list of detected attributes from the options menu
+cpu_graph_upper="total"
+
+#* Sets the CPU stat shown in lower half of the CPU graph, "total" is always available, see:
+#* https://psutil.readthedocs.io/en/latest/#psutil.cpu_times for attributes available on specific platforms.
+#* Select from a list of detected attributes from the options menu
+cpu_graph_lower="total"
+
+#* Toggles if the lower CPU graph should be inverted.
+cpu_invert_lower=True
+
+#* Set to True to completely disable the lower CPU graph.
+cpu_single_graph=False
+
+#* Shows the system uptime in the CPU box.
+show_uptime=True
+
 #* Check cpu temperature, needs "osx-cpu-temp" on MacOS X.
 check_temp=True
 
@@ -404,6 +432,12 @@ cpu_sensor=Auto
 
 #* Show temperatures for cpu cores also if check_temp is True and sensors has been found
 show_coretemp=True
+
+#* Which temperature scale to use, available values: "celsius", "fahrenheit", "kelvin" and "rankine"
+temp_scale="celsius"
+
+#* Show CPU frequency, can cause slowdowns on certain systems with some versions of psutil
+show_cpu_freq=True
 
 #* Draw a clock at top of screen, formatting according to strftime, empty string to disable.
 draw_clock="%H:%M"
@@ -415,7 +449,7 @@ background_update=True
 custom_cpu_name=""
 
 #* Optional filter for shown disks, should be full path of a mountpoint, separate multiple values with a comma ",".
-#* Begin line with "exclude=" to change to exclude filter, oterwise defaults to "most include" filter. Example: disks_filter="exclude=/boot, /home/user"
+#* Begin line with "exclude=" to change to exclude filter, otherwise defaults to "most include" filter. Example: disks_filter="exclude=/boot, /home/user"
 disks_filter="exclude=/boot"
 
 #* Show graphs instead of meters for memory values.
@@ -436,13 +470,16 @@ only_physical=True
 #* Read disks list from /etc/fstab. This also disables only_physical.
 use_fstab=True
 
+#* Toggles if io stats should be shown in regular disk usage view
+show_io_stat=True
+
 #* Toggles io mode for disks, showing only big graphs for disk read/write speeds.
 io_mode=False
 
 #* Set to True to show combined read/write io graphs in io mode.
 io_graph_combined=False
 
-#* Set the top speed for the io graphs in MiB/s (10 by default), use format "device:speed" seperate disks with a comma ",".
+#* Set the top speed for the io graphs in MiB/s (10 by default), use format "device:speed" separate disks with a comma ",".
 #* Example: "/dev/sda:100, /dev/sdb:20"
 io_graph_speeds=""
 
@@ -454,13 +491,13 @@ net_upload="100Mbit"
 net_auto=True
 
 #* Sync the scaling for download and upload to whichever currently has the highest scale
-net_sync=True
+net_sync=False
 
-#* If the network graphs color gradient should scale to bandwith usage or auto scale, bandwith usage is based on "net_download" and "net_upload" values
+#* If the network graphs color gradient should scale to bandwidth usage or auto scale, bandwidth usage is based on "net_download" and "net_upload" values
 net_color_fixed=False
 
 #* Starts with the Network Interface specified here.
-net_iface=""
+net_iface="br0"
 
 #* Show battery stats in top right if battery is present
 show_battery=True
@@ -490,17 +527,6 @@ optional arguments:
   -v, --version         show version info and exit
   --debug               start with loglevel set to DEBUG overriding value set in config
 ```
-
-## TODO
-
-- [ ] Add gpu temp and usage.
-- [ ] Add cpu and mem stats for docker containers. (If feasible)
-- [x] Change process list to line scroll instead of page change.
-- [ ] Add options for resizing all boxes.
-- [x] Add command line argument parsing.
-
-- [ ] Miscellaneous optimizations and code cleanup.
-
 
 ## LICENSE
 
