@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.65
+* Fixed: Removed degrees symbol from Kelvin scale, by @jrbergen
+* Fixed: Mouse buttons not working in netbox when changing interface
+* Fixed: q key not working when terminal size warning is showed
+* Fixed: Cleanup of unused libraries and other small fixes
+
 ## v1.0.64
 
 * Changed: Init screen not shown by default

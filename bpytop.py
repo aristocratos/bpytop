@@ -19,7 +19,7 @@
 
 import os, sys, io, threading, signal, re, subprocess, logging, logging.handlers, argparse
 import urllib.request
-from time import time, sleep, strftime, localtime
+from time import time, sleep, strftime
 from datetime import timedelta
 from _thread import interrupt_main
 from collections import defaultdict
@@ -29,7 +29,7 @@ from string import Template
 from math import ceil, floor
 from random import randint
 from shutil import which
-from typing import List, Set, Dict, Tuple, Optional, Union, Any, Callable, ContextManager, Iterable, Type, NamedTuple
+from typing import List, Dict, Tuple, Union, Any, Iterable
 
 errors: List[str] = []
 try: import fcntl, termios, tty, pwd
@@ -55,7 +55,7 @@ if errors:
 		print("\nInstall required modules!\n")
 	raise SystemExit(1)
 
-VERSION: str = "1.0.64"
+VERSION: str = "1.0.65"
 
 #? Argument parser ------------------------------------------------------------------------------->
 args = argparse.ArgumentParser()
@@ -4578,7 +4578,7 @@ class Menu:
 				"tree_depth" : [
 					'Process tree auto collapse depth.',
 					'',
-					'Sets the depth were the tree view will auto',
+					'Sets the depth where the tree view will auto',
 					'collapse processes at.'],
 				"proc_colors" : [
 					'Enable colors in process view.',
