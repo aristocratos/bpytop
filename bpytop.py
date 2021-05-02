@@ -2356,21 +2356,20 @@ class NetBox(Box, SubBox):
 
 		if cls.resized or cls.redraw:
 			out_misc += cls._draw_bg()
-			if not "b" in Key.mouse:
-				Key.mouse["b"] = [[x+w - len(net.nic[:10]) - 9 + i, y-1] for i in range(4)]
-				Key.mouse["n"] = [[x+w - 5 + i, y-1] for i in range(4)]
-				Key.mouse["z"] = [[x+w - len(net.nic[:10]) - 14 + i, y-1] for i in range(4)]
+			Key.mouse["b"] = [[x+w - len(net.nic[:10]) - 9 + i, y-1] for i in range(4)]
+			Key.mouse["n"] = [[x+w - 5 + i, y-1] for i in range(4)]
+			Key.mouse["z"] = [[x+w - len(net.nic[:10]) - 14 + i, y-1] for i in range(4)]
 
 
 			out_misc += (f'{Mv.to(y-1, x+w - 25)}{THEME.net_box}{Symbol.h_line * (10 - len(net.nic[:10]))}{Symbol.title_left}{Fx.b if reset else ""}{THEME.hi_fg("z")}{THEME.title("ero")}'
 				f'{Fx.ub}{THEME.net_box(Symbol.title_right)}{Term.fg}'
 				f'{THEME.net_box}{Symbol.title_left}{Fx.b}{THEME.hi_fg("<b")} {THEME.title(net.nic[:10])} {THEME.hi_fg("n>")}{Fx.ub}{THEME.net_box(Symbol.title_right)}{Term.fg}')
 			if w - len(net.nic[:10]) - 20 > 6:
-				if not "a" in Key.mouse: Key.mouse["a"] = [[x+w - 20 - len(net.nic[:10]) + i, y-1] for i in range(4)]
+				Key.mouse["a"] = [[x+w - 20 - len(net.nic[:10]) + i, y-1] for i in range(4)]
 				out_misc += (f'{Mv.to(y-1, x+w - 21 - len(net.nic[:10]))}{THEME.net_box(Symbol.title_left)}{Fx.b if net.auto_min else ""}{THEME.hi_fg("a")}{THEME.title("uto")}'
 				f'{Fx.ub}{THEME.net_box(Symbol.title_right)}{Term.fg}')
 			if w - len(net.nic[:10]) - 20 > 13:
-				if not "y" in Key.mouse: Key.mouse["y"] = [[x+w - 26 - len(net.nic[:10]) + i, y-1] for i in range(4)]
+				Key.mouse["y"] = [[x+w - 26 - len(net.nic[:10]) + i, y-1] for i in range(4)]
 				out_misc += (f'{Mv.to(y-1, x+w - 27 - len(net.nic[:10]))}{THEME.net_box(Symbol.title_left)}{Fx.b if CONFIG.net_sync else ""}{THEME.title("s")}{THEME.hi_fg("y")}{THEME.title("nc")}'
 				f'{Fx.ub}{THEME.net_box(Symbol.title_right)}{Term.fg}')
 			if net.address and w - len(net.nic[:10]) - len(net.address) - 20 > 15:
