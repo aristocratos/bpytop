@@ -3555,6 +3555,7 @@ class NetCollector(Collector):
 		if not cls.nic or cls.nic not in up_stat:
 			cls._get_nics()
 			if not cls.nic: return
+			NetBox.redraw = True
 		try:
 			io_all = psutil.net_io_counters(pernic=True)[cls.nic]
 		except KeyError:
