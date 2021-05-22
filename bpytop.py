@@ -5533,7 +5533,7 @@ def main():
 	#? Switch to alternate screen, clear screen, hide cursor, enable mouse reporting and disable input echo
 	Draw.now(Term.alt_screen, Term.clear, Term.hide_cursor, Term.mouse_on, Term.title("BpyTOP"))
 	Term.echo(False)
-	#Term.refresh(force=True)
+	Term.refresh(force=True)
 
 	#? Start a thread checking for updates while running init
 	if CONFIG.update_check: UpdateChecker.run()
@@ -5630,7 +5630,7 @@ def main():
 	#? Main loop ------------------------------------------------------------------------------------->
 
 	def run():
-		while not False:
+		while True:
 			Term.refresh()
 			Timer.stamp()
 
