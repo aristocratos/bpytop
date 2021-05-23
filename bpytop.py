@@ -243,9 +243,7 @@ log_level=$log_level
 
 CONFIG_DIR: str = f'{os.path.expanduser("~")}/.config/bpytop'
 if not os.path.isdir(CONFIG_DIR):
-	try:
-		os.makedirs(CONFIG_DIR)
-		os.mkdir(f'{CONFIG_DIR}/themes')
+	try: os.makedirs(f'{CONFIG_DIR}/themes')
 	except PermissionError:
 		print(f'ERROR!\nNo permission to write to "{CONFIG_DIR}" directory!')
 		raise SystemExit(1)
