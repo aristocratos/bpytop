@@ -355,7 +355,7 @@ Available in void repo and void-packages ports tree
 >Installation
 
 ``` bash
-doas xbps-install bpytop
+sudo xbps-install bpytop
 ```
 ## Configurability
 
