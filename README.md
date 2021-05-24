@@ -348,6 +348,15 @@ sudo make install
 sudo make uninstall
 ```
 
+### Void Linux 
+
+Available in void repo and void-packages ports tree 
+
+>Installation
+
+``` bash
+doas xbps-install bpytop
+```
 ## Configurability
 
 All options changeable from within UI.
