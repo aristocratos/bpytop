@@ -1662,6 +1662,7 @@ class Box:
 	_b_mem_h: int
 	redraw_all: bool
 	buffers: List[str] = []
+	c_counter: int = 0
 	clock_on: bool = False
 	clock: str = ""
 	clock_len: int = 0
@@ -1701,6 +1702,10 @@ class Box:
 	@classmethod
 	def draw_clock(cls, force: bool = False):
 		if not "cpu" in cls.boxes or not cls.clock_on: return
+		cls.c_counter += 1
+		if cls.c_counter > 3600 / (Config.update_ms / 1000):
+			time.tzset()
+			cls.c_counter = 0
 		out: str = ""
 		if force: pass
 		elif Term.resized or strftime(CONFIG.draw_clock) == cls.clock: return
@@ -4975,7 +4980,11 @@ class Timer:
 
 	@classmethod
 	def left(cls) -> float:
-		return cls.timestamp + (CONFIG.update_ms / 1000) - time()
+		t_left: float = cls.timestamp + (CONFIG.update_ms / 1000) - time()
+		if t_left > CONFIG.update_ms / 1000:
+			cls.stamp()
+			return CONFIG.update_ms / 1000
+		return t_left
 
 	@classmethod
 	def finish(cls):
