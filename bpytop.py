@@ -19,7 +19,7 @@
 
 import os, sys, io, threading, signal, re, subprocess, logging, logging.handlers, argparse
 import urllib.request
-from time import time, sleep, strftime
+from time import time, sleep, strftime, tzset
 from datetime import timedelta
 from _thread import interrupt_main
 from collections import defaultdict
@@ -1704,7 +1704,7 @@ class Box:
 		if not "cpu" in cls.boxes or not cls.clock_on: return
 		cls.c_counter += 1
 		if cls.c_counter > 3600 / (Config.update_ms / 1000):
-			time.tzset()
+			tzset()
 			cls.c_counter = 0
 		out: str = ""
 		if force: pass
