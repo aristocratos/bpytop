@@ -1,6 +1,13 @@
 # Changelog
 
+## v1.0.66
+
+* Fixed: Program not stalling when system time is changed and regular update of current timezone
+* Fixed: NetBox not redrawing when network interface is removed, by @UmarJ
+* Fixed: Some typos
+
 ## v1.0.65
+
 * Fixed: Removed degrees symbol from Kelvin scale, by @jrbergen
 * Fixed: Mouse buttons not working in netbox when changing interface
 * Fixed: q key not working when terminal size warning is showed
