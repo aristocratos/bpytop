@@ -1141,9 +1141,10 @@ class Color:
 				else:
 					raise ValueError(f'RGB dec should be "0-255 0-255 0-255"')
 
-			ct = self.dec[0] + self.dec[1] + self.dec[2]
-			if ct > 255*3 or ct < 0:
-				raise ValueError(f'RGB values out of range: {color}')
+			for i in [0, 1, 2]:
+				if not (0 <= self.dec[i] <= 255):
+					raise ValueError(f'One or more RGB values are out of range: {color}')
+
 		except Exception as e:
 			errlog.exception(str(e))
 			self.escape = ""
