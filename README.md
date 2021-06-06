@@ -267,6 +267,16 @@ Please use MX Package Installer MX Test Repo tab to install.
 
 http://mxrepo.com/mx/testrepo/pool/test/b/bpytop/
 
+### Void Linux
+
+Available in void repo and void-packages ports tree
+
+>Installation
+
+``` bash
+sudo xbps-install bpytop
+```
+
 ### Snap package
 
 (Note! There is some issues caused by the snap sandboxing)
