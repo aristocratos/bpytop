@@ -3738,7 +3738,7 @@ class ProcCollector(Collector):
 
 				out[p.info["pid"]] = {
 					"name" : p.info["name"],
-					"cmd" : cmd.replace("\n", "").replace("\t", "").replace("\\", ""),
+					"cmd" : cmd,
 					"threads" : p.info["num_threads"],
 					"username" : p.info["username"],
 					"mem" : mem,
@@ -3922,7 +3922,7 @@ class ProcCollector(Collector):
 					out[pid] = {
 						"indent" : inindent,
 						"name": name,
-						"cmd" : cmd.replace("\n", "").replace("\t", "").replace("\\", ""),
+						"cmd" : cmd,
 						"threads" : threads,
 						"username" : username,
 						"mem" : mem,
