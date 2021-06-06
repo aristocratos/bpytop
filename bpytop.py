@@ -254,6 +254,8 @@ THEME_DIR: str = ""
 
 if os.path.isdir(f'{os.path.dirname(__file__)}/bpytop-themes'):
 	THEME_DIR = f'{os.path.dirname(__file__)}/bpytop-themes'
+elif os.path.isdir(f'{os.path.dirname(__file__)}/themes'):
+	THEME_DIR = f'{os.path.dirname(__file__)}/themes'
 else:
 	for td in ["/usr/local/", "/usr/", "/snap/bpytop/current/usr/"]:
 		if os.path.isdir(f'{td}share/bpytop/themes'):
