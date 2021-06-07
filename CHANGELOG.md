@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.67
+
+* Fixed: Removed not needed escape character replacements
+* Fixed: Themes missing when installing with pip3
+* Fixed: Color in-range check, by @GerbenWelter
+
 ## v1.0.66
 
 * Fixed: Program not stalling when system time is changed and regular update of current timezone
