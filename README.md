@@ -292,6 +292,13 @@ sudo snap install bpytop
 
 The config folder will be located in `~/snap/bpytop/current/.config/bpytop`
 
+
+### WSL
+
+Please follow the instructions for your distro above, then install the custom Consolas-Brallie font as described in [#318](https://github.com/aristocratos/bpytop/issues/318#issuecomment-856892684). Then, launch your WSL terminal and change the font to Consolas-Brallie.
+
+Otherwise, none of the graphs work correctly.
+
 ## Manual installation
 
 #### Dependencies installation Linux
