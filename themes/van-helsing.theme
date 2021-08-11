@@ -77,14 +77,14 @@ theme[used_mid]="#8be9fd"
 theme[used_end]="#f8f8f2"
 
 # Download graph colors
-theme[download_start]="#f8f8f2"
+theme[download_start]="#50fa7b"
 theme[download_mid]="#8be9fd"
-theme[download_end]="#50fa7b"
+theme[download_end]="#f8f8f2"
 
 # Upload graph colors
-theme[upload_start]="#f8f8f2"
+theme[upload_start]="#50fa7b"
 theme[upload_mid]="#8be9fd"
-theme[upload_end]="#50fa7b"
+theme[upload_end]="#f8f8f2"
 
 # Process box color gradient for threads, mem and cpu usage
 theme[process_start]="#50fa7b"
