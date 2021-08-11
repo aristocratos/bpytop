@@ -1,4 +1,5 @@
 # Color palette - https://draculatheme.com/contribute
+# Created by - https://github.com/Gabb-c
 
 # Main background, empty for terminal default, need to be empty if you want transparent background
 theme[main_bg]="#282a36"
