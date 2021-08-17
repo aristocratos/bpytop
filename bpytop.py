@@ -500,7 +500,7 @@ class Config:
 			self.info.append(f'Config file malformatted or missing, will be recreated on exit!')
 		elif conf["version"] != VERSION:
 			self.recreate = True
-			self.info.append(f'Config file version and bpytop version missmatch, will be recreated on exit!')
+			self.info.append(f'Config file version and bpytop version mismatch, will be recreated on exit!')
 		for key in self.keys:
 			if key in conf.keys() and conf[key] != "_error_":
 				setattr(self, key, conf[key])
@@ -807,7 +807,7 @@ class Mv:
 		return f'\033[{x}B'
 
 	save: str = "\033[s" 				#* Save cursor position
-	restore: str = "\033[u" 			#* Restore saved cursor postion
+	restore: str = "\033[u" 			#* Restore saved cursor position
 	t = to
 	r = right
 	l = left
@@ -970,7 +970,7 @@ class Key:
 										clean_key = "mouse_click"
 					elif input_key == "\\": clean_key = "\\"			#* Clean up "\" to not return escaped
 					else:
-						for code in cls.escape.keys():					#* Go trough dict of escape codes to get the cleaned key name
+						for code in cls.escape.keys():					#* Go through dict of escape codes to get the cleaned key name
 							if input_key.lstrip("\033").startswith(code):
 								clean_key = cls.escape[code]
 								break
@@ -3681,7 +3681,7 @@ class ProcCollector(Collector):
 
 	@classmethod
 	def _collect(cls):
-		'''List all processess with pid, name, arguments, threads, username, memory percent and cpu percent'''
+		'''List all processes with pid, name, arguments, threads, username, memory percent and cpu percent'''
 		if not "proc" in Box.boxes: return
 		out: Dict = {}
 		cls.det_cpu = 0.0
@@ -3836,7 +3836,7 @@ class ProcCollector(Collector):
 
 	@classmethod
 	def _tree(cls, sort_cmd, reverse: bool, proc_per_cpu: bool, search: List[str]):
-		'''List all processess in a tree view with pid, name, threads, username, memory percent and cpu percent'''
+		'''List all processes in a tree view with pid, name, threads, username, memory percent and cpu percent'''
 		out: Dict = {}
 		err: float = 0.0
 		det_cpu: float = 0.0
@@ -4408,7 +4408,7 @@ class Menu:
 					'Kelvin, 0 = absolute zero, 1 degree change',
 					'equals 1 degree change in Celsius.',
 					'',
-					'Rankine, 0 = abosulte zero, 1 degree change',
+					'Rankine, 0 = absolute zero, 1 degree change',
 					'equals 1 degree change in Fahrenheit.'],
 				"show_cpu_freq" : [
 					'Show CPU frequency',
@@ -4463,7 +4463,7 @@ class Menu:
 					'100 percent in the io graphs.',
 					'(10 MiB/s by default).',
 					'',
-					'Format: "device:speed" seperate disks with a',
+					'Format: "device:speed" separate disks with a',
 					'comma ",".',
 					'',
 					'Example: "/dev/sda:100, /dev/sdb:20".'],
