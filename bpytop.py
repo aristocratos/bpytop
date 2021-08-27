@@ -19,6 +19,7 @@
 
 import os, sys, io, threading, signal, re, subprocess, logging, logging.handlers, argparse
 import urllib.request
+import py3nvml.py3nvml as nvml
 from time import time, sleep, strftime, tzset
 from datetime import timedelta
 from _thread import interrupt_main
@@ -2458,7 +2459,7 @@ class ProcBox(Box):
 		else:
 			width_p = cls.width_p
 
-		if not "cpu" in cls.boxes:
+		if not "cpu" in cls.boxes or "gpu" in cls.boxes:
 			height_p = 100
 		else:
 			height_p = cls.height_p
@@ -2878,6 +2879,7 @@ class ProcBox(Box):
 		Draw.buffer(cls.buffer, f'{out_misc}{out}{Term.fg}', only_save=Menu.active)
 		cls.redraw = cls.resized = cls.moved = False
 
+
 class GpuBox(Box):
 	name = "gpu"
 	height_p = 30
@@ -2894,15 +2896,20 @@ class GpuBox(Box):
 
 	@classmethod
 	def _calc_size(cls):
-		width_p: int
-		if cls.stat_mode:
-			width_p = 100
-		else:
-			width_p = cls.width_p
+		# if not "gpu" in cls.boxes:
+		# 	width_p = 0
+		# 	Box._b_cpu_h = 0
+		# 	cls.width = Term.width
+		# 	return
 
+		# width_p: int
+		# if cls.stat_mode:
+		# width_p = 30
+		# else:
+		width_p = cls.width_p
 		cls.width = round(Term.width * width_p / 100)
-		cls.height = Term.height - Box._b_proc_h - Box._b_cpu_h
-		cls.y = Box._b_cpu_h + 1
+		cls.height = Term.height - Box._b_cpu_h - Box._b_cpu_h - 4
+		cls.y = Box._b_cpu_h + 24
 		cls.x = Term.width - cls.width + 1
 		cls.box_width = 27 if cls.width > 45 else 19
 		cls.box_height = 9 if cls.height > 10 else cls.height - 2
@@ -2912,33 +2919,34 @@ class GpuBox(Box):
 
 	@classmethod
 	def _draw_bg(cls) -> str:
-		if cls.proc_mode: return ""
 		return f'{create_box(box=cls, line_color=THEME.gpu_box)}'
 
 	@classmethod
 	def _draw_fg(cls):
-		if cls.proc_mode: return
 		gpu = GpuCollector
-		if gpu.redraw: cls.redraw = True
-		if not gpu.gpu: return
-		card, name = gpu.gpu[0], gpu.gpu[1][:20]
-		stat = gpu.stats[card]
-		stat_nums = gpu.stat_nums[card]
+
+		if gpu.redraw:
+			cls.redraw = True
+		if not gpu.gpu:
+			return
+
+		card, name = gpu.gpu[0], gpu.name
+		stat = gpu.stats[gpu.uuid]
+		stat_nums = gpu.stat_nums[gpu.uuid]
 		out: str = ""
 		out_misc: str = ""
 		x, y, w, h = cls.x + 1, cls.y + 1, cls.width - 2, cls.height - 2
 		reset: bool = bool(True)
 
-
 		if cls.resized or cls.redraw:
-			Meters.gpu = {k:{} for k in cls.gpu_keys}
+			Meters.gpu = {k: {} for k in cls.gpu_keys}
 			out_misc += cls._draw_bg()
-			out_misc += (f'{Mv.to(y-1, x+w - 23)}{THEME.gpu_box}{Symbol.h_line * (18 - len(name))}'
+			out_misc += (f'{Mv.to(y-1, x+w - 30)}{THEME.gpu_box}{Symbol.h_line * (18 - len(name))}'
 				f'{Symbol.title_left}{Fx.b}{THEME.title(name)}{Fx.ub}{THEME.gpu_box(Symbol.title_right)}{Term.fg}')
 
-			Meters.gpu["load"][card+"gpu"] = Meter(int(stat["load"]["gpu"]), (w // 2) - 4, "cpu")
-			Meters.gpu["load"][card+"mem"] = Meter(int(stat["load"]["mem"]), (w // 2) - 4, "cpu")
-			Meters.gpu["vitals"][card+"vram"] = Meter(int(stat["vitals"]["vram"]), (w // 2) - 4, "cpu")
+			Meters.gpu["load"]["gpu"] = Meter(int(stat["load"]["gpu"]), (w // 2) - 4, "cpu")
+			Meters.gpu["load"]["mem"] = Meter(int(stat["load"]["mem"]), (w // 2) - 4, "cpu")
+			# Meters.gpu["vitals"]["vram"] = Meter(int(stat["vitals"]["vram"]), (w // 2) - 4, "cpu")
 
 			Draw.buffer("gpu_misc", out_misc, only_save=True)
 
@@ -2947,42 +2955,43 @@ class GpuBox(Box):
 
 		fixedEnding = lambda s, n : f'{s}{(n-(int(log10(s))+1)) * " "}{Mv.r(n-(int(log10(s))+1))}'
 		clock = lambda s: fixedEnding(s, 4) + 'Mhz'
-		voltage = lambda s: fixedEnding(s, 4) + 'mV'
+		# voltage = lambda s: fixedEnding(s, 4) + 'mV'
 		watts = lambda s: f'{s}{(6-(len(str(s))+1)) * " "}{Mv.r(6-(len(str(s))+1))}W'
 
 		# load percent
-		out += f'{Mv.to(y, Term.width - round(w / 2) - 1)}{THEME.graph_text("GPU ")}{Meters.gpu["load"][card+"gpu"](None if cls.resized else stat["load"]["gpu"])}'
-		out += f'{Mv.to(y+1, Term.width - round(w / 2) - 1)}{THEME.graph_text("Mem ")}{Meters.gpu["load"][card+"mem"](None if cls.resized else stat["load"]["mem"])}'
+		out += f'{Mv.to(y, Term.width - round(w / 2) - 1)}{THEME.graph_text("GPU ")}{Meters.gpu["load"]["gpu"](None if cls.resized else stat["load"]["gpu"])}'
+		out += f'{Mv.to(y+1, Term.width - round(w / 2) - 1)}{THEME.graph_text("Mem ")}{Meters.gpu["load"]["mem"](None if cls.resized else stat["load"]["mem"])}'
 
 		# vram
-		out += f'{Mv.to(y+2, Term.width - round(w / 2) - 2)}{THEME.graph_text("VRAM ")}{Meters.gpu["vitals"][card+"vram"](None if cls.resized else stat["vitals"]["vram"])}'
+		if "AMD" == True:
+			out += f'{Mv.to(y+2, Term.width - round(w / 2) - 2)}{THEME.graph_text("VRAM ")}{Meters.gpu["vitals"]["vram"](None if cls.resized else stat["vitals"]["vram"])}'
 
 		# clocks
 		for f_i in range(len(stat_nums["freqs"])):
 			(f, name) = stat_nums["freqs"][f_i]
-			out += f'{Mv.to(y+f_i, x)}{THEME.graph_text(name+": ")}{clock(stat["freqs"][f"freq{f}"][0])}'
+			out += f'{Mv.to(y+f_i, x)}{THEME.graph_text(name+": ")}{clock(stat["freqs"][f"freq{f_i}"][0])}'
 
 		# voltage
-		out += f'{Mv.to(y+len(stat_nums["freqs"])-1, x)}'
-		for f_i in range(len(stat_nums["volts"])):
-			(n, name) = stat_nums["volts"][f_i]
-			out += f'{Mv.d(1)}{THEME.graph_text(name+": ")}{voltage(stat["volts"][f"volt{n}"][0])}'
+		if "AMD" == True:
+			out += f'{Mv.to(y+len(stat_nums["freqs"])-1, x)}'
+			for f_i in range(len(stat_nums["volts"])):
+				(n, name) = stat_nums["volts"][f_i]
+				out += f'{Mv.d(1)}{THEME.graph_text(name+": ")}{voltage(stat["volts"][f"volt{n}"][0])}'
 
 		# power
-		out += f'{Mv.to(y+len(stat_nums["freqs"])+len(stat_nums["volts"])-1, x)}'
+		out += f'{Mv.to(y+len(stat_nums["freqs"])+len(stat_nums["volts"])-2, x)}'
 		for f_i in range(len(stat_nums["power"])):
 			n = stat_nums["power"][f_i]
-			out += f'{Mv.d(1)}{THEME.graph_text("Draw: ")}{watts(stat["power"][f"power{n}"])}'
+			out += f'{Mv.d(1)}{THEME.graph_text("Draw: ")}{stat["power"][f"power{n}"]} W'
 
 		# temps
-		out += f'{Mv.to(y+3, Term.width - 5)}{stat["vitals"]["temp1"][0]}°C'
+		out += f'{Mv.to(y+2, Term.width - 5)}{stat["vitals"]["temp1"]}°C'
 
 		# fans
 		out += f'{Mv.l(4)}'#len of temps
 		for f_i in range(len(stat_nums["fans"])):
-			(n, rpm) = stat_nums["freqs"][f_i]
-			out += f'{Mv.l(8 * (f_i + 1))}{stat["fans"][f"fan{n}"][0]}RPM'
-
+			rpm = stat_nums["fans"][f_i]
+			out += f'{Mv.l(12 * (f_i + 1))}Fans: {rpm}% '
 
 		Draw.buffer(cls.buffer, f'{out_misc}{out}{Term.fg}', only_save=Menu.active)
 		cls.redraw = cls.resized = False
@@ -4084,25 +4093,33 @@ class ProcCollector(Collector):
 	def _draw(cls):
 		ProcBox._draw_fg()
 
+
 class GpuCollector(Collector):
 	'''Collects GPU stats'''
 	buffer: str = GpuBox.buffer
 
-	dir: str = "/sys/class/drm/"
-	hwmon: str = "/device/hwmon/hwmon0/"
-	pci_id_locations = ["/usr/share/hwdata/", "/usr/share/misc/"]
-
 	gpus: List[Tuple[str, str]] = []
 	gpu_i: int = 0
 	gpu: str = ""
+	name: str = ""
 	gpu_error: bool = False
 	reset: bool = False
-	
-	#* stats structure = stats[cardN]
-	#[fans, freqs, vitals, power, load]
-	#[fanN_rpm, fanN_max, freqN, tempN, vram_used, vram_total, vddgfx, avg_draw, gpu_load_p, mem_load_p]
+
+	if "AMD" == True:
+		dir: str = "/sys/class/drm/"
+		hwmon: str = "/device/hwmon/hwmon0/"
+		pci_id_locations = ["/usr/share/hwdata/", "/usr/share/misc/"]
+
+	else:
+		nvml.nvmlInit()
+		handle = nvml.nvmlDeviceGetHandleByIndex(0)
+		uuid = nvml.nvmlDeviceGetUUID(handle)
+
+	# * stats structure = stats[cardN]
+	# [fans, freqs, vitals, power, load]
+	# [fanN_rpm, fanN_max, freqN, tempN, vram_used, vram_total, vddgfx, avg_draw, gpu_load_p, mem_load_p]
 	stats: Dict[str, Dict[str, Dict[str, Any]]] = {}
-	#* stat_nums structure = stats[cardN][fans, freqs, temps, power, volts][n, ..., m]
+	# * stat_nums structure = stats[cardN][fans, freqs, temps, power, volts][n, ..., m]
 	stat_nums: Dict[str, Dict[str, List[Tuple[str, str]]]] = {}
 
 	populated: bool = False
@@ -4160,115 +4177,177 @@ class GpuCollector(Collector):
 	def _get_stat_nums(cls, card):
 		stat_keys = ["fans", "freqs", "temps", "power", "volts"]
 		sys_keys = ["fan", "freq", "temp", "power", "in"]
-		cls.stat_nums[card] = {
+		cls.stat_nums[cls.uuid] = {
 			"fans": [],
 			"freqs": [],
 			"temps": [],
 			"power": [],
 			"volts": [],
 		}
-		get_num = lambda s, f: re.match(f"{s}\d", f)
-		with os.scandir(cls._get_hwmon(card)) as files:
-			for file in files:
-				matches = [get_num(k, file.name) for k in sys_keys]
-				for i in range (0,5):
-					if matches[i]:
-						num = file.name[matches[i].end() - 1]
-						arr = cls.stat_nums[card][stat_keys[i]]
-						if len(arr) == 0 or num not in arr:
-							arr.append(num)
-						break
-		# label the properties which have labels
-		for key_i in range(len(cls.stat_nums[card])):
-			key = cls.stat_nums[card][stat_keys[key_i]]
-			for j in range(len(key)):
-				num = key[j]
-				try:
-					label = cls._read(cls._get_hwmon(card) + sys_keys[key_i] + num + "_label")
-					key[j] = (key[j], label)
-				except: pass
-		# prepopulate fans' max RPM
-		for f in range(len(cls.stat_nums[card]["fans"])):
-			fan = cls.stat_nums[card]["fans"][f]
-			f_max = cls._read(cls._get_hwmon(card) + f"fan{fan}_max")
-			cls.stat_nums[card]["fans"][f] = (fan, f_max)
+
+		if "AMD" == True:
+			get_num = lambda s, f: re.match(f"{s}\d", f)
+			with os.scandir(cls._get_hwmon(card)) as files:
+				for file in files:
+					matches = [get_num(k, file.name) for k in sys_keys]
+					for i in range (0,5):
+						if matches[i]:
+							num = file.name[matches[i].end() - 1]
+							arr = cls.stat_nums[card][stat_keys[i]]
+							if len(arr) == 0 or num not in arr:
+								arr.append(num)
+							break
+			# label the properties which have labels
+			for key_i in range(len(cls.stat_nums[card])):
+				key = cls.stat_nums[card][stat_keys[key_i]]
+				for j in range(len(key)):
+					num = key[j]
+					try:
+						label = cls._read(cls._get_hwmon(card) + sys_keys[key_i] + num + "_label")
+						key[j] = (key[j], label)
+					except: pass
+			# prepopulate fans' max RPM
+			for f in range(len(cls.stat_nums[card]["fans"])):
+				fan = cls.stat_nums[card]["fans"][f]
+				f_max = cls._read(cls._get_hwmon(card) + f"fan{fan}_max")
+				cls.stat_nums[card]["fans"][f] = (fan, f_max)
+		else:
+			cls.stat_nums[cls.uuid]["fans"] = [nvml.nvmlDeviceGetFanSpeed(card)]
+			cls.stat_nums[cls.uuid]["freqs"] = [(str(nvml.nvmlDeviceGetClockInfo(card, nvml.NVML_CLOCK_GRAPHICS)), "GPU"),
+												(str(nvml.nvmlDeviceGetClockInfo(card, nvml.NVML_CLOCK_MEM)), "MEM")]
+			cls.stat_nums[cls.uuid]["temps"] = [nvml.nvmlDeviceGetTemperature(card, nvml.NVML_TEMPERATURE_GPU)]
+			cls.stat_nums[cls.uuid]["volts"] = [nvml.nvmlDeviceGetPowerUsage(card)]
+			cls.stat_nums[cls.uuid]["power"] = [nvml.nvmlDeviceGetPowerUsage(card)]
+
 
 	@classmethod
 	def _get_gpus(cls):
 		'''Get a list of all GPUs with names'''
-		cls.gpu_i = 0
-		cls.gpu = ""
-		id, keys = ["", "", "", ""], ["vendor", "device", "subsystem_vendor", "subsystem_device"]
-		with os.scandir(cls.dir) as cards:
-			for card in cards:
-				if re.match('card\d$', card.name):
-					for i in range(len(keys)):
-						id[i] = cls._read(cls._get_device(card.name) + keys[i]).replace("0x", "")
-					id[2] = f"{id[2]} {id[3]}"
-					cls.gpus.append((card.name, tuple(id[:3])))
+		if "AMD" == True:
+			cls.gpu_i = 0
+			cls.gpu = ""
+			id, keys = ["", "", "", ""], ["vendor", "device", "subsystem_vendor", "subsystem_device"]
+			with os.scandir(cls.dir) as cards:
+				for card in cards:
+					if re.match('card\d$', card.name):
+						for i in range(len(keys)):
+							id[i] = cls._read(cls._get_device(card.name) + keys[i]).replace("0x", "")
+						id[2] = f"{id[2]} {id[3]}"
+						cls.gpus.append((card.name, tuple(id[:3])))
 
-		cls.gpus = cls._get_gpu_names(cls.gpus);
-		for gpu in cls.gpus:
-			cls._get_stat_nums(gpu[0])
-		if not cls.gpus: cls.gpus = [""]
-		cls.gpu = cls.gpus[cls.gpu_i]
-		cls.populated = True
+			cls.gpus = cls._get_gpu_names(cls.gpus)
+			for gpu in cls.gpus:
+				cls._get_stat_nums(gpu[0])
+			if not cls.gpus: cls.gpus = [""]
+			cls.gpu = cls.gpus[cls.gpu_i]
+			cls.populated = True
+		else:
+			if nvml.nvmlDeviceGetCount() == 1:
+				cls.gpu = [cls.handle]
+				cls.name = nvml.nvmlDeviceGetName(cls.handle)
+				cls._get_stat_nums(cls.gpu[0])
+			else:
+				print("multi gpu not yet supported")
 
 	@classmethod
 	def _get_vitals(cls, card):
-		temp = lambda n: str(round(int(cls._read(cls._get_hwmon(card) + f"temp{n}_input")) / 1000)) #°C
-		stat = {
-			"vram_used": int(cls._read(cls._get_device(card) + "mem_info_vram_used")), #kB
-			"vram_total": int(cls._read(cls._get_device(card) + "mem_info_vram_total")), #kB
-		}
-		stat["vram"] = (stat["vram_used"] / stat["vram_total"]) * 100 #percent
-		for (i, name) in cls.stat_nums[card]["temps"]:
-			stat[f"temp{i}"] = (temp(i), name)
+		stat = {}
+		if "AMD" == True:
+			temp = lambda n: str(round(int(cls._read(cls._get_hwmon(card) + f"temp{n}_input")) / 1000)) #°C
+			stat = {
+				"vram_used": int(cls._read(cls._get_device(card) + "mem_info_vram_used")), #kB
+				"vram_total": int(cls._read(cls._get_device(card) + "mem_info_vram_total")), #kB
+			}
+			stat["vram"] = (stat["vram_used"] / stat["vram_total"]) * 100 #percent
+			for (i, name) in cls.stat_nums[card]["temps"]:
+				stat[f"temp{i}"] = (temp(i), name)
+		else:
+			temp = nvml.nvmlDeviceGetTemperature(card, nvml.NVML_TEMPERATURE_GPU)
+			stat[f"temp1"] = temp
+
 		return stat
 
 	@classmethod
 	def _get_power(cls, card):
-		power = lambda n: str(round(int(cls._read(cls._get_hwmon(card) + f"power{n}_average")) / 1000000, 2)) # Watts
-		volt = lambda n: cls._read(cls._get_hwmon(card) + f"in{n}_input") # mV
-
 		stat = {}
-		for i in cls.stat_nums[card]["power"]:
-			stat[f"power{i}"] = power(i)
+		if "amd" == True:
+			power = lambda n: str(round(int(cls._read(cls._get_hwmon(card) + f"power{n}_average")) / 1000000, 2)) # Watts
+			volt = lambda n: cls._read(cls._get_hwmon(card) + f"in{n}_input") # mV
+
+		else:
+			power = str(round(int(nvml.nvmlDeviceGetPowerUsage(cls.handle) / 1000)))
+
+		for i in cls.stat_nums[cls.uuid]["power"]:
+			stat[f"power{i}"] = power
+
 		return stat
 
 	@classmethod
 	def _get_volts(cls, card):
-		volt = lambda n: int(cls._read(cls._get_hwmon(card) + f"in{n}_input")) # mV
+		if "amd" == True:
+			volt = lambda n: int(cls._read(cls._get_hwmon(card) + f"in{n}_input")) # mV
+		else:
+			# nvidia only allow voltage data to be returned for their S-class products, see nvmlReturn_t nvmlUnitGetPsuInfo()
+			return ""
 
 		stat = {}
 		for (i, name) in cls.stat_nums[card]["volts"]:
 			stat[f"volt{i}"] = (volt(i), name)
+
 		return stat
 
 	@classmethod
 	def _get_freqs(cls, card):
-		freq = lambda n: str(round(int(cls._read(cls._get_hwmon(card) + f"freq{n}_input")) / 1000000)) # MHz
-
-		freq = lambda n: round(int(cls._read(cls._get_hwmon(card) + f"freq{n}_input")) / 1000000) # MHz
-
 		stat = {}
-		for (i, name) in cls.stat_nums[card]["freqs"]:
-			stat[f"freq{i}"] = (freq(i), name)
+
+		if "AMD" == True:
+			freq = lambda n: str(round(int(cls._read(cls._get_hwmon(card) + f"freq{n}_input")) / 1000000)) # MHz
+
+			for (i, name) in cls.stat_nums[card]["freqs"]:
+				stat[f"freq{i}"] = (freq(i), name)
+		else:
+			stat["freq0"] = (nvml.nvmlDeviceGetClockInfo(card, nvml.NVML_CLOCK_GRAPHICS), "GPU")
+			stat["freq1"] = (nvml.nvmlDeviceGetClockInfo(card, nvml.NVML_CLOCK_MEM), "MEM")
+
 		return stat
 
 	@classmethod
 	def _get_fans(cls, card):
-		fan = lambda n: int(cls._read(cls._get_hwmon(card) + f"fan{n}_input")) # RPM
-		
 		stat = {}
-		for (i, f_max) in cls.stat_nums[card]["fans"]:
-			stat[f"fan{i}"] = (fan(i), f_max)
+
+		if "amd" == True:
+			fan = lambda n: int(cls._read(cls._get_hwmon(card) + f"fan{n}_input")) # RPM
+
+			for (i, f_max) in cls.stat_nums[card]["fans"]:
+				stat[f"fan{i}"] = (fan(i), f_max)
+		else:
+			fan = nvml.nvmlDeviceGetFanSpeed(card)
+			stat[f"fans"] = fan
+
+		return stat
+
+	@classmethod
+	def _get_load(cls, card):
+		stat = {}
+		if "AMD" == True:
+			stat = {
+				"mem": int(cls._read(cls._get_device(card) + "mem_busy_percent")),
+				"gpu": int(cls._read(cls._get_device(card) + "gpu_busy_percent")),
+			}
+		else:
+			gpu_stats = nvml.nvmlDeviceGetUtilizationRates(card)
+			stat["mem"] = int(gpu_stats.gpu)
+			stat["gpu"] = int(gpu_stats.memory)
+
 		return stat
 
 	@classmethod
 	def _collect(cls):
-		if not cls.populated: cls._get_gpus()
-		if not cls.gpu: return
+		if not cls.populated:
+			cls._get_gpus()
+		if not cls.gpu:
+			return
+
 		stat: Dict[str, Dict[str, Any]] = {}
 		card = cls.gpu[0]
 
@@ -4277,18 +4356,15 @@ class GpuCollector(Collector):
 		stat["power"] = cls._get_power(card)
 		stat["volts"] = cls._get_volts(card)
 		stat["vitals"] = cls._get_vitals(card)
-		stat["load"] = {
-			"mem": int(cls._read(cls._get_device(card) + "mem_busy_percent")),
-			"gpu": int(cls._read(cls._get_device(card) + "gpu_busy_percent")),
-		}
+		stat["load"] = cls._get_load(card)
 
-		cls.stats[card] = stat
+		cls.stats[cls.uuid] = stat
 		cls.timestamp = time()
-
 
 	@classmethod
 	def _draw(cls):
 		GpuBox._draw_fg()
+
 
 class Menu:
 	'''Holds all menus'''
@@ -5676,7 +5752,7 @@ def temperature(value: int, scale: str = "celsius") -> Tuple[int, str]:
 def process_keys():
 	mouse_pos: Tuple[int, int] = (0, 0)
 	filtered: bool = False
-	box_keys = {"1" : "cpu", "2" : "mem", "3" : "net", "4" : "proc"}
+	box_keys = {"1": "cpu", "2": "mem", "3": "net", "4": "proc", "5": "gpu"}
 	while Key.has_key():
 		key = Key.get()
 		found: bool = True
