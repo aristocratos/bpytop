@@ -60,7 +60,7 @@ VERSION: str = "1.0.67"
 
 #? Argument parser ------------------------------------------------------------------------------->
 args = argparse.ArgumentParser()
-args.add_argument("-b", "--boxes",		action="store",	dest="boxes", 	help = "which boxes to show at start, example: -b \"cpu mem net proc\"")
+args.add_argument("-b", "--boxes",		action="store",	dest="boxes", 	help = "which boxes to show at start, example: -b \"cpu mem net proc gpu\"")
 args.add_argument("-lc", "--low-color", action="store_true", 			help = "disable truecolor, converts 24-bit colors to 256-color")
 args.add_argument("-v", "--version",	action="store_true", 			help = "show version info and exit")
 args.add_argument("--debug",			action="store_true", 			help = "start with loglevel set to DEBUG overriding value set in config")
@@ -99,7 +99,7 @@ theme_background=$theme_background
 #* Sets if 24-bit truecolor should be used, will convert 24-bit colors to 256 color (6x6x6 color cube) if false.
 truecolor=$truecolor
 
-#* Manually set which boxes to show. Available values are "cpu mem net proc", separate values with whitespace.
+#* Manually set which boxes to show. Available values are "cpu mem net proc gpu", separate values with whitespace.
 shown_boxes="$shown_boxes"
 
 #* Update time in milliseconds, increases automatically if set below internal loops processing time, recommended 2000 ms or above for better sample times for graphs.
@@ -420,7 +420,7 @@ class Config:
 	color_theme: str = "Default"
 	theme_background: bool = True
 	truecolor: bool = True
-	shown_boxes: str = "cpu mem net proc"
+	shown_boxes: str = "cpu mem net proc gpu"
 	update_ms: int = 2000
 	proc_update_mult: int = 2
 	proc_sorting: str = "cpu lazy"
@@ -574,7 +574,7 @@ class Config:
 			self.warnings.append(f'Config key "cpu_sensor" does not contain an available sensor!')
 		if "shown_boxes" in new_config and not new_config["shown_boxes"] == "":
 			for box in new_config["shown_boxes"].split(): #type: ignore
-				if not box in ["cpu", "mem", "net", "proc"]:
+				if not box in ["cpu", "mem", "net", "proc", "gpu"]:
 					new_config["shown_boxes"] = "_error_"
 					self.warnings.append(f'Config key "shown_boxes" contains invalid box names!')
 					break
@@ -622,7 +622,7 @@ except Exception as e:
 if ARG_BOXES:
 	_new_boxes: List = []
 	for _box in ARG_BOXES.split():
-		if _box in ["cpu", "mem", "net", "proc"]:
+		if _box in ["cpu", "mem", "net", "proc", "gpu"]:
 			_new_boxes.append(_box)
 	CONFIG.shown_boxes = " ".join(_new_boxes)
 	del _box, _new_boxes
@@ -1250,17 +1250,17 @@ class Theme:
 	main_bg = main_fg = title = hi_fg = selected_bg = selected_fg = inactive_fg = proc_misc = cpu_box = mem_box = net_box = proc_box = div_line = temp_start = temp_mid = temp_end = cpu_start = cpu_mid = cpu_end = free_start = free_mid = free_end = cached_start = cached_mid = cached_end = available_start = available_mid = available_end = used_start = used_mid = used_end = download_start = download_mid = download_end = upload_start = upload_mid = upload_end = graph_text = meter_bg = process_start = process_mid = process_end = Colors.default
 
 	gradient: Dict[str, List[str]] = {
-		"temp" : [],
-		"cpu" : [],
-		"free" : [],
-		"cached" : [],
-		"available" : [],
-		"used" : [],
-		"download" : [],
-		"upload" : [],
-		"proc" : [],
-		"proc_color" : [],
-		"process" : [],
+		"temp": [],
+		"cpu": [],
+		"free": [],
+		"cached": [],
+		"available": [],
+		"used": [],
+		"download": [],
+		"upload": [],
+		"proc": [],
+		"proc_color": [],
+		"process": [],
 	}
 	def __init__(self, theme: str):
 		self.refresh()
@@ -1648,7 +1648,7 @@ class Box:
 	name: str
 	num: int = 0
 	boxes: List = []
-	view_modes: Dict[str, List] = {"full" : ["cpu", "mem", "net", "proc"], "stat" : ["cpu", "mem", "net"], "proc" : ["cpu", "proc"]}
+	view_modes: Dict[str, List] = {"full": ["cpu", "mem", "net", "proc", "gpu"], "stat": ["cpu", "mem", "net"], "proc": ["cpu", "proc"]}
 	view_mode: str
 	for view_mode in view_modes:
 		if sorted(CONFIG.shown_boxes.split(), key=str.lower) == view_modes[view_mode]:
@@ -1666,6 +1666,7 @@ class Box:
 	bg: str
 	_b_cpu_h: int
 	_b_mem_h: int
+	_b_proc_h: int
 	redraw_all: bool
 	buffers: List[str] = []
 	c_counter: int = 0
@@ -1743,6 +1744,7 @@ class Box:
 				f'{Mv.d(1)}{Mv.l(18)}{Fx.b}[2] {Fx.ub}Toggle MEM box'
 				f'{Mv.d(1)}{Mv.l(18)}{Fx.b}[3] {Fx.ub}Toggle NET box'
 				f'{Mv.d(1)}{Mv.l(18)}{Fx.b}[4] {Fx.ub}Toggle PROC box'
+				f'{Mv.d(1)}{Mv.l(18)}{Fx.b}[5] {Fx.ub}Toggle GPU box'
 				f'{Mv.d(1)}{Mv.l(19)}{Fx.b}[m] {Fx.ub}Cycle presets'
 				f'{Mv.d(1)}{Mv.l(17)}{Fx.b}[q] Quit {Fx.ub}{Term.bg}{Term.fg}')
 
@@ -2018,6 +2020,7 @@ class CpuBox(Box, SubBox):
 		Draw.buffer(cls.buffer, f'{out_misc}{out}{Term.fg}', only_save=Menu.active)
 		cls.resized = cls.redraw = cls.clock_block = False
 
+
 class MemBox(Box):
 	name = "mem"
 	num = 2
@@ -2051,8 +2054,8 @@ class MemBox(Box):
 			Box._b_mem_h = 0
 			cls.width = Term.width
 			return
-		width_p: int; height_p: int
-		if not "proc" in cls.boxes:
+		errlog.debug(f"boxes is {cls.boxes}")
+		if not "proc" in cls.boxes and not "gpu" in cls.boxes:
 			width_p = 100
 		else:
 			width_p = cls.width_p
@@ -2311,6 +2314,7 @@ class MemBox(Box):
 		Draw.buffer(cls.buffer, f'{out_misc}{out}{Term.fg}', only_save=Menu.active)
 		cls.resized = cls.redraw = False
 
+
 class NetBox(Box, SubBox):
 	name = "net"
 	num = 3
@@ -2333,7 +2337,8 @@ class NetBox(Box, SubBox):
 		if not "net" in cls.boxes:
 			cls.width = Term.width
 			return
-		if not "proc" in cls.boxes:
+
+		if not "proc" in cls.boxes and not "gpu" in cls.boxes:
 			width_p = 100
 		else:
 			width_p = cls.width_p
@@ -2417,6 +2422,7 @@ class NetBox(Box, SubBox):
 		Draw.buffer(cls.buffer, f'{out_misc}{out}{Term.fg}', only_save=Menu.active)
 		cls.redraw = cls.resized = False
 
+
 class ProcBox(Box):
 	name = "proc"
 	num = 4
@@ -2450,17 +2456,17 @@ class ProcBox(Box):
 
 	@classmethod
 	def _calc_size(cls):
-		if not "proc" in cls.boxes:
+		if "proc" not in cls.boxes:
+			Box._b_proc_h = 0
 			cls.width = Term.width
 			return
-		width_p: int; height_p: int
+
 		if not "net" in cls.boxes and not "mem" in cls.boxes:
 			width_p = 100
 		else:
 			width_p = cls.width_p
-
-		if not "cpu" in cls.boxes or "gpu" in cls.boxes:
-			height_p = 100
+		if not "cpu" in cls.boxes:
+			height_p = 60 if "gpu" in cls.boxes else 98
 		else:
 			height_p = cls.height_p
 
@@ -2471,7 +2477,7 @@ class ProcBox(Box):
 		cls.y = Box._b_cpu_h + 1
 		cls.current_y = cls.y
 		cls.current_h = cls.height
-		Box._b_proc_h = cls.current_h
+		Box._b_proc_h = cls.height
 		cls.select_max = cls.height - 3
 		cls.redraw = True
 		cls.resized = True
@@ -2896,20 +2902,14 @@ class GpuBox(Box):
 
 	@classmethod
 	def _calc_size(cls):
-		# if not "gpu" in cls.boxes:
-		# 	width_p = 0
-		# 	Box._b_cpu_h = 0
-		# 	cls.width = Term.width
-		# 	return
+		if not "net" in cls.boxes and not "mem" in cls.boxes:
+			width_p = 100
+		else:
+			width_p = cls.width_p
 
-		# width_p: int
-		# if cls.stat_mode:
-		# width_p = 30
-		# else:
-		width_p = cls.width_p
 		cls.width = round(Term.width * width_p / 100)
-		cls.height = Term.height - Box._b_cpu_h - Box._b_cpu_h - 4
-		cls.y = Box._b_cpu_h + 24
+		cls.height = Term.height - Box._b_cpu_h - Box._b_proc_h
+		cls.y = Term.height - cls.height + 1
 		cls.x = Term.width - cls.width + 1
 		cls.box_width = 27 if cls.width > 45 else 19
 		cls.box_height = 9 if cls.height > 10 else cls.height - 2
@@ -4242,6 +4242,7 @@ class GpuCollector(Collector):
 			cls.gpu = cls.gpus[cls.gpu_i]
 			cls.populated = True
 		else:
+			nvml.nvmlInit()
 			if nvml.nvmlDeviceGetCount() == 1:
 				cls.gpu = [cls.handle]
 				cls.name = nvml.nvmlDeviceGetName(cls.handle)
@@ -4336,8 +4337,8 @@ class GpuCollector(Collector):
 			}
 		else:
 			gpu_stats = nvml.nvmlDeviceGetUtilizationRates(card)
-			stat["mem"] = int(gpu_stats.gpu)
-			stat["gpu"] = int(gpu_stats.memory)
+			stat["gpu"] = int(gpu_stats.gpu)
+			stat["mem"] = int(gpu_stats.memory)
 
 		return stat
 
@@ -4485,6 +4486,7 @@ class Menu:
 
 
 		Draw.now(f'{Draw.saved_buffer()}')
+		nvml.nvmlShutdown()
 		cls.background = ""
 		cls.active = False
 		cls.close = False
@@ -4505,45 +4507,46 @@ class Menu:
 		if not cls.background:
 			cls.background = f'{THEME.inactive_fg}' + Fx.uncolor(f'{Draw.saved_buffer()}') + f'{Term.fg}'
 		help_items: Dict[str, str] = {
-			"(Mouse 1)" : "Clicks buttons and selects in process list.",
-			"Selected (Mouse 1)" : "Show detailed information for selected process.",
-			"(Mouse scroll)" : "Scrolls any scrollable list/text under cursor.",
-			"(Esc, shift+m)" : "Toggles main menu.",
-			"(m)" : "Cycle view presets, order: full->proc->stat->user.",
-			"(1)" : "Toggle CPU box.",
-			"(2)" : "Toggle MEM box.",
-			"(3)" : "Toggle NET box.",
-			"(4)" : "Toggle PROC box.",
-			"(d)" : "Toggle disks view in MEM box.",
-			"(F2, o)" : "Shows options.",
-			"(F1, shift+h)" : "Shows this window.",
-			"(ctrl+z)" : "Sleep program and put in background.",
-			"(ctrl+c, q)" : "Quits program.",
-			"(+) / (-)" : "Add/Subtract 100ms to/from update timer.",
-			"(Up, k) (Down, j)" : "Select in process list.",
-			"(Enter)" : "Show detailed information for selected process.",
-			"(Spacebar)" : "Expand/collapse the selected process in tree view.",
-			"(Pg Up) (Pg Down)" : "Jump 1 page in process list.",
-			"(Home) (End)" : "Jump to first or last page in process list.",
-			"(Left, h) (Right, l)" : "Select previous/next sorting column.",
-			"(b) (n)" : "Select previous/next network device.",
-			"(s)" : "Toggle showing swap as a disk.",
-			"(i)" : "Toggle disks io mode with big graphs.",
-			"(z)" : "Toggle totals reset for current network device",
-			"(a)" : "Toggle auto scaling for the network graphs.",
-			"(y)" : "Toggle synced scaling mode for network graphs.",
-			"(f)" : "Input a NON case-sensitive process filter.",
-			"(shift+f)" : "Input a case-sensitive process filter.",
-			"(c)" : "Toggle per-core cpu usage of processes.",
-			"(r)" : "Reverse sorting order in processes box.",
-			"(e)" : "Toggle processes tree view.",
-			"(delete)" : "Clear any entered filter.",
-			"Selected (shift+t)" : "Terminate selected process with SIGTERM - 15.",
-			"Selected (shift+k)" : "Kill selected process with SIGKILL - 9.",
-			"Selected (shift+i)" : "Interrupt selected process with SIGINT - 2.",
-			"_1" : " ",
-			"_2" : "For bug reporting and project updates, visit:",
-			"_3" : "https://github.com/aristocratos/bpytop",
+			"(Mouse 1)": "Clicks buttons and selects in process list.",
+			"Selected (Mouse 1)": "Show detailed information for selected process.",
+			"(Mouse scroll)": "Scrolls any scrollable list/text under cursor.",
+			"(Esc, shift+m)": "Toggles main menu.",
+			"(m)": "Cycle view presets, order: full->proc->stat->user.",
+			"(1)": "Toggle CPU box.",
+			"(2)": "Toggle MEM box.",
+			"(3)": "Toggle NET box.",
+			"(4)": "Toggle PROC box.",
+			"(5)": "Toggle GPU box.",
+			"(d)": "Toggle disks view in MEM box.",
+			"(F2, o)": "Shows options.",
+			"(F1, shift+h)": "Shows this window.",
+			"(ctrl+z)": "Sleep program and put in background.",
+			"(ctrl+c, q)": "Quits program.",
+			"(+) / (-)": "Add/Subtract 100ms to/from update timer.",
+			"(Up, k) (Down, j)": "Select in process list.",
+			"(Enter)": "Show detailed information for selected process.",
+			"(Spacebar)": "Expand/collapse the selected process in tree view.",
+			"(Pg Up) (Pg Down)": "Jump 1 page in process list.",
+			"(Home) (End)": "Jump to first or last page in process list.",
+			"(Left, h) (Right, l)": "Select previous/next sorting column.",
+			"(b) (n)": "Select previous/next network device.",
+			"(s)": "Toggle showing swap as a disk.",
+			"(i)": "Toggle disks io mode with big graphs.",
+			"(z)": "Toggle totals reset for current network device",
+			"(a)": "Toggle auto scaling for the network graphs.",
+			"(y)": "Toggle synced scaling mode for network graphs.",
+			"(f)": "Input a NON case-sensitive process filter.",
+			"(shift+f)": "Input a case-sensitive process filter.",
+			"(c)": "Toggle per-core cpu usage of processes.",
+			"(r)": "Reverse sorting order in processes box.",
+			"(e)": "Toggle processes tree view.",
+			"(delete)": "Clear any entered filter.",
+			"Selected (shift+t)": "Terminate selected process with SIGTERM - 15.",
+			"Selected (shift+k)": "Kill selected process with SIGKILL - 9.",
+			"Selected (shift+i)": "Interrupt selected process with SIGINT - 2.",
+			"_1": " ",
+			"_2": "For bug reporting and project updates, visit:",
+			"_3": "https://github.com/aristocratos/bpytop",
 		}
 
 		while not cls.close:
@@ -4686,7 +4689,7 @@ class Menu:
 				"shown_boxes" : [
 					'Manually set which boxes to show.',
 					'',
-					'Available values are "cpu mem net proc".',
+					'Available values are "cpu mem net proc gpu".',
 					'Seperate values with whitespace.',
 					'',
 					'Toggle between presets with mode key "m".'],
@@ -5173,7 +5176,7 @@ class Menu:
 							elif selected == "shown_boxes":
 								new_boxes: List = []
 								for box in input_val.split():
-									if box in ["cpu", "mem", "net", "proc"]:
+									if box in ["cpu", "mem", "net", "proc", "gpu"]:
 										new_boxes.append(box)
 								CONFIG.shown_boxes = " ".join(new_boxes)
 								Box.view_mode = "user"
@@ -5418,6 +5421,7 @@ class UpdateChecker:
 						"-i", "update-notifier", "-t", "10000"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 				except Exception as e:
 					errlog.exception(f'{e}')
+
 
 class Init:
 	running: bool = True
