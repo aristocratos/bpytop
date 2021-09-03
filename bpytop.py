@@ -356,7 +356,6 @@ UNITS: Dict[str, Tuple[str, ...]] = {
 	"byte" : ("Byte", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB", "BiB", "GEB")
 }
 
-SUBSCRIPT: Tuple[str, ...] = ("₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉")
 SUPERSCRIPT: Tuple[str, ...] = ("⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹")
 
 #? Setup error logger ---------------------------------------------------------------->
@@ -2054,15 +2053,15 @@ class MemBox(Box):
 			Box._b_mem_h = 0
 			cls.width = Term.width
 			return
-		errlog.debug(f"boxes is {cls.boxes}")
-		if not "proc" in cls.boxes and not "gpu" in cls.boxes:
+
+		if not "proc" in cls.boxes:
 			width_p = 100
 		else:
 			width_p = cls.width_p
 
 		if not "cpu" in cls.boxes:
 			height_p = 60 if "net" in cls.boxes else 98
-		elif not "net" in cls.boxes:
+		elif not "net" in cls.boxes and not "gpu" in cls.boxes:
 			height_p = 98 - CpuBox.height_p
 		else:
 			height_p = cls.height_p
@@ -2457,7 +2456,6 @@ class ProcBox(Box):
 	@classmethod
 	def _calc_size(cls):
 		if "proc" not in cls.boxes:
-			Box._b_proc_h = 0
 			cls.width = Term.width
 			return
 
@@ -2465,7 +2463,10 @@ class ProcBox(Box):
 			width_p = 100
 		else:
 			width_p = cls.width_p
-		if not "cpu" in cls.boxes:
+
+		if "gpu" not in cls.boxes:
+			height_p = 100 - Box._b_cpu_h
+		elif "cpu" not in cls.boxes:
 			height_p = 60 if "gpu" in cls.boxes else 98
 		else:
 			height_p = cls.height_p
@@ -2888,21 +2889,26 @@ class ProcBox(Box):
 
 class GpuBox(Box):
 	name = "gpu"
-	height_p = 30
-	width_p = 55
+	num = 5
+	width = 30
+	height = 30
 	x = 1
 	y = 1
+	height_p = 30
+	width_p = 55
 	resized: bool = True
 	redraw: bool = True
 	graph_height: Dict[str, int] = {}
 	buffer: str = "gpu"
 	gpu_keys = ["freqs", "fans", "load", "vitals", "power"]
-
 	Box.buffers.append(buffer)
 
 	@classmethod
 	def _calc_size(cls):
-		if not "net" in cls.boxes and not "mem" in cls.boxes:
+		if "gpu" not in cls.boxes:
+			return
+
+		if "net" not in cls.boxes:
 			width_p = 100
 		else:
 			width_p = cls.width_p
@@ -2919,6 +2925,7 @@ class GpuBox(Box):
 
 	@classmethod
 	def _draw_bg(cls) -> str:
+		if not "gpu" in cls.boxes: return ""
 		return f'{create_box(box=cls, line_color=THEME.gpu_box)}'
 
 	@classmethod
@@ -2963,8 +2970,9 @@ class GpuBox(Box):
 		out += f'{Mv.to(y+1, Term.width - round(w / 2) - 1)}{THEME.graph_text("Mem ")}{Meters.gpu["load"]["mem"](None if cls.resized else stat["load"]["mem"])}'
 
 		# vram
-		if "AMD" == True:
+		if gpu.gpu_brand == "AMD":
 			out += f'{Mv.to(y+2, Term.width - round(w / 2) - 2)}{THEME.graph_text("VRAM ")}{Meters.gpu["vitals"]["vram"](None if cls.resized else stat["vitals"]["vram"])}'
+		# TODO NVIDIA?
 
 		# clocks
 		for f_i in range(len(stat_nums["freqs"])):
@@ -2972,7 +2980,7 @@ class GpuBox(Box):
 			out += f'{Mv.to(y+f_i, x)}{THEME.graph_text(name+": ")}{clock(stat["freqs"][f"freq{f_i}"][0])}'
 
 		# voltage
-		if "AMD" == True:
+		if gpu.gpu_brand == "AMD":
 			out += f'{Mv.to(y+len(stat_nums["freqs"])-1, x)}'
 			for f_i in range(len(stat_nums["volts"])):
 				(n, name) = stat_nums["volts"][f_i]
@@ -4102,18 +4110,10 @@ class GpuCollector(Collector):
 	gpu_i: int = 0
 	gpu: str = ""
 	name: str = ""
+	gpu_brand: str = ""
 	gpu_error: bool = False
 	reset: bool = False
 
-	if "AMD" == True:
-		dir: str = "/sys/class/drm/"
-		hwmon: str = "/device/hwmon/hwmon0/"
-		pci_id_locations = ["/usr/share/hwdata/", "/usr/share/misc/"]
-
-	else:
-		nvml.nvmlInit()
-		handle = nvml.nvmlDeviceGetHandleByIndex(0)
-		uuid = nvml.nvmlDeviceGetUUID(handle)
 
 	# * stats structure = stats[cardN]
 	# [fans, freqs, vitals, power, load]
@@ -4185,7 +4185,7 @@ class GpuCollector(Collector):
 			"volts": [],
 		}
 
-		if "AMD" == True:
+		if cls.gpu_brand == "AMD":
 			get_num = lambda s, f: re.match(f"{s}\d", f)
 			with os.scandir(cls._get_hwmon(card)) as files:
 				for file in files:
@@ -4211,19 +4211,21 @@ class GpuCollector(Collector):
 				fan = cls.stat_nums[card]["fans"][f]
 				f_max = cls._read(cls._get_hwmon(card) + f"fan{fan}_max")
 				cls.stat_nums[card]["fans"][f] = (fan, f_max)
-		else:
+		elif cls.gpu_brand == "NVIDIA":
 			cls.stat_nums[cls.uuid]["fans"] = [nvml.nvmlDeviceGetFanSpeed(card)]
 			cls.stat_nums[cls.uuid]["freqs"] = [(str(nvml.nvmlDeviceGetClockInfo(card, nvml.NVML_CLOCK_GRAPHICS)), "GPU"),
 												(str(nvml.nvmlDeviceGetClockInfo(card, nvml.NVML_CLOCK_MEM)), "MEM")]
 			cls.stat_nums[cls.uuid]["temps"] = [nvml.nvmlDeviceGetTemperature(card, nvml.NVML_TEMPERATURE_GPU)]
 			cls.stat_nums[cls.uuid]["volts"] = [nvml.nvmlDeviceGetPowerUsage(card)]
 			cls.stat_nums[cls.uuid]["power"] = [nvml.nvmlDeviceGetPowerUsage(card)]
+		else:
+			errlog.debug("GPU not supported")
 
 
 	@classmethod
 	def _get_gpus(cls):
 		'''Get a list of all GPUs with names'''
-		if "AMD" == True:
+		if cls.gpu_brand == "AMD":
 			cls.gpu_i = 0
 			cls.gpu = ""
 			id, keys = ["", "", "", ""], ["vendor", "device", "subsystem_vendor", "subsystem_device"]
@@ -4241,7 +4243,7 @@ class GpuCollector(Collector):
 			if not cls.gpus: cls.gpus = [""]
 			cls.gpu = cls.gpus[cls.gpu_i]
 			cls.populated = True
-		else:
+		elif cls.gpu_brand == "NVIDIA":
 			nvml.nvmlInit()
 			if nvml.nvmlDeviceGetCount() == 1:
 				cls.gpu = [cls.handle]
@@ -4249,11 +4251,13 @@ class GpuCollector(Collector):
 				cls._get_stat_nums(cls.gpu[0])
 			else:
 				print("multi gpu not yet supported")
+		else:
+			errlog.debug("GPU not supported")
 
 	@classmethod
 	def _get_vitals(cls, card):
 		stat = {}
-		if "AMD" == True:
+		if cls.gpu_brand == "AMD":
 			temp = lambda n: str(round(int(cls._read(cls._get_hwmon(card) + f"temp{n}_input")) / 1000)) #°C
 			stat = {
 				"vram_used": int(cls._read(cls._get_device(card) + "mem_info_vram_used")), #kB
@@ -4262,21 +4266,25 @@ class GpuCollector(Collector):
 			stat["vram"] = (stat["vram_used"] / stat["vram_total"]) * 100 #percent
 			for (i, name) in cls.stat_nums[card]["temps"]:
 				stat[f"temp{i}"] = (temp(i), name)
-		else:
+		elif cls.gpu_brand == "NVIDIA":
 			temp = nvml.nvmlDeviceGetTemperature(card, nvml.NVML_TEMPERATURE_GPU)
 			stat[f"temp1"] = temp
+		else:
+			errlog.debug("GPU not supported")
 
 		return stat
 
 	@classmethod
 	def _get_power(cls, card):
 		stat = {}
-		if "amd" == True:
+		if cls.gpu_brand == "AMD":
 			power = lambda n: str(round(int(cls._read(cls._get_hwmon(card) + f"power{n}_average")) / 1000000, 2)) # Watts
 			volt = lambda n: cls._read(cls._get_hwmon(card) + f"in{n}_input") # mV
 
-		else:
+		elif cls.gpu_brand == "NVIDIA":
 			power = str(round(int(nvml.nvmlDeviceGetPowerUsage(cls.handle) / 1000)))
+		else:
+			errlog.debug("GPU not supported")
 
 		for i in cls.stat_nums[cls.uuid]["power"]:
 			stat[f"power{i}"] = power
@@ -4285,11 +4293,13 @@ class GpuCollector(Collector):
 
 	@classmethod
 	def _get_volts(cls, card):
-		if "amd" == True:
+		if cls.gpu_brand == "AMD":
 			volt = lambda n: int(cls._read(cls._get_hwmon(card) + f"in{n}_input")) # mV
-		else:
-			# nvidia only allow voltage data to be returned for their S-class products, see nvmlReturn_t nvmlUnitGetPsuInfo()
+		elif cls.gpu_brand == "NVIDIA":
+			# nvidia only allow voltage data to be fetched for their S-class products, see nvmlReturn_t nvmlUnitGetPsuInfo()
 			return ""
+		else:
+			errlog.debug("GPU not supported")
 
 		stat = {}
 		for (i, name) in cls.stat_nums[card]["volts"]:
@@ -4301,14 +4311,16 @@ class GpuCollector(Collector):
 	def _get_freqs(cls, card):
 		stat = {}
 
-		if "AMD" == True:
+		if cls.gpu_brand == "AMD":
 			freq = lambda n: str(round(int(cls._read(cls._get_hwmon(card) + f"freq{n}_input")) / 1000000)) # MHz
 
 			for (i, name) in cls.stat_nums[card]["freqs"]:
 				stat[f"freq{i}"] = (freq(i), name)
-		else:
+		elif cls.gpu_brand == "NVIDIA":
 			stat["freq0"] = (nvml.nvmlDeviceGetClockInfo(card, nvml.NVML_CLOCK_GRAPHICS), "GPU")
 			stat["freq1"] = (nvml.nvmlDeviceGetClockInfo(card, nvml.NVML_CLOCK_MEM), "MEM")
+		else:
+			errlog.debug("GPU not supported")
 
 		return stat
 
@@ -4316,35 +4328,41 @@ class GpuCollector(Collector):
 	def _get_fans(cls, card):
 		stat = {}
 
-		if "amd" == True:
+		if cls.gpu_brand == "AMD":
 			fan = lambda n: int(cls._read(cls._get_hwmon(card) + f"fan{n}_input")) # RPM
 
 			for (i, f_max) in cls.stat_nums[card]["fans"]:
 				stat[f"fan{i}"] = (fan(i), f_max)
-		else:
+		elif cls.gpu_brand == "NVIDIA":
 			fan = nvml.nvmlDeviceGetFanSpeed(card)
 			stat[f"fans"] = fan
+		else:
+			errlog.debug("GPU not supported")
 
 		return stat
 
 	@classmethod
 	def _get_load(cls, card):
 		stat = {}
-		if "AMD" == True:
+		if cls.gpu_brand == "AMD":
 			stat = {
 				"mem": int(cls._read(cls._get_device(card) + "mem_busy_percent")),
 				"gpu": int(cls._read(cls._get_device(card) + "gpu_busy_percent")),
 			}
-		else:
+		elif cls.gpu_brand == "NVIDIA":
 			gpu_stats = nvml.nvmlDeviceGetUtilizationRates(card)
 			stat["gpu"] = int(gpu_stats.gpu)
 			stat["mem"] = int(gpu_stats.memory)
+		else:
+			errlog.debug("GPU not supported")
 
 		return stat
 
 	@classmethod
 	def _collect(cls):
 		if not cls.populated:
+			cls._get_brand()
+			cls._gpu_init()
 			cls._get_gpus()
 		if not cls.gpu:
 			return
@@ -4361,6 +4379,41 @@ class GpuCollector(Collector):
 
 		cls.stats[cls.uuid] = stat
 		cls.timestamp = time()
+
+	@classmethod
+	def _get_brand(cls):
+		'''Get Gpu brand'''
+
+		if SYSTEM == "Linux":
+			brand = str(subprocess.check_output(["lspci -nn | grep -E 'VGA|Display'"], shell=True))
+			if "NVIDIA" in brand:
+				cls.gpu_brand = "NVIDIA"
+			elif "AMD" in brand:
+				cls.gpu_brand = "AMD"
+			elif "INTEL" in brand:
+				cls.gpu_brand = "INTEl"
+			else:
+				cls.gpu_brand = "other"
+		elif SYSTEM == "BSD":
+			print("TODO")
+		elif SYSTEM == "MacOS":
+			print("TODO")
+
+
+	@classmethod
+	def _gpu_init(cls):
+		'''Init specific brand libraries and paths'''
+		if cls.gpu_brand == "AMD":
+			cls.dir: str = "/sys/class/drm/"
+			cls.hwmon: str = "/device/hwmon/hwmon0/"
+			cls.pci_id_locations = ["/usr/share/hwdata/", "/usr/share/misc/"]
+
+		elif cls.gpu_brand == "NVIDIA":
+			nvml.nvmlInit()
+			cls.handle = nvml.nvmlDeviceGetHandleByIndex(0)
+			cls.uuid = nvml.nvmlDeviceGetUUID(cls.handle)
+		else:
+			errlog.debug("GPU not supported")
 
 	@classmethod
 	def _draw(cls):
