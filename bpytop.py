@@ -88,7 +88,7 @@ BANNER_SRC: List[Tuple[str, str, str]] = [
 #*?This is the template used to create the config file
 DEFAULT_CONF: Template = Template(f'#? Config file for bpytop v. {VERSION}' + '''
 
-#* Color theme, looks for a .theme file in "/usr/[local/]share/bpytop/themes" and "~/.config/bpytop/themes", "Default" for builtin default theme.
+#* Color theme, looks for a .theme file in "/usr/[local/]share/bpytop/themes" and "$${XDG_CONFIG_HOME:-$$HOME/.config}/bpytop/themes", "Default" for builtin default theme.
 #* Prefix name by a plus sign (+) for a theme located in user themes folder, i.e. color_theme="+monokai"
 color_theme="$color_theme"
 
@@ -236,7 +236,7 @@ show_init=$show_init
 #* Enable check for new version from github.com/aristocratos/bpytop at start.
 update_check=$update_check
 
-#* Set loglevel for "~/.config/bpytop/error.log" levels are: "ERROR" "WARNING" "INFO" "DEBUG".
+#* Set loglevel for "$${XDG_CONFIG_HOME:-$$HOME/.config}/bpytop/error.log" levels are: "ERROR" "WARNING" "INFO" "DEBUG".
 #* The level set includes all lower levels, i.e. "DEBUG" will show all logging info.
 log_level=$log_level
 ''')
@@ -4271,7 +4271,7 @@ class Menu:
 					'',
 					'Choose from all theme files in',
 					'"/usr/[local/]share/bpytop/themes" and',
-					'"~/.config/bpytop/themes".',
+					'"${XDG_CONFIG_HOME:-$HOME/.config}/bpytop/themes".',
 					'',
 					'"Default" for builtin default theme.',
 					'User themes are prefixed by a plus sign "+".',

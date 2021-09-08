@@ -86,7 +86,7 @@ See [themes](https://github.com/aristocratos/bpytop/tree/master/themes) folder f
 
 The `make install` command places the default themes in `/usr/local/share/bpytop/themes`.
 If installed with `pip3` the themes will be located in a folder called `bpytop-themes` in the python3 site-packages folder.
-User created themes should be placed in `$HOME/.config/bpytop/themes`.
+User created themes should be placed in `${XDG_CONFIG_HOME:-$HOME/.config}/bpytop/themes`.
 
 Let me know if you want to contribute with new themes.
 
@@ -361,7 +361,7 @@ sudo make uninstall
 ## Configurability
 
 All options changeable from within UI.
-Config files stored in "$HOME/.config/bpytop" folder
+Config files stored in "${XDG_CONFIG_HOME:-$HOME/.config}/bpytop" folder
 
 #### bpytop.cfg: (auto generated if not found)
 
@@ -370,7 +370,7 @@ Config files stored in "$HOME/.config/bpytop" folder
 ```bash
 #? Config file for bpytop v. 1.0.64
 
-#* Color theme, looks for a .theme file in "/usr/[local/]share/bpytop/themes" and "~/.config/bpytop/themes", "Default" for builtin default theme.
+#* Color theme, looks for a .theme file in "/usr/[local/]share/bpytop/themes" and "${XDG_CONFIG_HOME:-$HOME/.config}/bpytop/themes", "Default" for builtin default theme.
 #* Prefix name by a plus sign (+) for a theme located in user themes folder, i.e. color_theme="+monokai"
 color_theme="monokai"
 
@@ -518,7 +518,7 @@ show_init=False
 #* Enable check for new version from github.com/aristocratos/bpytop at start.
 update_check=True
 
-#* Set loglevel for "~/.config/bpytop/error.log" levels are: "ERROR" "WARNING" "INFO" "DEBUG".
+#* Set loglevel for "${XDG_CONFIG_HOME:-$HOME/.config}/bpytop/error.log" levels are: "ERROR" "WARNING" "INFO" "DEBUG".
 #* The level set includes all lower levels, i.e. "DEBUG" will show all logging info.
 log_level=DEBUG
 
