@@ -241,7 +241,13 @@ update_check=$update_check
 log_level=$log_level
 ''')
 
-CONFIG_DIR: str = f'{os.path.expanduser("~")}/.config/bpytop'
+
+def get_config_dir():
+	config_home = os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
+	return os.path.join(config_home, 'bpytop')
+
+
+CONFIG_DIR: str = get_config_dir()
 if not os.path.isdir(CONFIG_DIR):
 	try:
 		os.makedirs(CONFIG_DIR)
