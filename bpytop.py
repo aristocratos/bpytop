@@ -4136,7 +4136,7 @@ class Menu:
 			"(z)" : "Toggle totals reset for current network device",
 			"(a)" : "Toggle auto scaling for the network graphs.",
 			"(y)" : "Toggle synced scaling mode for network graphs.",
-			"(f)" : "Input a NON case-sensitive process filter.",
+			"(f, /)" : "Input a NON case-sensitive process filter.",
 			"(shift+f)" : "Input a case-sensitive process filter.",
 			"(c)" : "Toggle per-core cpu usage of processes.",
 			"(r)" : "Reverse sorting order in processes box.",
@@ -5444,7 +5444,7 @@ def process_keys():
 			elif key == "c":
 				CONFIG.proc_per_core = not CONFIG.proc_per_core
 				Collector.collect(ProcCollector, interrupt=True, redraw=True)
-			elif key in ["f", "F"]:
+			elif key in ["f", "F", "/"]:
 				ProcBox.filtering = True
 				ProcCollector.case_sensitive = key == "F"
 				if not ProcCollector.search_filter: ProcBox.start = 0
