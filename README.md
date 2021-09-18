@@ -36,6 +36,22 @@
 ## News
 
 ### C++ Version
+
+##### 18 September 2021
+
+![btop++](https://raw.githubusercontent.com/aristocratos/btop/main/Img/logo.png)
+
+The Linux version of btop++ is complete. Released as version 1.0.0
+
+Get it at https://github.com/aristocratos/btop
+
+The development plan right now:
+
+* 1.1.0 Mac OsX support
+* 1.2.0 FreeBSD support
+* 1.3.0 Support for GPU monitoring
+* 1.X.0 Other platforms and features...
+
 ##### 2 May 2021
 
 I've started work on the third iteration of bashtop->bpytop.
