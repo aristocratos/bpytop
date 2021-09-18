@@ -1665,7 +1665,7 @@ class Box:
 	bg: str
 	_b_cpu_h: int
 	_b_mem_h: int
-	_b_proc_h: int
+	_b_proc_h: int = 0
 	redraw_all: bool
 	buffers: List[str] = []
 	c_counter: int = 0
@@ -4113,7 +4113,7 @@ class GpuCollector(Collector):
 	gpu_brand: str = ""
 	gpu_error: bool = False
 	reset: bool = False
-
+	uuid: str = ""
 
 	# * stats structure = stats[cardN]
 	# [fans, freqs, vitals, power, load]
@@ -4244,7 +4244,6 @@ class GpuCollector(Collector):
 			cls.gpu = cls.gpus[cls.gpu_i]
 			cls.populated = True
 		elif cls.gpu_brand == "NVIDIA":
-			nvml.nvmlInit()
 			if nvml.nvmlDeviceGetCount() == 1:
 				cls.gpu = [cls.handle]
 				cls.name = nvml.nvmlDeviceGetName(cls.handle)
@@ -4267,8 +4266,11 @@ class GpuCollector(Collector):
 			for (i, name) in cls.stat_nums[card]["temps"]:
 				stat[f"temp{i}"] = (temp(i), name)
 		elif cls.gpu_brand == "NVIDIA":
-			temp = nvml.nvmlDeviceGetTemperature(card, nvml.NVML_TEMPERATURE_GPU)
-			stat[f"temp1"] = temp
+			try:
+				temp = nvml.nvmlDeviceGetTemperature(card, nvml.NVML_TEMPERATURE_GPU)
+				stat[f"temp1"] = temp
+			except:
+				return NotImplemented
 		else:
 			errlog.debug("GPU not supported")
 
@@ -4282,7 +4284,10 @@ class GpuCollector(Collector):
 			volt = lambda n: cls._read(cls._get_hwmon(card) + f"in{n}_input") # mV
 
 		elif cls.gpu_brand == "NVIDIA":
-			power = str(round(int(nvml.nvmlDeviceGetPowerUsage(cls.handle) / 1000)))
+			try:
+				power = str(round(int(nvml.nvmlDeviceGetPowerUsage(cls.handle) / 1000)))
+			except:
+				return NotImplemented
 		else:
 			errlog.debug("GPU not supported")
 
@@ -4297,7 +4302,7 @@ class GpuCollector(Collector):
 			volt = lambda n: int(cls._read(cls._get_hwmon(card) + f"in{n}_input")) # mV
 		elif cls.gpu_brand == "NVIDIA":
 			# nvidia only allow voltage data to be fetched for their S-class products, see nvmlReturn_t nvmlUnitGetPsuInfo()
-			return ""
+			return NotImplemented
 		else:
 			errlog.debug("GPU not supported")
 
@@ -4317,8 +4322,11 @@ class GpuCollector(Collector):
 			for (i, name) in cls.stat_nums[card]["freqs"]:
 				stat[f"freq{i}"] = (freq(i), name)
 		elif cls.gpu_brand == "NVIDIA":
-			stat["freq0"] = (nvml.nvmlDeviceGetClockInfo(card, nvml.NVML_CLOCK_GRAPHICS), "GPU")
-			stat["freq1"] = (nvml.nvmlDeviceGetClockInfo(card, nvml.NVML_CLOCK_MEM), "MEM")
+			try:
+				stat["freq0"] = (nvml.nvmlDeviceGetClockInfo(card, nvml.NVML_CLOCK_GRAPHICS), "GPU")
+				stat["freq1"] = (nvml.nvmlDeviceGetClockInfo(card, nvml.NVML_CLOCK_MEM), "MEM")
+			except:
+				return NotImplemented
 		else:
 			errlog.debug("GPU not supported")
 
@@ -4334,8 +4342,11 @@ class GpuCollector(Collector):
 			for (i, f_max) in cls.stat_nums[card]["fans"]:
 				stat[f"fan{i}"] = (fan(i), f_max)
 		elif cls.gpu_brand == "NVIDIA":
-			fan = nvml.nvmlDeviceGetFanSpeed(card)
-			stat[f"fans"] = fan
+			try:
+				fan = nvml.nvmlDeviceGetFanSpeed(card)
+				stat[f"fans"] = fan
+			except:
+				return NotImplemented
 		else:
 			errlog.debug("GPU not supported")
 
@@ -4350,9 +4361,12 @@ class GpuCollector(Collector):
 				"gpu": int(cls._read(cls._get_device(card) + "gpu_busy_percent")),
 			}
 		elif cls.gpu_brand == "NVIDIA":
-			gpu_stats = nvml.nvmlDeviceGetUtilizationRates(card)
-			stat["gpu"] = int(gpu_stats.gpu)
-			stat["mem"] = int(gpu_stats.memory)
+			try:
+				gpu_stats = nvml.nvmlDeviceGetUtilizationRates(card)
+				stat["gpu"] = int(gpu_stats.gpu)
+				stat["mem"] = int(gpu_stats.memory)
+			except:
+				return NotImplemented
 		else:
 			errlog.debug("GPU not supported")
 
