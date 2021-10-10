@@ -5642,7 +5642,7 @@ def main():
 	#? Main loop ------------------------------------------------------------------------------------->
 
 	def run():
-		while not False:
+		while True:
 			Term.refresh()
 			Timer.stamp()
 
