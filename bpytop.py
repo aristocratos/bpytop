@@ -4498,7 +4498,7 @@ class Menu:
 					'with a comma ",".',
 					'Begin line with "exclude=" to change to exclude',
 					'filter.',
-					'Oterwise defaults to "most include" filter.',
+					'Otherwise defaults to "most include" filter.',
 					'',
 					'Example: disks_filter="exclude=/boot, /home/user"'],
 			},
