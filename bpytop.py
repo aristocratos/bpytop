@@ -415,12 +415,12 @@ def strtobool(val: str) -> bool:
 	"""
 	try:
 		val = val.lower()
-		if val in ('y', 'yes', 't', 'true', 'on', '1'):
-			return True
-		elif val in ('n', 'no', 'f', 'false', 'off', '0'):
-			return False
-	except:
+	except AttributeError:
 		raise ValueError(f"invalid type {type(val)} for truth value {val}")
+	if val in ('y', 'yes', 't', 'true', 'on', '1'):
+		return True
+	elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+		return False
 	else:
 		raise ValueError(f"invalid truth value {val}")
 
