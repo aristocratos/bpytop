@@ -4827,7 +4827,7 @@ class Menu:
 				elif key in ["escape", "o", "M", "f2"]:
 					cls.close = True
 					break
-				elif key == "tab" or (key == "down" and selected_int == len(option_items) - 1 and (page == pages or pages == 0)):
+				elif key == "tab" or (key == "down" and selected_int == len(option_items) - 1 and page in [0, pages]):
 					if cat_int == len(categories) - 1:
 						cat_int = 0
 					else:
