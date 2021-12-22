@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.68
+
+* Fixed: typos discovered by codespell, by @cclauss
+* Added: search processes using vim keybinds, by @jedi2610
+* Fixed: Removed a simple consider-using-in pitfall case, by @NaelsonDouglas
+* Added: New theme gruvbox_dark_v2, by @pietryszak
+* Fixed: Implement strtobool over distutils strtobool, by @RCristiano
+
 ## v1.0.67
 
 * Fixed: Removed not needed escape character replacements
