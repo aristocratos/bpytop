@@ -24,7 +24,6 @@ from datetime import timedelta
 from _thread import interrupt_main
 from collections import defaultdict
 from select import select
-from distutils.util import strtobool
 from string import Template
 from math import ceil, floor
 from random import randint
@@ -403,6 +402,27 @@ def timeit_decorator(func):
 		errlog.debug(f'{func.__name__} completed in {time() - ts:.6f} seconds')
 		return out
 	return timed
+
+
+#? Issue #364 ----------------------------------------------------------->
+
+def strtobool(val: str) -> bool:
+	"""Convert a string representation of truth to true (1) or false (0).
+
+	True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
+	are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
+	'val' is anything else.
+	"""
+	try:
+		val = val.lower()
+	except AttributeError:
+		raise ValueError(f"invalid type {type(val)} for truth value {val}")
+	if val in ('y', 'yes', 't', 'true', 'on', '1'):
+		return True
+	elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+		return False
+	else:
+		raise ValueError(f"invalid truth value {val}")
 
 #? Set up config class and load config ----------------------------------------------------------->
 
