@@ -29,7 +29,7 @@
 
 ## v1.0.63
 
-* Added: Options for choosing temperature scale and readded support for negative celsius temps
+* Added: Options for choosing temperature scale and re-added support for negative celsius temps
 * Changed: Cpu values above 0 will always register on the graphs
 
 ## v1.0.62
@@ -154,7 +154,7 @@
 
 ## v1.0.44
 
-* Added: Spread CPUs accross columns evenly if possible, by @ErwinJunge
+* Added: Spread CPUs across columns evenly if possible, by @ErwinJunge
 * Added: Additional crash fixes for graph and swap toggles
 
 ## v1.0.43
@@ -292,7 +292,7 @@
 
 ## v1.0.20
 
-* Release bump to fix pypi and source version missmatch
+* Release bump to fix pypi and source version mismatch
 
 ## v1.0.19
 
