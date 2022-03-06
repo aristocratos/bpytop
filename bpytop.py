@@ -972,8 +972,8 @@ class Key:
 							pass
 						else:
 							if input_key.startswith("\033[<35;"):		#* Detected mouse move in mouse direct mode
-									cls.mouse_move.set()
-									cls.new.set()
+								cls.mouse_move.set()
+								cls.new.set()
 							elif input_key.startswith("\033[<64;"):		#* Detected mouse scroll up
 								clean_key = "mouse_scroll_up"
 							elif input_key.startswith("\033[<65;"):		#* Detected mouse scroll down
@@ -3197,9 +3197,9 @@ class CpuCollector(Collector):
 							except IndexError:
 								break
 			except Exception as e:
-					errlog.exception(f'{e}')
-					cls.got_sensors = False
-					CpuBox._calc_size()
+				errlog.exception(f'{e}')
+				cls.got_sensors = False
+				CpuBox._calc_size()
 
 		else:
 			try:
@@ -3235,9 +3235,9 @@ class CpuCollector(Collector):
 						cls.cpu_temp_high = 60
 						cls.cpu_temp_crit = 80
 			except Exception as e:
-					errlog.exception(f'{e}')
-					cls.got_sensors = False
-					CpuBox._calc_size()
+				errlog.exception(f'{e}')
+				cls.got_sensors = False
+				CpuBox._calc_size()
 			else:
 				if not cores:
 					cls.cpu_temp[0].append(temp)
@@ -3894,7 +3894,7 @@ class ProcCollector(Collector):
 
 			if search and not found:
 				if cls.detailed and pid == cls.detailed_pid:
-						det_cpu = getinfo["cpu_percent"]
+					det_cpu = getinfo["cpu_percent"]
 				if "username" in getinfo and isinstance(getinfo["username"], float): getinfo["username"] = ""
 				if "cmdline" in getinfo and isinstance(getinfo["cmdline"], float): getinfo["cmdline"] = ""
 				for value in [ name, str(pid), getinfo.get("username", ""), " ".join(getinfo.get("cmdline", "")) ]:
@@ -4817,7 +4817,7 @@ class Menu:
 					elif key == "backspace" and len(input_val):
 						input_val = input_val[:-1]
 					elif key == "delete":
-							input_val = ""
+						input_val = ""
 					elif isinstance(getattr(CONFIG, selected), str) and len(key) == 1:
 						input_val += key
 					elif isinstance(getattr(CONFIG, selected), int) and key.isdigit():
