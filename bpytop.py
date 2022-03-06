@@ -3540,8 +3540,8 @@ class NetCollector(Collector):
 		if not cls.nics: cls.nics = [""]
 		cls.nic = cls.nics[cls.nic_i]
 		if cls.net_iface and cls.net_iface in cls.nics:
-                        cls.nic = cls.net_iface
-                        cls.nic_i = cls.nics.index(cls.nic)
+			cls.nic = cls.net_iface
+			cls.nic_i = cls.nics.index(cls.nic)
 
 
 	@classmethod
