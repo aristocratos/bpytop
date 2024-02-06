@@ -840,7 +840,7 @@ class Key:
 	mouse: Dict[str, List[List[int]]] = {}
 	mouse_pos: Tuple[int, int] = (0, 0)
 	escape: Dict[Union[str, Tuple[str, str]], str] = {
-		"\n" :					"enter",
+		("\n", "\r") :			"enter",
 		("\x7f", "\x08") :		"backspace",
 		("[A", "OA") :			"up",
 		("[B", "OB") :			"down",
