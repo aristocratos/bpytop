@@ -2736,7 +2736,7 @@ class ProcBox(Box):
 						(" " if proc.num_procs > cls.select_max else ""))
 				if selected in ["pid", "program", "arguments"]: selected = "tree"
 			else:
-				label = (f'{THEME.title}{Fx.b}{Mv.to(y, x)}{"Pid:":>7} {"Program:" if prog_len > 8 else "Prg:":<{prog_len}}' + (f'{"Arguments:":<{arg_len-4}}' if arg_len else "") +
+				label = (f'{THEME.title}{Fx.b}{Mv.to(y, x)}{"Pid:":>7} {"Program:" if prog_len > 8 else "Prg:":<{prog_len}}' + (f'{"Arguments:":<{max(arg_len-4, 0)}}' if arg_len else "") +
 					((f'{"Threads:":<9}' if arg_len else f'{"Tr:":^5}') if tr_show else "") + (f'{"User:":<9}' if usr_show else "") + f'Mem%{"Cpu%":>11}{Fx.ub}{THEME.main_fg} ' +
 					(" " if proc.num_procs > cls.select_max else ""))
 				if selected == "program" and prog_len <= 8: selected = "prg"
