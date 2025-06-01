@@ -3225,7 +3225,7 @@ class CpuCollector(Collector):
 						cls.cpu_temp_high = 85
 						cls.cpu_temp_crit = 100
 				elif cls.sensor_method == "osx-cpu-temp":
-					temp = max(0, round(float(subprocess.check_output("osx-cpu-temp", universal_newlines=True).strip()[:-2])))
+					temp = max(0, round(float(subprocess.check_output("osx-cpu-temp", universal_newlines=True).splitlines()[-1].strip()[:-2])))
 					if not cls.cpu_temp_high:
 						cls.cpu_temp_high = 85
 						cls.cpu_temp_crit = 100
