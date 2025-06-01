@@ -5130,7 +5130,7 @@ def get_cpu_name() -> str:
 	if rem_line:
 		for line in cmd_out.split("\n"):
 			if rem_line in line:
-				name = re.sub( ".*" + rem_line + ".*:", "", line,1).lstrip()
+				name = re.sub(".*" + rem_line + ".*:", "", line, count=1).lstrip()
 	else:
 		name = cmd_out
 	nlist = name.split(" ")
