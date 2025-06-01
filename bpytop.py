@@ -1970,7 +1970,7 @@ class CpuBox(Box, SubBox):
 		cx = cy = cc = 0
 		ccw = (bw + 1) // cls.box_columns
 		if cpu.cpu_freq:
-			freq: str = f'{cpu.cpu_freq} Mhz' if cpu.cpu_freq < 1000 else f'{float(cpu.cpu_freq / 1000):.1f} GHz'
+			freq: str = f'{cpu.cpu_freq} MHz' if cpu.cpu_freq < 1000 else f'{float(cpu.cpu_freq / 1000):.1f} GHz'
 			out += f'{Mv.to(by - 1, bx + bw - 9)}{THEME.div_line(Symbol.title_left)}{Fx.b}{THEME.title(freq)}{Fx.ub}{THEME.div_line(Symbol.title_right)}'
 		out += f'{Mv.to(y, x)}{Graphs.cpu["up"](None if cls.resized else cpu.cpu_upper[-1])}'
 		if mid_line:
